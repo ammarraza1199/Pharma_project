@@ -10,6 +10,7 @@ import { AlertOctagon, Lock } from 'lucide-react';
 
 export const DrugInteractionModal: React.FC = () => {
   const dispatch = useDispatch();
+  const currentUser = useSelector((state: RootState) => state.pos.currentUser);
   const modal = useSelector((state: RootState) => state.pos.drugInteractionModal);
   const [signedCheckbox, setSignedCheckbox] = useState<boolean>(false);
   const [overridePin, setOverridePin] = useState<string>('');
@@ -134,7 +135,7 @@ export const DrugInteractionModal: React.FC = () => {
                   required
                 />
                 <span className="text-xs font-semibold text-slate-800 leading-snug">
-                  I, <strong>Navya Sri (Chief Pharmacist)</strong>, hereby verify that I have counseled the patient regarding this major drug interaction and confirm physician approval.
+                  I, <strong>{currentUser?.pharmacistName || 'Pharmacist'} (Chief Pharmacist)</strong>, hereby verify that I have counseled the patient regarding this major drug interaction and confirm physician approval.
                 </span>
               </label>
             </div>

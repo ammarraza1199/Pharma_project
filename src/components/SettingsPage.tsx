@@ -229,7 +229,7 @@ export const SettingsPage: React.FC = () => {
           <div className="divide-y divide-slate-100 text-xs">
             <div className="py-2 flex justify-between items-center">
               <div>
-                <p className="font-bold text-slate-900">Navya Sri</p>
+                <p className="font-bold text-slate-900">{currentUser?.pharmacistName || 'Pharmacist'}</p>
                 <p className="text-[10px] text-slate-500">navyasri@genquantaa.com</p>
               </div>
               <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full">

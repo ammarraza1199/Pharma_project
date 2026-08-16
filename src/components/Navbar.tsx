@@ -1,18 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { verifyManagerPin, navigateTo, logoutUser } from '../store/posSlice';
-import { ShieldCheck, Wifi, Clock, User, Lock, Store, LogOut, Home, LayoutDashboard, ShoppingCart, Package, Truck, BarChart3, RotateCcw, Users, Building, Settings } from 'lucide-react';
+import { navigateTo, logoutUser } from '../store/posSlice';
+import { Wifi, Clock, Store, LogOut, LayoutDashboard, ShoppingCart, Package, Truck, BarChart3, RotateCcw, Users, Building, Settings } from 'lucide-react';
 
 
 
 export const Navbar: React.FC = () => {
   const dispatch = useDispatch();
-  const isManager = useSelector((state: RootState) => state.pos.isManagerAuthenticated);
   const currentUser = useSelector((state: RootState) => state.pos.currentUser);
   const [timeStr, setTimeStr] = useState<string>('');
-  const [showPinInput, setShowPinInput] = useState<boolean>(false);
-  const [pin, setPin] = useState<string>('');
+  const [showProfileDropdown, setShowProfileDropdown] = useState<boolean>(false);
+
+  // Dynamically derive signed-in account details
+  const accountEmail = currentUser?.email || 'navyasri@genquantaa.com';
+  const emailPrefixName = accountEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  const accountName = currentUser?.pharmacistName || emailPrefixName || 'User';
+  const accountInitial = accountName.trim().charAt(0).toUpperCase() || 'U';
 
   useEffect(() => {
     const updateClock = () => {
@@ -24,29 +28,19 @@ export const Navbar: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const handlePinSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    dispatch(verifyManagerPin(pin));
-    setPin('');
-    setShowPinInput(false);
-  };
-
   return (
     <header className="bg-white border-b border-slate-200 shadow-xs px-4 py-2 flex items-center justify-between sticky top-0 z-30">
       {/* Brand & Store Information */}
-      <div className="flex items-center space-x-3 cursor-pointer" onClick={() => dispatch(navigateTo('LANDING'))}>
+      <div className="flex items-center space-x-3">
         <div className="bg-emerald-600 text-white p-2 rounded-lg shadow-sm flex items-center justify-center">
           <Store className="w-5 h-5" />
         </div>
         <div>
           <div className="flex items-center space-x-2">
             <h1 className="text-base font-bold text-slate-900 tracking-tight font-heading">
-              {currentUser?.pharmacyName || 'GENQUANTAA POS'}
+              GENQUANTAA POS
             </h1>
           </div>
-          <p className="text-[11px] text-slate-500 font-medium">
-            Tech City Store • DL: {currentUser?.licenseNo || 'DL-2024/HYD/889201'}
-          </p>
         </div>
       </div>
 
@@ -73,60 +67,6 @@ export const Navbar: React.FC = () => {
 
       {/* Right Controls: Manager Lock & Pharmacist Profile & Exit */}
       <div className="flex items-center space-x-2">
-        {/* Manager Auth Button */}
-        {isManager ? (
-          <div className="flex items-center space-x-1.5 bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-semibold px-2.5 py-1 rounded-lg shadow-2xs">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Manager Unlocked</span>
-          </div>
-        ) : (
-          <div className="relative">
-            {!showPinInput ? (
-              <button
-                onClick={() => setShowPinInput(true)}
-                className="flex items-center space-x-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-2.5 py-1 rounded-lg border border-slate-300 transition-colors cursor-pointer"
-              >
-                <Lock className="w-3.5 h-3.5 text-slate-500" />
-                <span>PIN Lock</span>
-              </button>
-            ) : (
-              <form onSubmit={handlePinSubmit} className="flex items-center space-x-1 bg-white border border-slate-300 p-1 rounded-lg shadow-md">
-                <input
-                  type="password"
-                  placeholder="PIN (1234)"
-                  value={pin}
-                  onChange={(e) => setPin(e.target.value)}
-                  className="w-16 text-xs px-1.5 py-0.5 border border-slate-300 rounded focus:outline-hidden focus:ring-1 focus:ring-emerald-500"
-                  autoFocus
-                />
-                <button type="submit" className="bg-emerald-600 text-white text-[11px] px-2 py-0.5 rounded hover:bg-emerald-700 font-medium">
-                  OK
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowPinInput(false)}
-                  className="text-slate-400 hover:text-slate-600 text-xs px-1"
-                >
-                  ✕
-                </button>
-              </form>
-            )}
-          </div>
-        )}
-
-        {/* Pharmacist Profile */}
-        <div className="flex items-center space-x-2 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg">
-          <div className="bg-slate-200 p-1 rounded-full text-slate-700">
-            <User className="w-3.5 h-3.5" />
-          </div>
-          <div className="text-left">
-            <p className="text-xs font-bold text-slate-800 leading-tight">
-              {currentUser?.pharmacistName || 'Navya Sri'}
-            </p>
-            <p className="text-[10px] text-slate-500 font-medium">Chief Pharmacist</p>
-          </div>
-        </div>
-
         {/* Dashboard Nav */}
         <button
           onClick={() => dispatch(navigateTo('DASHBOARD'))}
@@ -217,22 +157,59 @@ export const Navbar: React.FC = () => {
           <Settings className="w-4 h-4" />
         </button>
 
-        {/* Home */}
-        <button
-          onClick={() => dispatch(navigateTo('LANDING'))}
-          className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-          title="Back to Landing Page"
-        >
-          <Home className="w-4 h-4" />
-        </button>
+        {/* User Profile Initial Avatar with Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+            className="w-7 h-7 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center justify-center shadow-xs uppercase select-none cursor-pointer transition-all active:scale-95 ring-2 ring-emerald-100"
+            title={`Signed in as ${accountName}`}
+          >
+            {accountInitial}
+          </button>
 
-        <button
-          onClick={() => dispatch(logoutUser())}
-          className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors"
-          title="Log Out"
-        >
-          <LogOut className="w-4 h-4" />
-        </button>
+          {showProfileDropdown && (
+            <>
+              {/* Backdrop listener to close popup on outside click */}
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setShowProfileDropdown(false)}
+              ></div>
+
+              {/* Profile Email Card Dropdown */}
+              <div className="absolute right-0 mt-2.5 w-60 bg-white rounded-2xl shadow-xl border border-slate-200 p-4 z-50 animate-fadeIn">
+                <div className="flex items-center space-x-3 pb-3 border-b border-slate-100">
+                  <div className="w-9 h-9 rounded-full bg-emerald-600 text-white text-xs font-black flex items-center justify-center shadow-sm uppercase flex-shrink-0">
+                    {accountInitial}
+                  </div>
+                  <div className="overflow-hidden">
+                    <h4 className="text-xs font-bold text-slate-900 truncate" title={accountName}>
+                      {accountName}
+                    </h4>
+                  </div>
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-center">
+                    <p className="text-xs font-bold text-slate-800 truncate" title={accountEmail}>
+                      {accountEmail}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setShowProfileDropdown(false);
+                      dispatch(logoutUser());
+                    }}
+                    className="w-full py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl border border-rose-200 transition-colors flex items-center justify-center space-x-1.5 cursor-pointer active:scale-98"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sign Out Account</span>
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
 
       </div>
     </header>

@@ -7,15 +7,17 @@ import {
   closeTab,
   holdActiveBill,
   setHeldBillsModalOpen,
-  setCustomerDisplayModalOpen
+  setCustomerDisplayModalOpen,
+  verifyManagerPin
 } from '../store/posSlice';
-import { Plus, X, PauseCircle, Monitor, ShoppingBag } from 'lucide-react';
+import { Plus, X, PauseCircle, Monitor, ShoppingBag, Lock, ShieldCheck } from 'lucide-react';
 
 export const TabBar: React.FC = () => {
   const dispatch = useDispatch();
   const sessions = useSelector((state: RootState) => state.pos.sessions);
   const activeSessionId = useSelector((state: RootState) => state.pos.activeSessionId);
   const heldBills = useSelector((state: RootState) => state.pos.heldBills);
+  const isManager = useSelector((state: RootState) => state.pos.isManagerAuthenticated);
   
   const currentSession = sessions.find(s => s.id === activeSessionId);
   const cartItemCount = currentSession ? currentSession.items.reduce((sum, i) => sum + i.quantity, 0) : 0;
@@ -24,12 +26,22 @@ export const TabBar: React.FC = () => {
   const [holdCustomerPhone, setHoldCustomerPhone] = useState<string>('');
   const [showHoldPrompt, setShowHoldPrompt] = useState<boolean>(false);
 
+  const [showPinInput, setShowPinInput] = useState<boolean>(false);
+  const [pin, setPin] = useState<string>('');
+
   const handleConfirmHold = (e: React.FormEvent) => {
     e.preventDefault();
     dispatch(holdActiveBill({ customerName: holdCustomerName, customerPhone: holdCustomerPhone }));
     setHoldCustomerName('');
     setHoldCustomerPhone('');
     setShowHoldPrompt(false);
+  };
+
+  const handlePinSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    dispatch(verifyManagerPin(pin));
+    setPin('');
+    setShowPinInput(false);
   };
 
   return (
@@ -92,6 +104,46 @@ export const TabBar: React.FC = () => {
 
       {/* Right: Park / Hold Bill & Customer Display Actions */}
       <div className="flex items-center space-x-2 pb-1.5">
+        {/* Manager Auth Button (Shifted to left side of Hold Bill) */}
+        {isManager ? (
+          <div className="flex items-center space-x-1.5 bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-semibold px-2.5 py-1.5 rounded-lg shadow-2xs">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Manager Unlocked</span>
+          </div>
+        ) : (
+          <div className="relative">
+            {!showPinInput ? (
+              <button
+                onClick={() => setShowPinInput(true)}
+                className="flex items-center space-x-1 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-300 transition-colors cursor-pointer shadow-2xs"
+              >
+                <Lock className="w-3.5 h-3.5 text-slate-500" />
+                <span>PIN Lock</span>
+              </button>
+            ) : (
+              <form onSubmit={handlePinSubmit} className="flex items-center space-x-1 bg-white border border-slate-300 p-1 rounded-lg shadow-lg z-20">
+                <input
+                  type="password"
+                  placeholder="PIN (1234)"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value)}
+                  className="w-16 text-xs px-1.5 py-0.5 border border-slate-300 rounded focus:outline-hidden focus:ring-1 focus:ring-emerald-500"
+                  autoFocus
+                />
+                <button type="submit" className="bg-emerald-600 text-white text-[11px] px-2 py-0.5 rounded hover:bg-emerald-700 font-bold cursor-pointer">
+                  OK
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPinInput(false)}
+                  className="text-slate-400 hover:text-slate-600 text-xs px-1 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </form>
+            )}
+          </div>
+        )}
         {/* Hold Active Bill Button */}
         <div className="relative">
           {!showHoldPrompt ? (

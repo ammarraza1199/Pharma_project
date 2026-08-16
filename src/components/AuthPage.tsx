@@ -43,6 +43,8 @@ export const AuthPage: React.FC = () => {
   const [regEmail, setRegEmail] = useState<string>('');
   const [regPassword, setRegPassword] = useState<string>('');
   const [regSuccess, setRegSuccess] = useState<boolean>(false);
+  const [signUpNotice, setSignUpNotice] = useState<string>('');
+  const [signUpError, setSignUpError] = useState<string>('');
 
   const handleSignInSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,8 +58,13 @@ export const AuthPage: React.FC = () => {
     );
 
     if (match) {
-      // ✅ Correct credentials — launch POS terminal
-      dispatch(loginUser({ email: match.email, password: match.password }));
+      // ✅ Correct credentials — launch POS Dashboard page
+      dispatch(loginUser({
+        email: match.email,
+        password: match.password,
+        pharmacistName: match.pharmacistName,
+        pharmacyName: match.pharmacyName
+      }));
     } else {
       // ❌ Wrong credentials — show inline error, increment attempt counter
       const attempts = loginAttempts + 1;
@@ -77,40 +84,57 @@ export const AuthPage: React.FC = () => {
 
   const handleSignUpSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setSignUpError('');
+
+    const name = regPharmacistName.trim();
+    const store = regPharmacyName.trim();
+    const email = regEmail.trim();
+    const password = regPassword.trim();
+
+    // Strictly verify that all 4 details are entered
+    if (!name || !store || !email || !password) {
+      setSignUpError('All 4 details (Pharmacist Name, Store Name, Email, and Password) are required to create an account.');
+      return;
+    }
+
+    if (!email.includes('@') || !email.includes('.')) {
+      setSignUpError('Please enter a valid email address.');
+      return;
+    }
 
     // Check if email is already registered
     const emailExists = registeredAccounts.find(
-      acc => acc.email.toLowerCase().trim() === regEmail.toLowerCase().trim()
+      acc => acc.email.toLowerCase().trim() === email.toLowerCase()
     );
     if (emailExists) {
-      alert(`An account with email "${regEmail}" already exists. Please Sign In instead.`);
-      dispatch(setAuthMode('SIGN_IN'));
+      setSignUpError(`An account with email "${email}" already exists. Please Sign In instead.`);
       return;
     }
 
     // Save new account to the registered accounts store
     const newAccount: RegisteredAccount = {
-      pharmacistName: regPharmacistName,
-      pharmacyName: regPharmacyName,
-      email: regEmail,
-      password: regPassword
+      pharmacistName: name,
+      pharmacyName: store,
+      email: email,
+      password: password
     };
     registeredAccounts.push(newAccount);
 
     setRegSuccess(true);
+    // Redirect to Sign In mode and ask for credentials
     setTimeout(() => {
-      dispatch(registerUser({
-        pharmacistName: regPharmacistName,
-        pharmacyName: regPharmacyName,
-        licenseNo: '',
-        email: regEmail,
-        isLoggedIn: true
-      }));
+      setLoginEmail(email);
+      setLoginPassword('');
+      setLoginError('');
+      setSignUpNotice(`Account created successfully for ${store}! Please enter your password to sign in.`);
+      dispatch(setAuthMode('SIGN_IN'));
+      setRegSuccess(false);
+      setRegPharmacistName('');
+      setRegPharmacyName('');
+      setRegEmail('');
+      setRegPassword('');
+      setSignUpError('');
     }, 1200);
-  };
-
-  const handleQuickDemoAccess = () => {
-    dispatch(loginUser({ email: 'navyasri@genquantaa.com' }));
   };
 
   return (
@@ -144,7 +168,7 @@ export const AuthPage: React.FC = () => {
           <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-2xl mb-6 border border-slate-200">
             <button
               type="button"
-              onClick={() => dispatch(setAuthMode('SIGN_IN'))}
+              onClick={() => { dispatch(setAuthMode('SIGN_IN')); setSignUpNotice(''); setSignUpError(''); }}
               className={`py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
                 authMode === 'SIGN_IN'
                   ? 'bg-white text-emerald-800 shadow-2xs'
@@ -156,7 +180,7 @@ export const AuthPage: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => dispatch(setAuthMode('SIGN_UP'))}
+              onClick={() => { dispatch(setAuthMode('SIGN_UP')); setSignUpNotice(''); setSignUpError(''); }}
               className={`py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
                 authMode === 'SIGN_UP'
                   ? 'bg-white text-emerald-800 shadow-2xs'
@@ -170,6 +194,14 @@ export const AuthPage: React.FC = () => {
           {/* Option 1: Sign In Form */}
           {authMode === 'SIGN_IN' ? (
             <form onSubmit={handleSignInSubmit} className="space-y-4">
+              {/* ✅ Success Notice Banner after sign up */}
+              {signUpNotice && (
+                <div className="flex items-start space-x-2 bg-emerald-50 border border-emerald-300 rounded-xl p-3 text-xs text-emerald-800 animate-fadeIn">
+                  <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                  <span className="font-semibold leading-snug">{signUpNotice}</span>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Pharmacy Email / License ID
@@ -248,13 +280,21 @@ export const AuthPage: React.FC = () => {
                 className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-98"
               >
                 <ShieldCheck className="w-4 h-4" />
-                <span>Sign In to POS Terminal</span>
+                <span>Sign In to POS Dashboard</span>
                 <ArrowRight className="w-4 h-4 ml-1" />
               </button>
             </form>
           ) : (
             /* Option 2: Sign Up Form */
             <form onSubmit={handleSignUpSubmit} className="space-y-3">
+              {/* ❌ Sign Up Validation Error Banner */}
+              {signUpError && (
+                <div className="flex items-start space-x-2 bg-rose-50 border border-rose-300 rounded-xl p-3 text-xs text-rose-800 animate-fadeIn">
+                  <AlertCircle className="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5" />
+                  <span className="font-semibold leading-snug">{signUpError}</span>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Chief Pharmacist Name *
@@ -266,9 +306,9 @@ export const AuthPage: React.FC = () => {
                   <input
                     type="text"
                     value={regPharmacistName}
-                    onChange={(e) => setRegPharmacistName(e.target.value)}
+                    onChange={(e) => { setRegPharmacistName(e.target.value); setSignUpError(''); }}
                     className="w-full pl-9 pr-3 py-2 text-xs font-semibold bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-                    placeholder="Navya Sri"
+                    placeholder="Pharmacist"
                     required
                   />
                 </div>
@@ -285,7 +325,7 @@ export const AuthPage: React.FC = () => {
                   <input
                     type="text"
                     value={regPharmacyName}
-                    onChange={(e) => setRegPharmacyName(e.target.value)}
+                    onChange={(e) => { setRegPharmacyName(e.target.value); setSignUpError(''); }}
                     className="w-full pl-9 pr-3 py-2 text-xs font-semibold bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                     placeholder="MedPlus Pharmacy"
                     required
@@ -304,7 +344,7 @@ export const AuthPage: React.FC = () => {
                   <input
                     type="email"
                     value={regEmail}
-                    onChange={(e) => setRegEmail(e.target.value)}
+                    onChange={(e) => { setRegEmail(e.target.value); setSignUpError(''); }}
                     className="w-full pl-9 pr-3 py-2 text-xs font-semibold bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                     placeholder="navyasri@genquantaa.com"
                     required
@@ -323,7 +363,7 @@ export const AuthPage: React.FC = () => {
                   <input
                     type="password"
                     value={regPassword}
-                    onChange={(e) => setRegPassword(e.target.value)}
+                    onChange={(e) => { setRegPassword(e.target.value); setSignUpError(''); }}
                     className="w-full pl-9 pr-3 py-2 text-xs font-semibold bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                     placeholder="••••••••"
                     required
@@ -335,7 +375,7 @@ export const AuthPage: React.FC = () => {
               {regSuccess ? (
                 <div className="flex items-center space-x-2 bg-emerald-50 border border-emerald-300 rounded-xl p-3.5 text-xs text-emerald-800">
                   <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                  <span className="font-bold">Account created! Launching POS Terminal…</span>
+                  <span className="font-bold">Account created successfully! Redirecting to Sign In…</span>
                 </div>
               ) : (
                 <button
@@ -343,22 +383,11 @@ export const AuthPage: React.FC = () => {
                   className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-98"
                 >
                   <UserCheck className="w-4 h-4" />
-                  <span>Create Account & Launch Terminal</span>
-                  <ArrowRight className="w-4 h-4 ml-1" />
+                  <span>Create Account</span>
                 </button>
               )}
             </form>
           )}
-
-          {/* Quick Demo Access Bar */}
-          <div className="mt-6 pt-4 border-t border-slate-200 text-center">
-            <button
-              onClick={handleQuickDemoAccess}
-              className="text-xs text-slate-500 hover:text-emerald-700 font-semibold transition-colors flex items-center justify-center space-x-1 mx-auto cursor-pointer"
-            >
-              <span>⚡ Quick Demo Access (Sign In as Navya Sri)</span>
-            </button>
-          </div>
         </div>
       </div>
     </div>

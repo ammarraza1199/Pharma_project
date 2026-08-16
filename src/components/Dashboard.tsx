@@ -5,7 +5,7 @@ import { navigateTo } from '../store/posSlice';
 import {
   TrendingUp, ShoppingCart, Package, AlertTriangle,
   Clock, BarChart2, ArrowUpRight,
-  ArrowRight, Pill, Users, Activity, RefreshCw,
+  ArrowRight, Pill, Users, Activity,
   CheckCircle2, ChevronRight
 } from 'lucide-react';
 
@@ -24,38 +24,38 @@ const MOCK_DAILY_STATS = {
 };
 
 const MOCK_RECENT_BILLS = [
-  { inv: 'INV-2026-841201', patient: 'Ramesh Kumar',    items: 4,  amount: 512.00,  method: 'UPI',  time: '04:02 PM', status: 'PAID' },
-  { inv: 'INV-2026-841185', patient: 'Priya Sharma',    items: 2,  amount: 185.00,  method: 'CASH', time: '03:48 PM', status: 'PAID' },
-  { inv: 'INV-2026-841170', patient: 'Walk-in',         items: 6,  amount: 924.50,  method: 'CARD', time: '03:31 PM', status: 'PAID' },
-  { inv: 'INV-2026-841155', patient: 'Anjali Reddy',    items: 1,  amount: 31.00,   method: 'UPI',  time: '03:15 PM', status: 'PAID' },
-  { inv: 'INV-2026-841140', patient: 'Mohammed Ali',    items: 3,  amount: 278.00,  method: 'CASH', time: '03:00 PM', status: 'PAID' },
-  { inv: 'INV-2026-841120', patient: 'Sunita Verma',    items: 5,  amount: 689.00,  method: 'UPI',  time: '02:44 PM', status: 'PAID' },
+  { inv: 'INV-2026-841201', patient: 'Ramesh Kumar', items: 4, amount: 512.00, method: 'UPI', time: '04:02 PM', status: 'PAID' },
+  { inv: 'INV-2026-841185', patient: 'Priya Sharma', items: 2, amount: 185.00, method: 'CASH', time: '03:48 PM', status: 'PAID' },
+  { inv: 'INV-2026-841170', patient: 'Walk-in', items: 6, amount: 924.50, method: 'CARD', time: '03:31 PM', status: 'PAID' },
+  { inv: 'INV-2026-841155', patient: 'Anjali Reddy', items: 1, amount: 31.00, method: 'UPI', time: '03:15 PM', status: 'PAID' },
+  { inv: 'INV-2026-841140', patient: 'Mohammed Ali', items: 3, amount: 278.00, method: 'CASH', time: '03:00 PM', status: 'PAID' },
+  { inv: 'INV-2026-841120', patient: 'Sunita Verma', items: 5, amount: 689.00, method: 'UPI', time: '02:44 PM', status: 'PAID' },
 ];
 
 const MOCK_TOP_MEDICINES = [
-  { name: 'Augmentin 625 Duo',   sold: 28, revenue: 5180,  percent: 100 },
-  { name: 'Dolo 650 Tablet',     sold: 45, revenue: 1395,  percent: 75  },
-  { name: 'Paracip 650mg',       sold: 38, revenue: 950,   percent: 62  },
-  { name: 'Crocin 650 Advance',  sold: 30, revenue: 900,   percent: 50  },
-  { name: 'Calpol 650mg',        sold: 22, revenue: 638,   percent: 38  },
+  { name: 'Augmentin 625 Duo', sold: 28, revenue: 5180, percent: 100 },
+  { name: 'Dolo 650 Tablet', sold: 45, revenue: 1395, percent: 75 },
+  { name: 'Paracip 650mg', sold: 38, revenue: 950, percent: 62 },
+  { name: 'Crocin 650 Advance', sold: 30, revenue: 900, percent: 50 },
+  { name: 'Calpol 650mg', sold: 22, revenue: 638, percent: 38 },
 ];
 
 const MOCK_LOW_STOCK = [
-  { name: 'Alprazolam 0.25mg',    stock: 8,  threshold: 20, schedule: 'SCHEDULE_X' },
-  { name: 'Azithromycin 500mg',   stock: 12, threshold: 25, schedule: 'REGULAR'    },
-  { name: 'Metformin 500mg',      stock: 15, threshold: 30, schedule: 'REGULAR'    },
+  { name: 'Alprazolam 0.25mg', stock: 8, threshold: 20, schedule: 'SCHEDULE_X' },
+  { name: 'Azithromycin 500mg', stock: 12, threshold: 25, schedule: 'REGULAR' },
+  { name: 'Metformin 500mg', stock: 15, threshold: 30, schedule: 'REGULAR' },
 ];
 
 const MOCK_NEAR_EXPIRY = [
   { name: 'Augmentin 625 Duo', batch: 'AUG-2025-01', expiry: '2025-11-30', qty: 100 },
-  { name: 'Telmikind 40mg',    batch: 'TLM-2025-03', expiry: '2025-12-15', qty: 45  },
+  { name: 'Telmikind 40mg', batch: 'TLM-2025-03', expiry: '2025-12-15', qty: 45 },
 ];
 
 // Mini revenue bar chart data (last 7 days)
 const CHART_DATA = [
-  { day: 'Mon', value: 8200,  },
+  { day: 'Mon', value: 8200, },
   { day: 'Tue', value: 10500 },
-  { day: 'Wed', value: 9800  },
+  { day: 'Wed', value: 9800 },
   { day: 'Thu', value: 11200 },
   { day: 'Fri', value: 13400 },
   { day: 'Sat', value: 15100 },
@@ -69,9 +69,9 @@ export const Dashboard: React.FC = () => {
   const [activeChart, setActiveChart] = useState<'revenue' | 'bills'>('revenue');
 
   const paymentBreakdown = [
-    { label: 'UPI / QR',   amount: MOCK_DAILY_STATS.upiCollected,   color: 'bg-emerald-500', pct: Math.round(MOCK_DAILY_STATS.upiCollected / MOCK_DAILY_STATS.todayRevenue * 100) },
-    { label: 'Cash',       amount: MOCK_DAILY_STATS.cashCollected,   color: 'bg-blue-500',    pct: Math.round(MOCK_DAILY_STATS.cashCollected / MOCK_DAILY_STATS.todayRevenue * 100) },
-    { label: 'Card / POS', amount: MOCK_DAILY_STATS.cardCollected,   color: 'bg-violet-500',  pct: Math.round(MOCK_DAILY_STATS.cardCollected / MOCK_DAILY_STATS.todayRevenue * 100) },
+    { label: 'UPI / QR', amount: MOCK_DAILY_STATS.upiCollected, color: 'bg-emerald-500', pct: Math.round(MOCK_DAILY_STATS.upiCollected / MOCK_DAILY_STATS.todayRevenue * 100) },
+    { label: 'Cash', amount: MOCK_DAILY_STATS.cashCollected, color: 'bg-blue-500', pct: Math.round(MOCK_DAILY_STATS.cashCollected / MOCK_DAILY_STATS.todayRevenue * 100) },
+    { label: 'Card / POS', amount: MOCK_DAILY_STATS.cardCollected, color: 'bg-violet-500', pct: Math.round(MOCK_DAILY_STATS.cardCollected / MOCK_DAILY_STATS.todayRevenue * 100) },
   ];
 
   return (
@@ -84,7 +84,7 @@ export const Dashboard: React.FC = () => {
             POS Billing Dashboard
           </h1>
           <p className="text-xs text-slate-500 font-medium mt-0.5">
-            {currentUser?.pharmacyName || 'GENQUANTAA MedPlus Pharmacy'} &nbsp;·&nbsp;
+            GENQUANTAA POS &nbsp;·&nbsp;
             {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
         </div>
@@ -95,10 +95,6 @@ export const Dashboard: React.FC = () => {
           >
             <ShoppingCart className="w-3.5 h-3.5" />
             <span>New Bill</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-          <button className="p-2 bg-white border border-slate-200 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer" title="Refresh">
-            <RefreshCw className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -284,11 +280,10 @@ export const Dashboard: React.FC = () => {
                     <td className="px-4 py-2.5 text-center text-slate-600">{b.items}</td>
                     <td className="px-4 py-2.5 text-right font-bold text-slate-900">₹{b.amount.toFixed(2)}</td>
                     <td className="px-4 py-2.5 text-center">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        b.method === 'UPI'  ? 'bg-emerald-100 text-emerald-800' :
-                        b.method === 'CASH' ? 'bg-blue-100 text-blue-800' :
-                        'bg-violet-100 text-violet-800'
-                      }`}>{b.method}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${b.method === 'UPI' ? 'bg-emerald-100 text-emerald-800' :
+                          b.method === 'CASH' ? 'bg-blue-100 text-blue-800' :
+                            'bg-violet-100 text-violet-800'
+                        }`}>{b.method}</span>
                     </td>
                     <td className="px-4 py-2.5 text-center text-slate-400">{b.time}</td>
                     <td className="px-4 py-2.5 text-center">
@@ -313,9 +308,8 @@ export const Dashboard: React.FC = () => {
               <div key={m.name}>
                 <div className="flex justify-between text-xs font-semibold text-slate-700 mb-1">
                   <span className="flex items-center space-x-1.5">
-                    <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-white ${
-                      i === 0 ? 'bg-amber-500' : i === 1 ? 'bg-slate-400' : 'bg-orange-400'
-                    }`}>{i + 1}</span>
+                    <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-white ${i === 0 ? 'bg-amber-500' : i === 1 ? 'bg-slate-400' : 'bg-orange-400'
+                      }`}>{i + 1}</span>
                     <span className="truncate max-w-[120px]">{m.name}</span>
                   </span>
                   <span className="text-slate-400 font-normal">{m.sold} sold</span>
@@ -378,11 +372,11 @@ export const Dashboard: React.FC = () => {
           <h3 className="text-sm font-bold text-slate-900 font-heading mb-3">Quick Actions</h3>
           <div className="space-y-2">
             {[
-              { icon: ShoppingCart, label: 'New Billing Session',    color: 'text-emerald-600 bg-emerald-50', view: 'POS_TERMINAL' as const },
-              { icon: Package,      label: 'View Inventory',          color: 'text-blue-600 bg-blue-50',      view: 'INVENTORY' as const },
-              { icon: TrendingUp,   label: 'Sales Reports',           color: 'text-violet-600 bg-violet-50',  view: 'REPORTS' as const },
-              { icon: Users,        label: 'Patient Records',         color: 'text-orange-600 bg-orange-50',  view: 'PATIENTS' as const },
-              { icon: Activity,     label: 'Expiry Management',       color: 'text-rose-600 bg-rose-50',      view: 'EXPIRY_MANAGEMENT' as const },
+              { icon: ShoppingCart, label: 'New Billing Session', color: 'text-emerald-600 bg-emerald-50', view: 'POS_TERMINAL' as const },
+              { icon: Package, label: 'View Inventory', color: 'text-blue-600 bg-blue-50', view: 'INVENTORY' as const },
+              { icon: TrendingUp, label: 'Sales Reports', color: 'text-violet-600 bg-violet-50', view: 'REPORTS' as const },
+              { icon: Users, label: 'Patient Records', color: 'text-orange-600 bg-orange-50', view: 'PATIENTS' as const },
+              { icon: Activity, label: 'Expiry Management', color: 'text-rose-600 bg-rose-50', view: 'EXPIRY_MANAGEMENT' as const },
             ].map((a) => (
               <button
                 key={a.label}

@@ -88,7 +88,7 @@ export const ExpiryManagementPage: React.FC = () => {
       quantityDisposed: disposalQty,
       disposalDate: new Date().toLocaleDateString('en-IN'),
       reason: disposalReason,
-      disposedBy: 'Navya Sri (Chief Pharmacist)',
+      disposedBy: 'Pharmacist (Chief Pharmacist)',
       approvalManagerPin: managerPin
     };
 

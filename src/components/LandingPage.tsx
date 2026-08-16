@@ -28,17 +28,13 @@ export const LandingPage: React.FC = () => {
     dispatch(navigateTo('AUTH'));
   };
 
-  const handleLaunchDemo = () => {
-    dispatch(navigateTo('POS_TERMINAL'));
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col selection:bg-emerald-500 selection:text-white">
       {/* Top Header Navbar */}
       <header className="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-slate-200 shadow-2xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between">
           {/* Logo & Brand */}
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => dispatch(navigateTo('LANDING'))}>
+          <div className="flex items-center space-x-3">
             <div className="bg-emerald-600 text-white p-2.5 rounded-xl shadow-sm flex items-center justify-center">
               <Store className="w-6 h-6" />
             </div>
@@ -117,14 +113,6 @@ export const LandingPage: React.FC = () => {
             >
               <Lock className="w-4 h-4 text-slate-500" />
               <span>Sign In to Existing Account</span>
-            </button>
-
-            <button
-              onClick={handleLaunchDemo}
-              className="w-full sm:w-auto px-6 py-3.5 bg-slate-900 hover:bg-slate-950 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer"
-            >
-              <Activity className="w-4 h-4 text-emerald-400" />
-              <span>Launch Demo Terminal</span>
             </button>
           </div>
 
@@ -239,7 +227,6 @@ export const LandingPage: React.FC = () => {
             <Store className="w-4 h-4 text-emerald-400" />
             <span>GENQUANTAA Point of Sale Platform</span>
           </div>
-          <p>© 2026 GENQUANTAA. Built for Navya Sri (Frontend Developer). All Rights Reserved.</p>
           <div className="flex items-center space-x-4">
             <button onClick={handleSignIn} className="hover:text-white transition-colors">Sign In</button>
             <button onClick={handleSignUp} className="hover:text-white transition-colors">Sign Up</button>

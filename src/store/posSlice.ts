@@ -156,12 +156,14 @@ export const posSlice = createSlice({
     setAuthMode: (state, action: PayloadAction<AuthMode>) => {
       state.authMode = action.payload;
     },
-    loginUser: (state, action: PayloadAction<{ email: string; password?: string }>) => {
+    loginUser: (state, action: PayloadAction<{ email: string; password?: string; pharmacistName?: string; pharmacyName?: string; licenseNo?: string }>) => {
+      const email = action.payload.email || '';
+      const emailPrefixName = email ? email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'User';
       state.currentUser = {
-        pharmacistName: 'Navya Sri',
-        pharmacyName: 'GENQUANTAA MedPlus Pharmacy',
-        licenseNo: 'DL-2024/HYD/889201',
-        email: action.payload.email || 'navyasri@genquantaa.com',
+        pharmacistName: action.payload.pharmacistName || emailPrefixName,
+        pharmacyName: action.payload.pharmacyName || 'GENQUANTAA POS Store',
+        licenseNo: action.payload.licenseNo || 'DL-2024/HYD/889201',
+        email: email || 'user@genquantaa.com',
         isLoggedIn: true
       };
       state.currentView = 'DASHBOARD';
@@ -169,9 +171,9 @@ export const posSlice = createSlice({
     registerUser: (state, action: PayloadAction<UserAccount>) => {
       state.currentUser = {
         ...action.payload,
-        isLoggedIn: true
+        isLoggedIn: false
       };
-      state.currentView = 'POS_TERMINAL';
+      state.currentView = 'AUTH';
     },
     logoutUser: (state) => {
       state.currentUser = null;
