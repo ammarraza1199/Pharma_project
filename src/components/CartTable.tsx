@@ -335,14 +335,20 @@ export const CartTable: React.FC = () => {
 
       {/* ── INLINE MINOR AI DRUG INTERACTION ALERT ─────────────────── */}
       {interactionResult.hasMinor && (
-        <div className="mt-2.5 bg-amber-50 border border-amber-300 rounded-xl p-2.5 flex items-center space-x-2 text-amber-900 text-xs flex-shrink-0">
-          <AlertOctagon className="w-4 h-4 text-amber-600 flex-shrink-0" />
-          <div className="flex-1">
-            <span className="font-bold">Minor AI Drug Interaction Detected: </span>
+        <div className="mt-2.5 bg-amber-100/90 border border-amber-400 rounded-xl p-3 flex items-start space-x-2.5 text-amber-950 text-xs flex-shrink-0 shadow-2xs animate-fadeIn">
+          <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5 animate-bounce" />
+          <div className="flex-1 space-y-0.5">
+            <p className="font-extrabold uppercase tracking-wide text-amber-900 text-[11px]">
+              🟠 AMBER WARNING: MINOR AI DRUG INTERACTION DETECTED
+            </p>
             {interactionResult.interactions
               .filter((i) => i.severity === 'MINOR')
-              .map((i) => i.description)
-              .join(' | ')}
+              .map((item, idx) => (
+                <div key={idx} className="text-xs font-medium text-amber-900">
+                  <span>• <strong>{item.drug1}</strong> ⚡ <strong>{item.drug2}</strong>: {item.description}</span>
+                  <span className="block text-[11px] font-semibold text-amber-800 italic mt-0.5">Advice: {item.management}</span>
+                </div>
+              ))}
           </div>
         </div>
       )}

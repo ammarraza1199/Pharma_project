@@ -89,9 +89,16 @@ export const MOCK_PRODUCTS: Product[] = [
     totalStock: 210,
     batches: [
       {
+        batchNumber: 'CAL-NEAR-EXP',
+        expiryDate: '2026-09-02', // NEAR EXPIRY (< 30 days)
+        stockQuantity: 45,
+        location: 'Rack B-14 (Front)',
+        mrp: 31.00
+      },
+      {
         batchNumber: 'CAL-2025-A',
         expiryDate: '2026-12-31',
-        stockQuantity: 210,
+        stockQuantity: 165,
         location: 'Rack B-14',
         mrp: 31.00
       }

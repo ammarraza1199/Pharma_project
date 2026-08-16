@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 // ── Filter & Sort Types ──────────────────────────────────────────────────────
-type FilterTab = 'ALL' | 'REGULAR' | 'SCHEDULE_H' | 'SCHEDULE_H1' | 'SCHEDULE_X' | 'LOW_STOCK' | 'OUT_OF_STOCK';
+type FilterTab = 'ALL' | 'REGULAR' | 'SCHEDULE_H' | 'SCHEDULE_H1' | 'SCHEDULE_X' | 'LOW_STOCK' | 'NEAR_EXPIRY' | 'OUT_OF_STOCK';
 type SortKey   = 'name' | 'price_asc' | 'price_desc' | 'stock' | 'margin';
 
 const FILTER_TABS: { key: FilterTab; label: string; color: string }[] = [
@@ -19,6 +19,7 @@ const FILTER_TABS: { key: FilterTab; label: string; color: string }[] = [
   { key: 'SCHEDULE_H1',  label: 'Sch-H1',       color: 'text-orange-700 bg-orange-50 border-orange-300' },
   { key: 'SCHEDULE_X',   label: 'Sch-X',        color: 'text-rose-700 bg-rose-50 border-rose-300'       },
   { key: 'LOW_STOCK',    label: 'Low Stock',    color: 'text-yellow-700 bg-yellow-50 border-yellow-300' },
+  { key: 'NEAR_EXPIRY',  label: 'Near Expiry',  color: 'text-amber-900 bg-amber-100 border-amber-400 font-extrabold' },
   { key: 'OUT_OF_STOCK', label: 'Out of Stock', color: 'text-red-700 bg-red-50 border-red-300'          },
 ];
 
@@ -94,6 +95,13 @@ export const ProductSearch: React.FC = () => {
     // Category filter
     if (activeFilter === 'LOW_STOCK')    return p.stockStatus === 'LOW_STOCK' || (p.totalStock > 0 && p.totalStock <= 20);
     if (activeFilter === 'OUT_OF_STOCK') return p.stockStatus === 'OUT_OF_STOCK' || p.totalStock === 0;
+    if (activeFilter === 'NEAR_EXPIRY') {
+      const thirtyDays = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      return p.batches.some(b => {
+        const exp = new Date(b.expiryDate);
+        return exp < thirtyDays && exp > new Date();
+      });
+    }
     if (activeFilter !== 'ALL')          return p.scheduleCategory === (activeFilter as ScheduleCategory);
     return true;
   });
@@ -144,6 +152,7 @@ export const ProductSearch: React.FC = () => {
     setQtyMap(prev => ({ ...prev, [productId]: Math.max(1, qty) }));
 
   // ── Tab counts ─────────────────────────────────────────────────────────────
+  const thirtyDaysAhead = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   const tabCounts: Record<FilterTab, number> = {
     ALL:          products.length,
     REGULAR:      products.filter(p => p.scheduleCategory === 'REGULAR').length,
@@ -151,6 +160,7 @@ export const ProductSearch: React.FC = () => {
     SCHEDULE_H1:  products.filter(p => p.scheduleCategory === 'SCHEDULE_H1').length,
     SCHEDULE_X:   products.filter(p => p.scheduleCategory === 'SCHEDULE_X').length,
     LOW_STOCK:    products.filter(p => p.stockStatus === 'LOW_STOCK' || (p.totalStock > 0 && p.totalStock <= 20)).length,
+    NEAR_EXPIRY:  products.filter(p => p.batches.some(b => { const exp = new Date(b.expiryDate); return exp < thirtyDaysAhead && exp > new Date(); })).length,
     OUT_OF_STOCK: products.filter(p => p.stockStatus === 'OUT_OF_STOCK' || p.totalStock === 0).length,
   };
 
@@ -272,6 +282,11 @@ export const ProductSearch: React.FC = () => {
           sorted.map(product => {
             const isOut      = product.stockStatus === 'OUT_OF_STOCK' || product.totalStock === 0;
             const isLow      = !isOut && (product.stockStatus === 'LOW_STOCK' || product.totalStock <= 20);
+            const hasNearExpiry = product.batches.some(b => {
+              const exp = new Date(b.expiryDate);
+              const thirtyDays = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+              return exp < thirtyDays && exp > new Date();
+            });
             const badge      = SCHEDULE_BADGE[product.scheduleCategory];
             const selBatch   = selectedBatchMap[product._id] || product.batches[0];
             const qty        = qtyMap[product._id] || 1;
@@ -285,8 +300,8 @@ export const ProductSearch: React.FC = () => {
                     ? 'border-emerald-500 bg-emerald-50 shadow-md scale-[1.01]'
                     : isOut
                     ? 'bg-rose-50/40 border-rose-200 hover:border-rose-300'
-                    : isLow
-                    ? 'bg-amber-50/30 border-amber-200 hover:border-amber-300'
+                    : isLow || hasNearExpiry
+                    ? 'bg-amber-50/40 border-amber-300 hover:border-amber-400'
                     : 'bg-white border-slate-200 hover:border-emerald-400 hover:shadow-sm'
                 }`}
               >
@@ -312,6 +327,13 @@ export const ProductSearch: React.FC = () => {
                       ) : (
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
                           ✓ {product.totalStock}
+                        </span>
+                      )}
+
+                      {/* Near Expiry Amber Warning Badge */}
+                      {hasNearExpiry && (
+                        <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-amber-500 text-white border border-amber-600 shadow-2xs animate-pulse">
+                          ⚠ Near Expiry (&lt;30d)
                         </span>
                       )}
 
