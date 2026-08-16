@@ -3,8 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import {
   closeComplianceModal,
-  setDoctorDetails,
-  setPatientDetails,
+  saveScheduleHCompliance,
   verifyManagerPin
 } from '../store/posSlice';
 import { ShieldAlert, Lock, Stethoscope, X, CheckCircle } from 'lucide-react';
@@ -28,9 +27,14 @@ export const ComplianceModal: React.FC = () => {
 
   const handleScheduleHSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    dispatch(setDoctorDetails({ doctorName: docName, regNo: docRegNo }));
-    dispatch(setPatientDetails({ patientName, phone: patientPhone, age: patientAge, gender: patientGender }));
-    dispatch(closeComplianceModal());
+    if (!docName.trim() || !patientName.trim()) {
+      alert('Doctor Name and Patient Name are required.');
+      return;
+    }
+    dispatch(saveScheduleHCompliance({
+      doctorDetails: { doctorName: docName, regNo: docRegNo },
+      patientDetails: { patientName, phone: patientPhone, age: patientAge, gender: patientGender }
+    }));
   };
 
   const handleManagerPinSubmit = (e: React.FormEvent) => {
@@ -63,7 +67,7 @@ export const ComplianceModal: React.FC = () => {
               <p className="text-[11px] text-slate-500 font-medium">
                 {modal.type === 'SCHEDULE_X'
                   ? 'Store Manager PIN authorization required by Drug Controller Authority'
-                  : 'Prescribing doctor and patient details required for audit verification'}
+                  : 'Prescribing doctor and patient details required before adding medicine'}
               </p>
             </div>
           </div>
@@ -79,16 +83,19 @@ export const ComplianceModal: React.FC = () => {
         {/* Schedule X Hard Lock PIN Prompt */}
         {modal.type === 'SCHEDULE_X' && (
           <form onSubmit={handleManagerPinSubmit} className="space-y-4">
-            <div className="bg-rose-50 border border-rose-200 rounded-xl p-3.5 text-xs text-rose-900 space-y-1">
-              <p className="font-bold flex items-center space-x-1">
-                <ShieldAlert className="w-4 h-4 text-rose-600" />
-                <span>RESTRICTED CONTROLLED SUBSTANCE</span>
+            <div className="bg-rose-50 border border-rose-200 rounded-xl p-3.5 text-xs text-rose-900 space-y-1.5">
+              <p className="font-extrabold flex items-center space-x-1.5 text-rose-800">
+                <ShieldAlert className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                <span>RESTRICTED CONTROLLED SUBSTANCE (SCHEDULE X / NARCOTIC)</span>
               </p>
-              <p className="text-[11px]">
-                Product: <strong className="font-bold">{modal.targetProduct?.name || 'Narcotic Drug'}</strong>
+              <p className="text-xs">
+                Medicine: <strong className="font-bold text-slate-900">{modal.targetProduct?.name || 'Controlled Narcotic Drug'}</strong>
+                {modal.targetProduct?.saltComposition && (
+                  <span className="block text-[11px] text-slate-600 font-medium">Composition: {modal.targetProduct.saltComposition}</span>
+                )}
               </p>
-              <p className="text-[11px] text-rose-800">
-                Cannot add Schedule X drugs without Store Manager authentication.
+              <p className="text-[11px] text-rose-800 font-semibold bg-rose-100/60 p-2 rounded-lg border border-rose-200">
+                🔒 Manager PIN authorization is required <strong>every time</strong> a Schedule X or Narcotic drug is added to a bill.
               </p>
             </div>
 
@@ -112,7 +119,7 @@ export const ComplianceModal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => dispatch(closeComplianceModal())}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg"
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
               >
                 Cancel
               </button>
@@ -120,7 +127,7 @@ export const ComplianceModal: React.FC = () => {
                 type="submit"
                 className="px-5 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-2xs cursor-pointer"
               >
-                Verify & Unlock
+                Authorize & Add to Cart
               </button>
             </div>
           </form>
@@ -206,16 +213,16 @@ export const ComplianceModal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => dispatch(closeComplianceModal())}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg"
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
               >
-                Skip Details
+                Cancel
               </button>
               <button
                 type="submit"
                 className="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-2xs cursor-pointer flex items-center space-x-1"
               >
                 <CheckCircle className="w-3.5 h-3.5" />
-                <span>Save Compliance Info</span>
+                <span>Save Details & Add to Cart</span>
               </button>
             </div>
           </form>

@@ -51,6 +51,8 @@ interface PosState {
     isOpen: boolean;
     type: 'SCHEDULE_H' | 'SCHEDULE_X' | null;
     targetProduct?: Product;
+    pendingBatch?: BatchInfo;
+    pendingQuantity?: number;
   };
   drugInteractionModal: {
     isOpen: boolean;
@@ -143,6 +145,85 @@ const initialState: PosState = {
   
   latestFinalizedInvoice: null,
   isSubmittingBill: false
+};
+
+export const checkIsScheduleXOrNarcotic = (product: Product): boolean => {
+  if (!product) return false;
+  if (product.scheduleCategory === 'SCHEDULE_X') return true;
+  if (product.isNarcotic) return true;
+  const catUpper = String(product.scheduleCategory || '').toUpperCase();
+  if (catUpper.includes('SCH-X') || catUpper.includes('SCHEDULE_X') || catUpper.includes('NARCOTIC')) return true;
+  const nameLower = (product.name || '').toLowerCase();
+  const saltLower = (product.saltComposition || '').toLowerCase();
+  if (
+    nameLower.includes('narcotic') || saltLower.includes('narcotic') ||
+    nameLower.includes('alprazolam') || nameLower.includes('restyl') ||
+    nameLower.includes('morphine') || nameLower.includes('fentanyl') ||
+    nameLower.includes('pethidine') || nameLower.includes('ketamine') ||
+    nameLower.includes('codeine') || nameLower.includes('methadone')
+  ) return true;
+  return false;
+};
+
+const addProductToCartInternal = (
+  state: PosState,
+  product: Product,
+  selectedBatch?: BatchInfo,
+  quantity: number = 1
+) => {
+  const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
+  if (!currentSession) return;
+
+  const batchToUse = selectedBatch || product.batches.find(b => {
+    const expDate = new Date(b.expiryDate);
+    return expDate > new Date() && b.stockQuantity > 0;
+  }) || product.batches[0];
+
+  if (batchToUse) {
+    const expDate = new Date(batchToUse.expiryDate);
+    if (expDate <= new Date()) {
+      alert(`HARD BLOCK: Batch ${batchToUse.batchNumber} has EXPIRED (${batchToUse.expiryDate}). Cannot add to cart.`);
+      return;
+    }
+  }
+
+  const existingItem = currentSession.items.find(item => item.productId === product._id && item.selectedBatch.batchNumber === batchToUse?.batchNumber);
+
+  if (existingItem) {
+    const newQty = existingItem.quantity + quantity;
+    const gst = calculateItemGST(product.sellingPrice, newQty, existingItem.discountPercent, product.gstRate);
+    existingItem.quantity = newQty;
+    existingItem.taxableAmount = gst.taxableAmount;
+    existingItem.cgstAmount = gst.cgstAmount;
+    existingItem.sgstAmount = gst.sgstAmount;
+    existingItem.totalGst = gst.totalGst;
+    existingItem.lineTotal = gst.lineTotal;
+  } else {
+    const gst = calculateItemGST(product.sellingPrice, quantity, 0, product.gstRate);
+    const newItem: CartItem = {
+      cartItemId: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      productId: product._id,
+      product,
+      selectedBatch: batchToUse,
+      quantity,
+      unitPrice: product.sellingPrice,
+      discountPercent: 0,
+      taxableAmount: gst.taxableAmount,
+      cgstAmount: gst.cgstAmount,
+      sgstAmount: gst.sgstAmount,
+      totalGst: gst.totalGst,
+      lineTotal: gst.lineTotal
+    };
+    currentSession.items.push(newItem);
+  }
+
+  const interactionResult = analyzeDrugInteractions(currentSession.items);
+  if (interactionResult.hasMajor || interactionResult.hasContraindicated) {
+    state.drugInteractionModal = {
+      isOpen: true,
+      interactions: interactionResult.interactions
+    };
+  }
 };
 
 export const posSlice = createSlice({
@@ -306,8 +387,8 @@ export const posSlice = createSlice({
     },
 
     // Cart Management
-    addItemToCart: (state, action: PayloadAction<{ product: Product; selectedBatch?: BatchInfo; quantity?: number }>) => {
-      const { product, selectedBatch, quantity = 1 } = action.payload;
+    addItemToCart: (state, action: PayloadAction<{ product: Product; selectedBatch?: BatchInfo; quantity?: number; isAuthorizedByPin?: boolean; skipSchHPrompt?: boolean }>) => {
+      const { product, selectedBatch, quantity = 1, isAuthorizedByPin = false } = action.payload;
       const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
       if (!currentSession) return;
 
@@ -326,69 +407,36 @@ export const posSlice = createSlice({
         return;
       }
 
-      // 2. Schedule X narcotics requirement -> PIN Modal if not verified
-      if (product.scheduleCategory === 'SCHEDULE_X' && !currentSession.scheduleXVerified && !state.isManagerAuthenticated) {
+      // 2. Schedule X / Narcotic requirement -> Mandatory Manager PIN Modal EVERY TIME
+      const isNarcoticOrSchX = checkIsScheduleXOrNarcotic(product);
+      if (isNarcoticOrSchX && !isAuthorizedByPin) {
         state.complianceModal = {
           isOpen: true,
           type: 'SCHEDULE_X',
-          targetProduct: product
+          targetProduct: product,
+          pendingBatch: selectedBatch,
+          pendingQuantity: quantity
         };
         return;
       }
 
-      // 3. Batch Selection & Expiry Check
-      const batchToUse = selectedBatch || product.batches.find(b => {
-        const expDate = new Date(b.expiryDate);
-        return expDate > new Date() && b.stockQuantity > 0;
-      }) || product.batches[0];
+      // 3. Schedule H / H1 requirement -> Ask for Doctor & Patient details if missing BEFORE adding to cart
+      const isSchH = product.scheduleCategory === 'SCHEDULE_H' || (product.scheduleCategory && String(product.scheduleCategory).includes('H'));
+      const hasDocAndPatient = Boolean(currentSession.doctorDetails?.doctorName && currentSession.patientDetails?.patientName);
 
-      if (batchToUse) {
-        const expDate = new Date(batchToUse.expiryDate);
-        if (expDate <= new Date()) {
-          alert(`HARD BLOCK: Batch ${batchToUse.batchNumber} has EXPIRED (${batchToUse.expiryDate}). Cannot add to cart.`);
-          return;
-        }
-      }
-
-      // 4. Calculate GST & Add Item
-      const existingItem = currentSession.items.find(item => item.productId === product._id && item.selectedBatch.batchNumber === batchToUse?.batchNumber);
-
-      if (existingItem) {
-        const newQty = existingItem.quantity + quantity;
-        const gst = calculateItemGST(product.sellingPrice, newQty, existingItem.discountPercent, product.gstRate);
-        existingItem.quantity = newQty;
-        existingItem.taxableAmount = gst.taxableAmount;
-        existingItem.cgstAmount = gst.cgstAmount;
-        existingItem.sgstAmount = gst.sgstAmount;
-        existingItem.totalGst = gst.totalGst;
-        existingItem.lineTotal = gst.lineTotal;
-      } else {
-        const gst = calculateItemGST(product.sellingPrice, quantity, 0, product.gstRate);
-        const newItem: CartItem = {
-          cartItemId: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-          productId: product._id,
-          product,
-          selectedBatch: batchToUse,
-          quantity,
-          unitPrice: product.sellingPrice,
-          discountPercent: 0,
-          taxableAmount: gst.taxableAmount,
-          cgstAmount: gst.cgstAmount,
-          sgstAmount: gst.sgstAmount,
-          totalGst: gst.totalGst,
-          lineTotal: gst.lineTotal
-        };
-        currentSession.items.push(newItem);
-      }
-
-      // 5. Asynchronous AI Drug Interaction Check
-      const interactionResult = analyzeDrugInteractions(currentSession.items);
-      if (interactionResult.hasMajor || interactionResult.hasContraindicated) {
-        state.drugInteractionModal = {
+      if (isSchH && !hasDocAndPatient) {
+        state.complianceModal = {
           isOpen: true,
-          interactions: interactionResult.interactions
+          type: 'SCHEDULE_H',
+          targetProduct: product,
+          pendingBatch: selectedBatch,
+          pendingQuantity: quantity
         };
+        return; // Do NOT add to cart yet! Require saving doctor & patient details first!
       }
+
+      // 4. Batch Selection & Cart addition
+      addProductToCartInternal(state, product, selectedBatch, quantity);
     },
 
     updateCartItemQuantity: (state, action: PayloadAction<{ cartItemId: string; quantity: number }>) => {
@@ -470,14 +518,49 @@ export const posSlice = createSlice({
         currentSession.patientDetails = action.payload;
       }
     },
+    saveScheduleHCompliance: (state, action: PayloadAction<{ doctorDetails: DoctorDetails; patientDetails: PatientDetails }>) => {
+      const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
+      if (currentSession) {
+        currentSession.doctorDetails = action.payload.doctorDetails;
+        currentSession.patientDetails = action.payload.patientDetails;
+      }
+
+      if (state.complianceModal.isOpen && state.complianceModal.type === 'SCHEDULE_H' && state.complianceModal.targetProduct) {
+        const targetProd = state.complianceModal.targetProduct;
+        const pendingBatch = state.complianceModal.pendingBatch;
+        const pendingQty = state.complianceModal.pendingQuantity || 1;
+
+        state.complianceModal.isOpen = false;
+        state.complianceModal.targetProduct = undefined;
+        state.complianceModal.pendingBatch = undefined;
+        state.complianceModal.pendingQuantity = undefined;
+
+        // Add medicine to cart AFTER doctor & patient details are saved!
+        addProductToCartInternal(state, targetProd, pendingBatch, pendingQty);
+      } else {
+        state.complianceModal.isOpen = false;
+      }
+    },
     verifyManagerPin: (state, action: PayloadAction<string>) => {
       if (action.payload === '1234') {
         state.isManagerAuthenticated = true;
-        const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
-        if (currentSession) {
-          currentSession.scheduleXVerified = true;
+        
+        // Handle authorized pending Schedule X / Narcotic drug addition
+        if (state.complianceModal.isOpen && state.complianceModal.type === 'SCHEDULE_X' && state.complianceModal.targetProduct) {
+          const targetProd = state.complianceModal.targetProduct;
+          const pendingBatch = state.complianceModal.pendingBatch;
+          const pendingQty = state.complianceModal.pendingQuantity || 1;
+
+          state.complianceModal.isOpen = false;
+          state.complianceModal.targetProduct = undefined;
+          state.complianceModal.pendingBatch = undefined;
+          state.complianceModal.pendingQuantity = undefined;
+
+          addProductToCartInternal(state, targetProd, pendingBatch, pendingQty);
+        } else {
+          state.complianceModal.isOpen = false;
         }
-        state.complianceModal.isOpen = false;
+
         state.drugInteractionModal.isOpen = false;
       } else {
         alert('INVALID MANAGER PIN! Access Denied.');
@@ -542,6 +625,13 @@ export const posSlice = createSlice({
       state.complianceModal.isOpen = false;
     },
     closeDrugInteractionModal: (state) => {
+      const hasContraindicated = state.drugInteractionModal.interactions.some(i => i.severity === 'CONTRAINDICATED');
+      if (hasContraindicated) {
+        const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
+        if (currentSession && currentSession.items.length > 0) {
+          currentSession.items.pop();
+        }
+      }
       state.drugInteractionModal.isOpen = false;
     },
     setPaymentModalOpen: (state, action: PayloadAction<boolean>) => {
@@ -633,6 +723,7 @@ export const {
   applyBulkDiscount,
   setDoctorDetails,
   setPatientDetails,
+  saveScheduleHCompliance,
   verifyManagerPin,
   acknowledgePharmacistSignature,
   holdActiveBill,

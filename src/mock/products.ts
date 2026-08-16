@@ -264,10 +264,43 @@ export const MOCK_PRODUCTS: Product[] = [
         mrp: 155.00
       }
     ]
+  },
+  {
+    _id: '64f1a2b3c4d5e6f7a8b9c012',
+    name: 'Morphine Sulphate 10mg (Narcotic)',
+    brand: 'Troikaa Pharmaceuticals',
+    saltComposition: 'Morphine Sulphate 10mg',
+    barcode: '8901234567801',
+    hsnCode: '30049080',
+    gstRate: 12,
+    unitMRP: 180.00,
+    sellingPrice: 165.00,
+    grossMarginPercent: 30.0,
+    scheduleCategory: 'SCHEDULE_X',
+    isNarcotic: true,
+    stockStatus: 'IN_STOCK',
+    totalStock: 40,
+    batches: [
+      {
+        batchNumber: 'MOR-10-VAULT',
+        expiryDate: '2027-09-30',
+        stockQuantity: 40,
+        location: 'Narcotics Vault L-2',
+        mrp: 180.00
+      }
+    ]
   }
 ];
 
 export const MOCK_DRUG_INTERACTIONS: DrugInteraction[] = [
+  {
+    severity: 'CONTRAINDICATED',
+    drug1: 'Sildenafil Citrate 50mg',
+    drug2: 'Isosorbide Dinitrate 10mg',
+    description: 'Severe hypotension hazard! Nitrates (Sorbitrate) and Sildenafil combination causes a life-threatening drop in blood pressure.',
+    clinicalImpact: 'Severe Refractory Hypotension / Myocardial Infarction hazard.',
+    management: 'Full-screen red security interlock! Requires Store Owner PIN (1234) authorization.'
+  },
   {
     severity: 'MAJOR',
     drug1: 'Warfarin Sodium 5mg',
@@ -275,14 +308,6 @@ export const MOCK_DRUG_INTERACTIONS: DrugInteraction[] = [
     description: 'Concurrent use of Warfarin and Aspirin significantly increases gastrointestinal bleeding risk.',
     clinicalImpact: 'High bleeding risk (INR elevation).',
     management: 'Requires Pharmacist Signature Acknowledgment before cart finalization.'
-  },
-  {
-    severity: 'CONTRAINDICATED',
-    drug1: 'Sildenafil Citrate 50mg',
-    drug2: 'Isosorbide Dinitrate 10mg',
-    description: 'Severe hypotension hazard! Nitrates and Sildenafil combination can cause life-threatening drop in blood pressure.',
-    clinicalImpact: 'Severe Refractory Hypotension / Myocardial Infarction hazard.',
-    management: 'Full-screen red block! Overriding requires Store Owner PIN.'
   },
   {
     severity: 'MINOR',

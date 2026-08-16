@@ -33,6 +33,7 @@ export interface Product {
   sellingPrice: number;
   grossMarginPercent: number;
   scheduleCategory: ScheduleCategory;
+  isNarcotic?: boolean;
   stockStatus: StockStatus;
   totalStock: number;
   batches: BatchInfo[];

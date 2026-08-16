@@ -82,27 +82,32 @@ export const DrugInteractionModal: React.FC = () => {
           ))}
         </div>
 
-        {/* Action Form: Pharmacist Checkbox Signature OR Manager PIN Override */}
+        {/* Action Form: Store Owner PIN Required for Contraindicated Drugs */}
         {hasContraindicated ? (
-          <form onSubmit={handleContraindicatedOverride} className="space-y-3 pt-3 border-t border-rose-800">
-            <div className="bg-rose-900/80 border border-rose-600 p-3 rounded-xl text-xs space-y-1">
-              <p className="font-bold flex items-center space-x-1 text-white">
-                <Lock className="w-4 h-4 text-rose-300" />
-                <span>STORE OWNER / MANAGER PIN OVERRIDE REQUIRED</span>
+          <form onSubmit={handleContraindicatedOverride} className="space-y-3.5 pt-3 border-t border-rose-800">
+            <div className="bg-rose-900/90 border border-rose-600 p-3.5 rounded-xl text-xs space-y-1.5 shadow-inner">
+              <p className="font-extrabold flex items-center space-x-1.5 text-white tracking-wide">
+                <Lock className="w-4 h-4 text-rose-300 animate-bounce" />
+                <span>STORE OWNER PIN VERIFICATION REQUIRED</span>
               </p>
-              <p className="text-[11px] text-rose-200">
-                This combination presents severe life-threatening hazards. Only authorized Store Manager PIN can override this block.
+              <p className="text-[11px] text-rose-200 leading-snug">
+                This medicine combination creates a severe, potentially life-threatening clinical hazard.
+                You must enter the <strong>Store Owner / Manager PIN (1234)</strong> to authorize adding this contraindicated drug to cart.
               </p>
             </div>
 
             <div>
+              <label className="block text-xs font-bold text-rose-200 mb-1">
+                Enter 4-Digit Owner PIN (Default: 1234)
+              </label>
               <input
                 type="password"
                 maxLength={4}
                 value={overridePin}
                 onChange={(e) => setOverridePin(e.target.value)}
-                placeholder="Enter Manager PIN (1234)"
-                className="w-full text-center text-lg font-bold py-2 border border-rose-500 rounded-xl bg-rose-950 text-white placeholder-rose-400 focus:outline-hidden"
+                placeholder="••••"
+                className="w-full text-center text-xl font-black tracking-widest py-2.5 border border-rose-500 rounded-xl bg-rose-950 text-white placeholder-rose-400 focus:ring-2 focus:ring-rose-400 focus:outline-hidden"
+                autoFocus
                 required
               />
             </div>
@@ -111,15 +116,15 @@ export const DrugInteractionModal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => dispatch(closeDrugInteractionModal())}
-                className="px-4 py-2 text-xs font-semibold text-rose-300 hover:text-white"
+                className="px-4 py-2 text-xs font-semibold text-rose-300 hover:text-white hover:bg-rose-900/40 rounded-lg cursor-pointer transition-colors"
               >
-                Clear Cart Items
+                Cancel & Remove Item
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 text-xs font-bold bg-white text-rose-950 hover:bg-rose-100 rounded-lg shadow-md font-heading cursor-pointer"
+                className="px-5 py-2 text-xs font-extrabold bg-white text-rose-950 hover:bg-rose-100 rounded-lg shadow-md font-heading cursor-pointer active:scale-98 transition-all"
               >
-                Override & Proceed
+                Authorize & Add to Cart
               </button>
             </div>
           </form>
