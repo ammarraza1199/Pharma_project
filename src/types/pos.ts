@@ -217,5 +217,15 @@ export interface StoreSettings {
   defaultPrintFormat: 'THERMAL' | 'A4';
   autoPrintReceipt: boolean;
   soundEffects: boolean;
+  autoAddOnScan?: boolean;
+  nearExpiryDaysThreshold?: number;
+  termsAndConditions?: string;
+  defaultTaxType?: 'CGST_SGST' | 'IGST';
   managerPin: string;
+  managerName?: string;
+  managerEmail?: string;
+  ownerName?: string;
+  ownerEmail?: string;
+  ownerPin?: string;
 }
+

@@ -4,7 +4,7 @@ import type { RootState } from '../store';
 import {
   closeDrugInteractionModal,
   acknowledgePharmacistSignature,
-  verifyManagerPin
+  verifyOwnerPin
 } from '../store/posSlice';
 import { AlertOctagon, Lock } from 'lucide-react';
 
@@ -31,7 +31,7 @@ export const DrugInteractionModal: React.FC = () => {
 
   const handleContraindicatedOverride = (e: React.FormEvent) => {
     e.preventDefault();
-    dispatch(verifyManagerPin(overridePin));
+    dispatch(verifyOwnerPin(overridePin));
     setOverridePin('');
   };
 
@@ -82,7 +82,7 @@ export const DrugInteractionModal: React.FC = () => {
           ))}
         </div>
 
-        {/* Action Form: Store Owner PIN Required for Contraindicated Drugs */}
+        {/* Action Form: Store Owner PIN Required for Contraindicated Drug Combinations */}
         {hasContraindicated ? (
           <form onSubmit={handleContraindicatedOverride} className="space-y-3.5 pt-3 border-t border-rose-800">
             <div className="bg-rose-900/90 border border-rose-600 p-3.5 rounded-xl text-xs space-y-1.5 shadow-inner">
@@ -92,13 +92,13 @@ export const DrugInteractionModal: React.FC = () => {
               </p>
               <p className="text-[11px] text-rose-200 leading-snug">
                 This medicine combination creates a severe, potentially life-threatening clinical hazard.
-                You must enter the <strong>Store Owner / Manager PIN (1234)</strong> to authorize adding this contraindicated drug to cart.
+                You must enter the <strong>Store Owner PIN (Default: 1234)</strong> to authorize adding this contraindicated drug combination to cart.
               </p>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-rose-200 mb-1">
-                Enter 4-Digit Owner PIN (Default: 1234)
+                Enter 4-Digit Owner PIN *
               </label>
               <input
                 type="password"
@@ -118,13 +118,13 @@ export const DrugInteractionModal: React.FC = () => {
                 onClick={() => dispatch(closeDrugInteractionModal())}
                 className="px-4 py-2 text-xs font-semibold text-rose-300 hover:text-white hover:bg-rose-900/40 rounded-lg cursor-pointer transition-colors"
               >
-                Cancel & Remove Item
+                Cancel &amp; Remove Item
               </button>
               <button
                 type="submit"
                 className="px-5 py-2 text-xs font-extrabold bg-white text-rose-950 hover:bg-rose-100 rounded-lg shadow-md font-heading cursor-pointer active:scale-98 transition-all"
               >
-                Authorize & Add to Cart
+                Authorize &amp; Add to Cart
               </button>
             </div>
           </form>
@@ -160,7 +160,7 @@ export const DrugInteractionModal: React.FC = () => {
                   signedCheckbox ? 'bg-rose-600 hover:bg-rose-700' : 'bg-slate-300 cursor-not-allowed'
                 }`}
               >
-                Sign & Acknowledge Risk
+                Sign &amp; Acknowledge Risk
               </button>
             </div>
           </form>

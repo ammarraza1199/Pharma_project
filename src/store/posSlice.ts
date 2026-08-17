@@ -99,7 +99,16 @@ const initialState: PosState = {
     defaultPrintFormat: 'THERMAL',
     autoPrintReceipt: true,
     soundEffects: true,
-    managerPin: '1234'
+    autoAddOnScan: true,
+    nearExpiryDaysThreshold: 30,
+    termsAndConditions: '1. Goods once sold will not be taken back without original tax receipt. 2. Please check expiry before leaving counter.',
+    defaultTaxType: 'CGST_SGST',
+    managerPin: '1234',
+    managerName: 'Rajesh Verma',
+    managerEmail: 'rajesh.verma@genquantaa.com',
+    ownerName: 'Dr. K. V. Rao',
+    ownerEmail: 'kvrao@genquantaa.com',
+    ownerPin: '1234'
   },
   products: MOCK_PRODUCTS,
   grnEntries: [],
@@ -217,7 +226,10 @@ const addProductToCartInternal = (
     currentSession.items.push(newItem);
   }
 
-  const interactionResult = analyzeDrugInteractions(currentSession.items);
+  const interactionResult = analyzeDrugInteractions(
+    currentSession.items,
+    product.saltComposition || product.name
+  );
   if (interactionResult.hasMajor || interactionResult.hasContraindicated) {
     state.drugInteractionModal = {
       isOpen: true,
@@ -542,7 +554,8 @@ export const posSlice = createSlice({
       }
     },
     verifyManagerPin: (state, action: PayloadAction<string>) => {
-      if (action.payload === '1234') {
+      const validPin = state.settings.managerPin || '1234';
+      if (action.payload === validPin) {
         state.isManagerAuthenticated = true;
         
         // Handle authorized pending Schedule X / Narcotic drug addition
@@ -564,6 +577,15 @@ export const posSlice = createSlice({
         state.drugInteractionModal.isOpen = false;
       } else {
         alert('INVALID MANAGER PIN! Access Denied.');
+      }
+    },
+
+    verifyOwnerPin: (state, action: PayloadAction<string>) => {
+      const validPin = state.settings.ownerPin || '1234';
+      if (action.payload === validPin) {
+        state.drugInteractionModal.isOpen = false;
+      } else {
+        alert('INVALID STORE OWNER PIN! Access Denied.');
       }
     },
     acknowledgePharmacistSignature: (state) => {
@@ -725,6 +747,7 @@ export const {
   setPatientDetails,
   saveScheduleHCompliance,
   verifyManagerPin,
+  verifyOwnerPin,
   acknowledgePharmacistSignature,
   holdActiveBill,
   restoreHeldBill,

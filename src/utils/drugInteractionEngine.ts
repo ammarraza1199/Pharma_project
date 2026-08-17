@@ -12,7 +12,10 @@ export interface InteractionCheckResult {
  * Real-Time AI Drug Interaction Checker
  * Scans active cart items and finds clinical drug-drug interaction pairs.
  */
-export function analyzeDrugInteractions(cartItems: CartItem[]): InteractionCheckResult {
+export function analyzeDrugInteractions(
+  cartItems: CartItem[],
+  targetMedicine?: string
+): InteractionCheckResult {
   if (cartItems.length < 2) {
     return {
       hasMinor: false,
@@ -23,13 +26,24 @@ export function analyzeDrugInteractions(cartItems: CartItem[]): InteractionCheck
   }
 
   const activeSalts = cartItems.map(item => item.product.saltComposition.toLowerCase());
+  const activeNames = cartItems.map(item => item.product.name.toLowerCase());
+  const targetLower = targetMedicine ? targetMedicine.toLowerCase() : null;
+
   const detectedInteractions: DrugInteraction[] = [];
 
   for (const rule of MOCK_DRUG_INTERACTIONS) {
-    const salt1Match = activeSalts.some(salt => salt.includes(rule.drug1.split(' ')[0].toLowerCase()));
-    const salt2Match = activeSalts.some(salt => salt.includes(rule.drug2.split(' ')[0].toLowerCase()));
+    const drug1Prefix = rule.drug1.split(' ')[0].toLowerCase();
+    const drug2Prefix = rule.drug2.split(' ')[0].toLowerCase();
+
+    const salt1Match = activeSalts.some(salt => salt.includes(drug1Prefix)) || activeNames.some(name => name.includes(drug1Prefix));
+    const salt2Match = activeSalts.some(salt => salt.includes(drug2Prefix)) || activeNames.some(name => name.includes(drug2Prefix));
 
     if (salt1Match && salt2Match) {
+      // When adding a specific medicine, only alert if the interaction directly involves that medicine
+      if (targetLower) {
+        const involvesTarget = targetLower.includes(drug1Prefix) || targetLower.includes(drug2Prefix);
+        if (!involvesTarget) continue;
+      }
       detectedInteractions.push(rule);
     }
   }

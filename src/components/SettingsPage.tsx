@@ -4,7 +4,8 @@ import type { RootState } from '../store';
 import { updateStoreSettings, navigateTo, logoutUser } from '../store/posSlice';
 import {
   Settings, Store, Printer, Lock, ShieldCheck, Crown, Users,
-  UserCheck, LogOut, CheckCircle2, Save, KeyRound, Monitor, Cpu, Laptop
+  UserCheck, LogOut, CheckCircle2, Save, KeyRound, Monitor, Cpu, Laptop,
+  Eye, EyeOff, RotateCcw, FileText, AlertTriangle
 } from 'lucide-react';
 
 export const SettingsPage: React.FC = () => {
@@ -18,17 +19,26 @@ export const SettingsPage: React.FC = () => {
   const [gstin, setGstin] = useState<string>(settings.gstin || '36AAACG1234F1Z8');
   const [phone, setPhone] = useState<string>(settings.phone || '+91 98765 43210');
   const [address, setAddress] = useState<string>(settings.address || 'Plot 42, Innovation Corridor, Tech City, Hyderabad - 500081');
+  const [defaultTaxType, setDefaultTaxType] = useState<'CGST_SGST' | 'IGST'>(settings.defaultTaxType || 'CGST_SGST');
+  const [termsAndConditions, setTermsAndConditions] = useState<string>(
+    settings.termsAndConditions || '1. Goods once sold will not be taken back without original tax receipt. 2. Please check expiry before leaving counter.'
+  );
 
   // 2. Security PINs of Manager & Owner Info
   const [managerPin, setManagerPin] = useState<string>(settings.managerPin || '1234');
-  const [ownerPin, setOwnerPin] = useState<string>('1234');
-  const [ownerName, setOwnerName] = useState<string>('Navya Sri (Store Owner)');
-  const [ownerEmail, setOwnerEmail] = useState<string>('navyasri@genquantaa.com');
+  const [managerName, setManagerName] = useState<string>(settings.managerName || 'Rajesh Verma');
+  const [managerEmail, setManagerEmail] = useState<string>(settings.managerEmail || 'rajesh.verma@genquantaa.com');
+  const [ownerPin, setOwnerPin] = useState<string>(settings.ownerPin || '1234');
+  const [ownerName, setOwnerName] = useState<string>(settings.ownerName || 'Dr. K. V. Rao');
+  const [ownerEmail, setOwnerEmail] = useState<string>(settings.ownerEmail || 'kvrao@genquantaa.com');
+  const [showPins, setShowPins] = useState<boolean>(false);
 
-  // 3. Thermal Printer & Hardware Details
+  // 3. Thermal Printer, Expiry & Hardware Details
   const [defaultPrintFormat, setDefaultPrintFormat] = useState<'THERMAL' | 'A4'>(settings.defaultPrintFormat || 'THERMAL');
   const [autoPrintReceipt, setAutoPrintReceipt] = useState<boolean>(settings.autoPrintReceipt ?? true);
   const [soundEffects, setSoundEffects] = useState<boolean>(settings.soundEffects ?? true);
+  const [autoAddOnScan, setAutoAddOnScan] = useState<boolean>(settings.autoAddOnScan ?? true);
+  const [nearExpiryDaysThreshold, setNearExpiryDaysThreshold] = useState<number>(settings.nearExpiryDaysThreshold || 30);
 
   const [savedBanner, setSavedBanner] = useState<boolean>(false);
 
@@ -45,14 +55,46 @@ export const SettingsPage: React.FC = () => {
       gstin,
       phone,
       address,
+      defaultTaxType,
+      termsAndConditions,
       defaultPrintFormat,
       autoPrintReceipt,
       soundEffects,
-      managerPin
+      autoAddOnScan,
+      nearExpiryDaysThreshold,
+      managerPin,
+      managerName,
+      managerEmail,
+      ownerName,
+      ownerEmail,
+      ownerPin
     }));
 
     setSavedBanner(true);
     setTimeout(() => setSavedBanner(false), 3000);
+  };
+
+  const handleResetDefaults = () => {
+    if (confirm('Are you sure you want to restore default pharmacy settings?')) {
+      setStoreName('GENQUANTAA MEDPLUS PHARMACY');
+      setDlNo('DL-2024/HYD/889201');
+      setGstin('36AAACG1234F1Z8');
+      setPhone('+91 98765 43210');
+      setAddress('Plot 42, Innovation Corridor, Tech City, Hyderabad - 500081');
+      setDefaultTaxType('CGST_SGST');
+      setTermsAndConditions('1. Goods once sold will not be taken back without original tax receipt. 2. Please check expiry before leaving counter.');
+      setManagerPin('1234');
+      setManagerName('Rajesh Verma');
+      setManagerEmail('rajesh.verma@genquantaa.com');
+      setOwnerPin('1234');
+      setOwnerName('Dr. K. V. Rao');
+      setOwnerEmail('kvrao@genquantaa.com');
+      setDefaultPrintFormat('THERMAL');
+      setAutoPrintReceipt(true);
+      setSoundEffects(true);
+      setAutoAddOnScan(true);
+      setNearExpiryDaysThreshold(30);
+    }
   };
 
   return (
@@ -99,7 +141,7 @@ export const SettingsPage: React.FC = () => {
             <Store className="w-5 h-5 text-emerald-600" />
             <div>
               <h3 className="text-xs font-extrabold text-slate-900 font-heading uppercase tracking-wider">
-                1. Pharmacy Store Related Details &amp; Legal Licenses
+                1. Pharmacy Store Related Details, Legal Licenses &amp; Tax Rules
               </h3>
               <p className="text-[11px] text-slate-500 font-medium">Printed on all customer tax receipts, invoices, and government GST compliance reports</p>
             </div>
@@ -154,7 +196,19 @@ export const SettingsPage: React.FC = () => {
               />
             </div>
 
-            <div className="md:col-span-2">
+            <div>
+              <label className="block text-slate-700 mb-1">Default Store GST Computation Mode *</label>
+              <select
+                value={defaultTaxType}
+                onChange={e => setDefaultTaxType(e.target.value as any)}
+                className="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500"
+              >
+                <option value="CGST_SGST">Intra-State GST (CGST 50% + SGST 50%) - Default</option>
+                <option value="IGST">Inter-State GST (IGST 100%)</option>
+              </select>
+            </div>
+
+            <div>
               <label className="block text-slate-700 mb-1">Full Store Address (Prints on Top of Receipt) *</label>
               <input
                 type="text"
@@ -165,41 +219,87 @@ export const SettingsPage: React.FC = () => {
                 className="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden text-slate-900"
               />
             </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-slate-700 mb-1">Tax Invoice Footer Terms &amp; Return Policy Text</label>
+              <textarea
+                rows={2}
+                value={termsAndConditions}
+                onChange={e => setTermsAndConditions(e.target.value)}
+                placeholder="Terms printed at the bottom of customer receipts..."
+                className="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 text-xs text-slate-900 font-medium"
+              />
+            </div>
           </div>
         </div>
 
         {/* ── SECTION 2: SECURITY PINS OF MANAGER & OWNER INFO ────────── */}
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-3">
-          <div className="flex items-center space-x-2 pb-2.5 border-b border-slate-200">
-            <Lock className="w-5 h-5 text-rose-600" />
-            <div>
-              <h3 className="text-xs font-extrabold text-slate-900 font-heading uppercase tracking-wider">
-                2. Security PINs of Manager &amp; Store Owner Info
-              </h3>
-              <p className="text-[11px] text-slate-500 font-medium">Security PIN interlocks for controlled Schedule X narcotics and contraindicated drug overrides</p>
+          <div className="flex items-center justify-between pb-2.5 border-b border-slate-200 flex-wrap gap-2">
+            <div className="flex items-center space-x-2">
+              <Lock className="w-5 h-5 text-rose-600" />
+              <div>
+                <h3 className="text-xs font-extrabold text-slate-900 font-heading uppercase tracking-wider">
+                  2. Security PINs of Manager &amp; Store Owner Info
+                </h3>
+                <p className="text-[11px] text-slate-500 font-medium">Security PIN interlocks for controlled Schedule X narcotics and contraindicated drug overrides</p>
+              </div>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setShowPins(!showPins)}
+              className="flex items-center space-x-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+            >
+              {showPins ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              <span>{showPins ? 'Hide Security PINs' : 'Show Security PINs'}</span>
+            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold">
-            {/* Store Manager PIN Box */}
+            {/* Store Manager PIN & Credentials Box */}
             <div className="bg-rose-50/60 border border-rose-200 rounded-2xl p-3.5 space-y-2">
               <div className="flex items-center space-x-2 text-rose-800">
-                <KeyRound className="w-4 h-4 text-rose-600" />
-                <span className="font-extrabold uppercase text-xs">Store Manager Security PIN</span>
+                <ShieldCheck className="w-4 h-4 text-rose-600" />
+                <span className="font-extrabold uppercase text-xs">Store Manager PIN &amp; Credentials</span>
               </div>
               <p className="text-[11px] text-rose-900 font-medium">
                 Mandatory 4-digit PIN required <strong>every time</strong> a <strong>Schedule X or Narcotic drug</strong> is added to cart.
               </p>
-              <div>
-                <label className="block text-slate-700 mb-1 text-[11px]">4-Digit Manager PIN *</label>
-                <input
-                  type="password"
-                  maxLength={4}
-                  required
-                  value={managerPin}
-                  onChange={e => setManagerPin(e.target.value)}
-                  className="w-full text-center text-lg font-black tracking-widest p-2 bg-white border border-rose-300 rounded-xl focus:ring-2 focus:ring-rose-500 focus:outline-hidden text-rose-950"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-slate-700 mb-1 text-[11px]">Manager Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={managerName}
+                    onChange={e => setManagerName(e.target.value)}
+                    placeholder="e.g. Rajesh Verma"
+                    className="w-full p-2 bg-white border border-rose-300 rounded-xl text-xs font-bold text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 mb-1 text-[11px]">Manager Email *</label>
+                  <input
+                    type="email"
+                    required
+                    value={managerEmail}
+                    onChange={e => setManagerEmail(e.target.value)}
+                    placeholder="e.g. rajesh.verma@genquantaa.com"
+                    className="w-full p-2 bg-white border border-rose-300 rounded-xl text-xs font-bold text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 mb-1 text-[11px]">4-Digit Manager PIN *</label>
+                  <input
+                    type={showPins ? 'text' : 'password'}
+                    maxLength={4}
+                    required
+                    value={managerPin}
+                    onChange={e => setManagerPin(e.target.value)}
+                    className="w-full text-center text-lg font-black tracking-widest p-1.5 bg-white border border-rose-300 rounded-xl focus:ring-2 focus:ring-rose-500 focus:outline-hidden text-rose-950"
+                  />
+                </div>
               </div>
             </div>
 
@@ -212,20 +312,33 @@ export const SettingsPage: React.FC = () => {
               <p className="text-[11px] text-amber-900 font-medium">
                 High-priority PIN required to override <strong>Contraindicated Drug Pair Interlocks</strong>.
               </p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div>
-                  <label className="block text-slate-700 mb-1 text-[11px]">Owner Name</label>
+                  <label className="block text-slate-700 mb-1 text-[11px]">Owner Name *</label>
                   <input
                     type="text"
+                    required
                     value={ownerName}
                     onChange={e => setOwnerName(e.target.value)}
+                    placeholder="e.g. Dr. K. V. Rao"
+                    className="w-full p-2 bg-white border border-amber-300 rounded-xl text-xs font-bold text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 mb-1 text-[11px]">Owner Email *</label>
+                  <input
+                    type="email"
+                    required
+                    value={ownerEmail}
+                    onChange={e => setOwnerEmail(e.target.value)}
+                    placeholder="e.g. kvrao@genquantaa.com"
                     className="w-full p-2 bg-white border border-amber-300 rounded-xl text-xs font-bold text-slate-900"
                   />
                 </div>
                 <div>
                   <label className="block text-slate-700 mb-1 text-[11px]">4-Digit Owner PIN *</label>
                   <input
-                    type="password"
+                    type={showPins ? 'text' : 'password'}
                     maxLength={4}
                     required
                     value={ownerPin}
@@ -290,8 +403,8 @@ export const SettingsPage: React.FC = () => {
                   <ShieldCheck className="w-4 h-4" />
                 </div>
                 <div>
-                  <p className="font-bold text-slate-900">Rajesh Verma</p>
-                  <p className="text-[10px] text-slate-500">rajesh.verma@genquantaa.com</p>
+                  <p className="font-bold text-slate-900">{managerName}</p>
+                  <p className="text-[10px] text-slate-500">{managerEmail}</p>
                 </div>
               </div>
               <span className="bg-rose-100 text-rose-900 border border-rose-300 text-[10px] font-extrabold px-2.5 py-1 rounded-full">
@@ -343,15 +456,15 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* ── SECTION 5: THERMAL PRINTER HARDWARE DETAILS ─────────────── */}
+        {/* ── SECTION 5: PRINTER, BARCODE & EXPIRY THRESHOLD SETTINGS ── */}
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-3">
           <div className="flex items-center space-x-2 pb-2.5 border-b border-slate-200">
             <Printer className="w-5 h-5 text-teal-600" />
             <div>
               <h3 className="text-xs font-extrabold text-slate-900 font-heading uppercase tracking-wider">
-                5. Thermal Printer Hardware &amp; Invoice Printing Details
+                5. Hardware, Barcode Scan &amp; Expiry Alarm Thresholds
               </h3>
-              <p className="text-[11px] text-slate-500 font-medium">ESC/POS thermal roll print settings, A4 GST tax invoice options, and audio chimes</p>
+              <p className="text-[11px] text-slate-500 font-medium">ESC/POS thermal roll print options, HID scanner auto-add behavior, and inventory alert windows</p>
             </div>
           </div>
 
@@ -368,7 +481,20 @@ export const SettingsPage: React.FC = () => {
               </select>
             </div>
 
-            <div className="flex flex-col justify-center space-y-2.5 pt-1">
+            <div>
+              <label className="block text-slate-700 mb-1">Near Expiry Warning Alert Window (Days)</label>
+              <select
+                value={nearExpiryDaysThreshold}
+                onChange={e => setNearExpiryDaysThreshold(parseInt(e.target.value) || 30)}
+                className="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-bold text-slate-900"
+              >
+                <option value={30}>⚠️ 30 Days Before Expiry (Recommended Standard)</option>
+                <option value={60}>⚠️ 60 Days Before Expiry (Early Warning)</option>
+                <option value={90}>⚠️ 90 Days Before Expiry (Quarterly Warning)</option>
+              </select>
+            </div>
+
+            <div className="md:col-span-2 flex flex-wrap gap-4 pt-1">
               <label className="flex items-center space-x-2.5 cursor-pointer">
                 <input
                   type="checkbox"
@@ -388,12 +514,31 @@ export const SettingsPage: React.FC = () => {
                 />
                 <span className="text-xs font-bold text-slate-800">Play audio chime on successful HID barcode scan</span>
               </label>
+
+              <label className="flex items-center space-x-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoAddOnScan}
+                  onChange={e => setAutoAddOnScan(e.target.checked)}
+                  className="rounded text-emerald-600 w-4 h-4 cursor-pointer"
+                />
+                <span className="text-xs font-bold text-slate-800">Auto-add scanned barcode item directly to active cart</span>
+              </label>
             </div>
           </div>
         </div>
 
-        {/* ── SAVE ACTION BUTTON ─────────────────────────────────────── */}
-        <div className="flex justify-end pt-3">
+        {/* ── SAVE & RESET ACTION BUTTONS ─────────────────────────────── */}
+        <div className="flex items-center justify-between pt-3 flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={handleResetDefaults}
+            className="flex items-center space-x-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs px-4 py-3 rounded-xl transition-all cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Reset to Factory Defaults</span>
+          </button>
+
           <button
             type="submit"
             className="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-8 py-3.5 rounded-xl shadow-lg cursor-pointer active:scale-95 transition-all"
