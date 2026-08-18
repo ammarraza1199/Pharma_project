@@ -296,6 +296,54 @@ export const MOCK_PRODUCTS: Product[] = [
         mrp: 180.00
       }
     ]
+  },
+  {
+    _id: '64f1a2b3c4d5e6f7a8b9c013',
+    name: 'Tramadol 50mg Capsule (Tramazac)',
+    brand: 'Zydus Healthcare',
+    saltComposition: 'Tramadol Hydrochloride 50mg',
+    barcode: '8901234567802',
+    hsnCode: '30049080',
+    gstRate: 12,
+    unitMRP: 78.00,
+    sellingPrice: 70.00,
+    grossMarginPercent: 26.0,
+    scheduleCategory: 'SCHEDULE_H1',
+    stockStatus: 'IN_STOCK',
+    totalStock: 120,
+    batches: [
+      {
+        batchNumber: 'TRM-50-2025',
+        expiryDate: '2027-04-30',
+        stockQuantity: 120,
+        location: 'Rack H1-01',
+        mrp: 78.00
+      }
+    ]
+  },
+  {
+    _id: '64f1a2b3c4d5e6f7a8b9c014',
+    name: 'Zolpidem 10mg Tablet (Nitrest)',
+    brand: 'Sun Pharma',
+    saltComposition: 'Zolpidem Tartrate 10mg',
+    barcode: '8901234567803',
+    hsnCode: '30049080',
+    gstRate: 12,
+    unitMRP: 115.00,
+    sellingPrice: 102.00,
+    grossMarginPercent: 28.5,
+    scheduleCategory: 'SCHEDULE_H1',
+    stockStatus: 'IN_STOCK',
+    totalStock: 75,
+    batches: [
+      {
+        batchNumber: 'ZOL-10-2025',
+        expiryDate: '2027-06-30',
+        stockQuantity: 75,
+        location: 'Rack H1-02',
+        mrp: 115.00
+      }
+    ]
   }
 ];
 
