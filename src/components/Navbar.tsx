@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import { navigateTo, logoutUser, setInvoiceHistoryModalOpen } from '../store/posSlice';
-import { Wifi, Clock, Store, LogOut, LayoutDashboard, ShoppingCart, Package, Truck, BarChart3, RotateCcw, Users, Building, Settings, History, FileText } from 'lucide-react';
+import { Wifi, Clock, Store, LogOut, LayoutDashboard, ShoppingCart, Package, Truck, BarChart3, RotateCcw, Users, Building, Settings, History, FileText, Siren } from 'lucide-react';
 
 
 
@@ -96,9 +96,13 @@ export const Navbar: React.FC = () => {
 
         {/* Saved Invoices History Nav */}
         <button
-          onClick={() => dispatch(setInvoiceHistoryModalOpen(true))}
-          className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
-          title="Saved Invoices & Billing History"
+          onClick={() => dispatch(navigateTo('INVOICES'))}
+          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+            currentView === 'INVOICES'
+              ? 'bg-emerald-100 text-emerald-800 font-bold'
+              : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
+          }`}
+          title="Invoices & Sales History"
         >
           <History className="w-4 h-4" />
         </button>
@@ -205,6 +209,20 @@ export const Navbar: React.FC = () => {
           title="Store Settings & Hardware Config"
         >
           <Settings className="w-4 h-4" />
+        </button>
+
+        {/* Emergency Delivery Nav (Between Settings & Profile) */}
+        <button
+          onClick={() => dispatch(navigateTo('EMERGENCY_DELIVERY'))}
+          className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer shadow-xs ${
+            currentView === 'EMERGENCY_DELIVERY'
+              ? 'bg-red-600 text-white ring-2 ring-red-300 shadow-sm shadow-red-600/40'
+              : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
+          }`}
+          title="Emergency Fast Delivery (Snake Bite, Heart Attack, Anaphylaxis, etc.)"
+        >
+          <Siren className="w-3.5 h-3.5 text-red-600 animate-pulse" />
+          <span className="font-heading tracking-tight">🚨 Emergency</span>
         </button>
 
         {/* User Profile Initial Avatar with Dropdown */}

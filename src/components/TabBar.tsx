@@ -8,9 +8,10 @@ import {
   holdActiveBill,
   setHeldBillsModalOpen,
   setCustomerDisplayModalOpen,
-  setInvoiceHistoryModalOpen
+  setInvoiceHistoryModalOpen,
+  navigateTo
 } from '../store/posSlice';
-import { Plus, X, PauseCircle, Monitor, ShoppingBag, History, FileText } from 'lucide-react';
+import { Plus, X, PauseCircle, Monitor, ShoppingBag, History, FileText, Siren } from 'lucide-react';
 
 export const TabBar: React.FC = () => {
   const dispatch = useDispatch();
@@ -96,6 +97,16 @@ export const TabBar: React.FC = () => {
           <Plus className="w-4 h-4" />
           <span>New Customer</span>
         </button>
+
+        {/* Emergency Fast Delivery Quick Tab */}
+        <button
+          onClick={() => dispatch(navigateTo('EMERGENCY_DELIVERY'))}
+          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-t-lg bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white text-xs font-black transition-all shadow-sm cursor-pointer ml-2 animate-pulse"
+          title="Go to Emergency Fast Delivery (Snake Bite, Cardiac, Anaphylaxis)"
+        >
+          <Siren className="w-3.5 h-3.5" />
+          <span>🚨 Emergency Fast Delivery</span>
+        </button>
       </div>
 
       {/* Right: Park / Hold Bill & Customer Display Actions */}
@@ -169,9 +180,9 @@ export const TabBar: React.FC = () => {
 
         {/* View Saved Invoices History Button */}
         <button
-          onClick={() => dispatch(setInvoiceHistoryModalOpen(true))}
+          onClick={() => dispatch(navigateTo('INVOICES'))}
           className="flex items-center space-x-1.5 bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
-          title="View All Saved Invoices History"
+          title="View All Saved Invoices History & Journal"
         >
           <History className="w-3.5 h-3.5 text-emerald-600" />
           <span>Past Invoices</span>

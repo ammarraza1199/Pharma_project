@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { clearFinalizedInvoice, setInvoiceHistoryModalOpen } from '../store/posSlice';
+import { clearFinalizedInvoice, setInvoiceHistoryModalOpen, navigateTo } from '../store/posSlice';
 import { useReactToPrint } from 'react-to-print';
 import { Printer, CheckCircle, X, FileText, History } from 'lucide-react';
 import { numberToWords } from '../utils/numberToWords';
@@ -504,11 +504,11 @@ export const ReceiptPrintView: React.FC = () => {
           <button
             onClick={() => {
               dispatch(clearFinalizedInvoice());
-              dispatch(setInvoiceHistoryModalOpen(true));
+              dispatch(navigateTo('INVOICES'));
             }}
             className="flex items-center space-x-1 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl cursor-pointer transition-colors"
           >
-            <History className="w-3.5 h-3.5" />
+            <History className="w-3.5 h-3.5 text-emerald-600" />
             <span>View All Saved Invoices</span>
           </button>
           

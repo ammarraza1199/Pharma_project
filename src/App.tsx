@@ -25,6 +25,8 @@ import { ExpiryManagementPage } from './components/ExpiryManagementPage';
 import { PatientsPage } from './components/PatientsPage';
 import { SuppliersPage } from './components/SuppliersPage';
 import { SettingsPage } from './components/SettingsPage';
+import { EmergencyDeliveryPage } from './components/EmergencyDeliveryPage';
+import { InvoicesPage } from './components/InvoicesPage';
 
 export const App: React.FC = () => {
   const currentView = useSelector((state: RootState) => state.pos.currentView);
@@ -81,6 +83,16 @@ export const App: React.FC = () => {
       {/* ── STORE SETTINGS & HARDWARE CONFIG VIEW ── */}
       {currentView === 'SETTINGS' && (
         <SettingsPage />
+      )}
+
+      {/* ── EMERGENCY FAST DELIVERY VIEW ── */}
+      {currentView === 'EMERGENCY_DELIVERY' && (
+        <EmergencyDeliveryPage />
+      )}
+
+      {/* ── INVOICES & SALES JOURNAL VIEW ── */}
+      {currentView === 'INVOICES' && (
+        <InvoicesPage />
       )}
 
       {/* ── POS TERMINAL VIEW ── */}
