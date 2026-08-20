@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { navigateTo, logoutUser } from '../store/posSlice';
-import { Wifi, Clock, Store, LogOut, LayoutDashboard, ShoppingCart, Package, Truck, BarChart3, RotateCcw, Users, Building, Settings } from 'lucide-react';
+import { navigateTo, logoutUser, setInvoiceHistoryModalOpen } from '../store/posSlice';
+import { Wifi, Clock, Store, LogOut, LayoutDashboard, ShoppingCart, Package, Truck, BarChart3, RotateCcw, Users, Building, Settings, History, FileText } from 'lucide-react';
 
 
 
@@ -92,6 +92,15 @@ export const Navbar: React.FC = () => {
           title="POS Billing Terminal"
         >
           <ShoppingCart className="w-4 h-4" />
+        </button>
+
+        {/* Saved Invoices History Nav */}
+        <button
+          onClick={() => dispatch(setInvoiceHistoryModalOpen(true))}
+          className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
+          title="Saved Invoices & Billing History"
+        >
+          <History className="w-4 h-4" />
         </button>
 
         {/* Inventory Catalog Nav */}

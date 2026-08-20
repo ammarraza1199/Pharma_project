@@ -67,8 +67,12 @@ interface PosState {
   customerDisplayModal: {
     isOpen: boolean;
   };
+  invoiceHistoryModal: {
+    isOpen: boolean;
+  };
   
   // Printing & Finalization
+  invoices: FinalizedInvoice[];
   latestFinalizedInvoice: FinalizedInvoice | null;
   isSubmittingBill: boolean;
 }
@@ -83,6 +87,80 @@ const createInitialSession = (index: number): BillingSession => ({
   pharmacistSignatureAcknowledged: false,
   createdAt: new Date().toISOString()
 });
+
+const LOCAL_STORAGE_INVOICES_KEY = 'genquantaa_pos_saved_invoices_v1';
+
+const getInitialInvoices = (): FinalizedInvoice[] => {
+  try {
+    const saved = localStorage.getItem(LOCAL_STORAGE_INVOICES_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (err) {
+    console.error('Failed to parse saved invoices:', err);
+  }
+  return [
+    {
+      invoiceNumber: 'INV-2026-532089',
+      invoiceDate: '20 Aug 2026, 10:59 am',
+      billingSession: {
+        id: 'session-prev-1',
+        tabTitle: 'Customer 1',
+        items: [
+          {
+            cartItemId: 'item-001',
+            productId: MOCK_PRODUCTS[0]._id,
+            product: MOCK_PRODUCTS[0],
+            selectedBatch: MOCK_PRODUCTS[0].batches[0],
+            quantity: 1,
+            unitPrice: 14.00,
+            discountPercent: 0,
+            taxableAmount: 12.50,
+            cgstAmount: 0.75,
+            sgstAmount: 0.75,
+            totalGst: 1.50,
+            lineTotal: 14.00
+          }
+        ],
+        doctorDetails: { doctorName: 'DR. RAMESH', regNo: 'REG-88219' },
+        patientDetails: { patientName: 'Walk-in Customer', phone: '9876543210', age: '35', gender: 'MALE' },
+        scheduleXVerified: true,
+        pharmacistSignatureAcknowledged: true,
+        createdAt: '2026-08-20T10:59:00Z'
+      },
+      subtotal: 14.00,
+      totalDiscount: 0.00,
+      totalCGST: 0.75,
+      totalSGST: 0.75,
+      grandTotal: 14.00,
+      payment: {
+        method: 'UPI',
+        cashAmount: 0,
+        upiAmount: 14.00,
+        cardAmount: 0,
+        totalPaid: 14.00,
+        changeDue: 0,
+        paymentStatus: 'SUCCESS'
+      },
+      storeInfo: {
+        name: 'GENQUANTAA MEDPLUS PHARMACY',
+        dlNo: 'DL-2024/HYD/889201',
+        gstin: '36AAACG1234F1Z8',
+        address: 'Plot 42, Innovation Corridor, Tech City, Hyderabad - 500081',
+        phone: '+91 98765 43210'
+      }
+    }
+  ];
+};
+
+const saveInvoicesToStorage = (invoices: FinalizedInvoice[]) => {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_INVOICES_KEY, JSON.stringify(invoices.slice(0, 200)));
+  } catch (err) {
+    console.error('Failed to save invoices to localStorage:', err);
+  }
+};
 
 const initialSession = createInitialSession(1);
 
@@ -151,7 +229,11 @@ const initialState: PosState = {
   customerDisplayModal: {
     isOpen: false
   },
+  invoiceHistoryModal: {
+    isOpen: false
+  },
   
+  invoices: getInitialInvoices(),
   latestFinalizedInvoice: null,
   isSubmittingBill: false
 };
@@ -705,6 +787,9 @@ export const posSlice = createSlice({
         }
       };
 
+      state.invoices.unshift(invoice);
+      saveInvoicesToStorage(state.invoices);
+
       state.latestFinalizedInvoice = invoice;
       state.isSubmittingBill = false;
       state.paymentModal.isOpen = false;
@@ -716,6 +801,23 @@ export const posSlice = createSlice({
     },
     clearFinalizedInvoice: (state) => {
       state.latestFinalizedInvoice = null;
+    },
+    setInvoiceHistoryModalOpen: (state, action: PayloadAction<boolean>) => {
+      state.invoiceHistoryModal.isOpen = action.payload;
+    },
+    reprintInvoice: (state, action: PayloadAction<string>) => {
+      const inv = state.invoices.find(i => i.invoiceNumber === action.payload);
+      if (inv) {
+        state.latestFinalizedInvoice = inv;
+      }
+    },
+    deleteSavedInvoice: (state, action: PayloadAction<string>) => {
+      state.invoices = state.invoices.filter(i => i.invoiceNumber !== action.payload);
+      saveInvoicesToStorage(state.invoices);
+    },
+    clearAllSavedInvoices: (state) => {
+      state.invoices = [];
+      saveInvoicesToStorage([]);
     }
   }
 });
@@ -761,7 +863,11 @@ export const {
   openScheduleHDetailsPrompt,
   startSubmittingBill,
   finalizeBillSuccess,
-  clearFinalizedInvoice
+  clearFinalizedInvoice,
+  setInvoiceHistoryModalOpen,
+  reprintInvoice,
+  deleteSavedInvoice,
+  clearAllSavedInvoices
 } = posSlice.actions;
 
 export default posSlice.reducer;

@@ -7,9 +7,10 @@ import {
   closeTab,
   holdActiveBill,
   setHeldBillsModalOpen,
-  setCustomerDisplayModalOpen
+  setCustomerDisplayModalOpen,
+  setInvoiceHistoryModalOpen
 } from '../store/posSlice';
-import { Plus, X, PauseCircle, Monitor, ShoppingBag } from 'lucide-react';
+import { Plus, X, PauseCircle, Monitor, ShoppingBag, History, FileText } from 'lucide-react';
 
 export const TabBar: React.FC = () => {
   const dispatch = useDispatch();
@@ -164,6 +165,16 @@ export const TabBar: React.FC = () => {
               {heldBills.length}
             </span>
           )}
+        </button>
+
+        {/* View Saved Invoices History Button */}
+        <button
+          onClick={() => dispatch(setInvoiceHistoryModalOpen(true))}
+          className="flex items-center space-x-1.5 bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+          title="View All Saved Invoices History"
+        >
+          <History className="w-3.5 h-3.5 text-emerald-600" />
+          <span>Past Invoices</span>
         </button>
 
         {/* Dual Monitor Customer Display Toggle */}

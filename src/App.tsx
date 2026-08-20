@@ -15,6 +15,7 @@ import { PaymentModal } from './components/PaymentModal';
 import { HeldBillsModal } from './components/HeldBillsModal';
 import { CustomerDisplayModal } from './components/CustomerDisplayModal';
 import { ReceiptPrintView } from './components/ReceiptPrintView';
+import { InvoiceHistoryModal } from './components/InvoiceHistoryModal';
 import { Dashboard } from './components/Dashboard';
 import { InventoryPage } from './components/InventoryPage';
 import { PurchaseGRNPage } from './components/PurchaseGRNPage';
@@ -113,9 +114,12 @@ export const App: React.FC = () => {
           <PaymentModal />
           <HeldBillsModal />
           <CustomerDisplayModal />
-          <ReceiptPrintView />
         </>
       )}
+
+      {/* Global Overlays accessible from all tabs */}
+      <ReceiptPrintView />
+      <InvoiceHistoryModal />
     </div>
   );
 };

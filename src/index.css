@@ -62,21 +62,20 @@
   background: #94A3B8;
 }
 
-/* Thermal Print Specific Styles */
+/* Thermal & A4 Print Specific Styles */
 @media print {
   body * {
     visibility: hidden;
   }
-  #printable-receipt, #printable-receipt * {
+  #printable-area, #printable-area * {
     visibility: visible;
   }
-  #printable-receipt {
+  #printable-area {
     position: absolute;
     left: 0;
     top: 0;
-    width: 80mm;
+    width: 100%;
     margin: 0;
-    padding: 10px;
-    font-size: 11px;
+    padding: 0;
   }
 }
