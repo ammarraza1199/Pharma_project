@@ -2,6 +2,7 @@ import React from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import { setPaymentModalOpen, openScheduleHDetailsPrompt } from '../store/posSlice';
+import { getMedicineDetails } from '../utils/medicineDetails';
 import { CreditCard, ShieldAlert, Loader2, ArrowRight } from 'lucide-react';
 
 export const CartSummary: React.FC = () => {
@@ -20,7 +21,18 @@ export const CartSummary: React.FC = () => {
   const totalCGST = items.reduce((sum, item) => sum + item.cgstAmount, 0);
   const totalSGST = items.reduce((sum, item) => sum + item.sgstAmount, 0);
   const grandTotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
-  const totalItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  
+  const totalPacksCount = items
+    .filter(item => (item.unitMode || 'PACK') === 'PACK')
+    .reduce((sum, item) => sum + item.quantity, 0);
+  const totalLooseUnits = items
+    .filter(item => (item.unitMode || 'PACK') === 'LOOSE')
+    .reduce((sum, item) => sum + item.quantity, 0);
+  const totalTabletsCount = items.reduce((sum, item) => {
+    const details = getMedicineDetails(item.product);
+    const isLoose = (item.unitMode || 'PACK') === 'LOOSE';
+    return sum + (isLoose ? item.quantity : item.quantity * details.unitsPerPack);
+  }, 0);
 
   // Check if any Schedule H / H1 items are in cart without Doctor info
   const hasScheduleHItems = items.some(i => i.product.scheduleCategory === 'SCHEDULE_H' || i.product.scheduleCategory === 'SCHEDULE_H1');
@@ -44,10 +56,24 @@ export const CartSummary: React.FC = () => {
       <div>
         <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100 font-heading flex items-center justify-between">
           <span>Billing Summary</span>
-          <span className="text-slate-700 font-semibold">{totalItemsCount} Units</span>
+          <span className="text-emerald-800 font-extrabold text-[11px] font-mono">
+            {totalPacksCount > 0 && `${totalPacksCount} Packs`}
+            {totalPacksCount > 0 && totalLooseUnits > 0 && ' + '}
+            {totalLooseUnits > 0 && `${totalLooseUnits} Loose Tabs`}
+            {` (${totalTabletsCount} Units)`}
+          </span>
         </h2>
 
         <div className="space-y-2 text-xs font-medium text-slate-600">
+          <div className="flex justify-between text-slate-700 bg-slate-50 p-2 rounded-lg border border-slate-200 text-[11.5px]">
+            <span>Selected Quantity</span>
+            <span className="font-extrabold text-slate-900 font-mono">
+              {totalPacksCount > 0 && `${totalPacksCount} Packs `}
+              {totalLooseUnits > 0 && `${totalLooseUnits} Loose Tabs `}
+              ({totalTabletsCount} Tablets/Units)
+            </span>
+          </div>
+
           <div className="flex justify-between">
             <span>Items Gross Total</span>
             <span className="font-bold text-slate-800">₹{subtotal.toFixed(2)}</span>

@@ -21,6 +21,8 @@ export interface BatchInfo {
   mrp: number;
 }
 
+export type MedicineType = 'Oral' | 'Injectable' | 'Topical' | 'Inhalation' | 'Ophthalmic' | 'Nasal' | 'Rectal';
+
 export interface Product {
   _id: string; // MongoDB ObjectID format
   name: string;
@@ -37,7 +39,14 @@ export interface Product {
   stockStatus: StockStatus;
   totalStock: number;
   batches: BatchInfo[];
+  packSize?: string; // e.g. "10 Tablets in a Strip", "15 Tablets / Strip", "100ml / Bottle"
+  unitsPerPack?: number; // e.g. 10, 15, 1
+  packType?: string; // e.g. "Strip", "Bottle", "Vial", "Box", "Tube"
+  medicineType?: MedicineType; // e.g. "Oral", "Injectable", "Topical"
+  dosageForm?: string; // e.g. "Tablet", "Capsule", "Syrup", "Injection"
 }
+
+export type SellingUnitMode = 'PACK' | 'LOOSE';
 
 export interface CartItem {
   cartItemId: string;
@@ -45,6 +54,7 @@ export interface CartItem {
   product: Product;
   selectedBatch: BatchInfo;
   quantity: number;
+  unitMode?: SellingUnitMode; // 'PACK' (full strip/bottle) or 'LOOSE' (individual loose tablets/units)
   unitPrice: number;
   discountPercent: number;
   taxableAmount: number;
@@ -52,6 +62,8 @@ export interface CartItem {
   sgstAmount: number;
   totalGst: number;
   lineTotal: number;
+  isSubstitute?: boolean;
+  substitutedFor?: string;
 }
 
 export interface DoctorDetails {

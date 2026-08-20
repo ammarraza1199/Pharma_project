@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import {
   updateCartItemQuantity,
+  updateCartItemUnitMode,
   updateCartItemDiscount,
   removeFromCart,
   clearActiveCart,
@@ -10,9 +11,10 @@ import {
   openScheduleHDetailsPrompt
 } from '../store/posSlice';
 import { analyzeDrugInteractions } from '../utils/drugInteractionEngine';
+import { getMedicineDetails } from '../utils/medicineDetails';
 import {
   Trash2, Plus, Minus, AlertTriangle, AlertOctagon, UserCheck,
-  Stethoscope, Edit2, Percent, FileText, RefreshCcw
+  Stethoscope, Edit2, Percent, FileText, RefreshCcw, Pill
 } from 'lucide-react';
 
 export const CartTable: React.FC = () => {
@@ -36,7 +38,17 @@ export const CartTable: React.FC = () => {
     return exp < thirtyDaysFromNow && exp > new Date();
   };
 
-  const totalItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalPacksCount = items
+    .filter(item => (item.unitMode || 'PACK') === 'PACK')
+    .reduce((sum, item) => sum + item.quantity, 0);
+  const totalLooseUnits = items
+    .filter(item => (item.unitMode || 'PACK') === 'LOOSE')
+    .reduce((sum, item) => sum + item.quantity, 0);
+  const totalTabletsCount = items.reduce((sum, item) => {
+    const details = getMedicineDetails(item.product);
+    const isLoose = (item.unitMode || 'PACK') === 'LOOSE';
+    return sum + (isLoose ? item.quantity : item.quantity * details.unitsPerPack);
+  }, 0);
   const hasRxItems = items.some(i => i.product.scheduleCategory !== 'REGULAR');
 
   const handleClearCart = () => {
@@ -106,7 +118,7 @@ export const CartTable: React.FC = () => {
         <div className="flex items-center space-x-2">
           <span className="text-xs font-bold text-slate-800 font-heading">Active Cart</span>
           <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-emerald-300">
-            {items.length} Medicines ({totalItemsCount} Units)
+            {items.length} Meds ({totalPacksCount > 0 && `${totalPacksCount} Packs`}{totalPacksCount > 0 && totalLooseUnits > 0 && ' + '}{totalLooseUnits > 0 && `${totalLooseUnits} Loose Tabs`} • {totalTabletsCount} Tablets/Units)
           </span>
         </div>
 
@@ -210,6 +222,22 @@ export const CartTable: React.FC = () => {
                         {item.product.name}
                       </div>
                       <div className="text-[10px] text-slate-500 truncate">{item.product.saltComposition}</div>
+                      
+                      {/* Medicine Size & Type Info */}
+                      {(() => {
+                        const medDetails = getMedicineDetails(item.product);
+                        return (
+                          <div className="flex items-center space-x-1 mt-0.5 flex-wrap gap-y-0.5 text-[9px]">
+                            <span className="bg-blue-50 text-blue-800 font-extrabold px-1 rounded border border-blue-200">
+                              Type: {medDetails.medicineType}
+                            </span>
+                            <span className="bg-slate-100 text-slate-700 font-medium px-1 rounded border border-slate-200">
+                              {medDetails.packSize}
+                            </span>
+                          </div>
+                        );
+                      })()}
+
                       <div className="flex items-center space-x-1 mt-0.5 flex-wrap gap-y-0.5">
                         <span className="text-[9px] bg-slate-100 text-slate-600 px-1 rounded font-mono">
                           HSN: {item.product.hsnCode}
@@ -219,7 +247,21 @@ export const CartTable: React.FC = () => {
                             {item.product.scheduleCategory}
                           </span>
                         )}
+                        {item.isSubstitute ? (
+                          <span className="text-[9px] bg-emerald-100 text-emerald-800 font-black px-1.5 py-0.2 rounded border border-emerald-300">
+                            🎁 15% Substitute Discount
+                          </span>
+                        ) : item.discountPercent > 0 ? (
+                          <span className="text-[9px] bg-emerald-50 text-emerald-700 font-bold px-1 rounded border border-emerald-200">
+                            {item.discountPercent}% Off
+                          </span>
+                        ) : null}
                       </div>
+                      {item.substitutedFor && (
+                        <div className="text-[9px] text-emerald-700 font-medium italic mt-0.5">
+                          Substituted for: {item.substitutedFor}
+                        </div>
+                      )}
                     </td>
 
                     {/* Batch & Expiry */}
@@ -237,8 +279,33 @@ export const CartTable: React.FC = () => {
                       )}
                     </td>
 
-                    {/* Quantity Controls */}
-                    <td className="py-2.5 px-1 text-center" style={{ width: '95px' }}>
+                    {/* Quantity Controls, Unit Mode Toggle & Total Tablets Count */}
+                    <td className="py-2.5 px-1 text-center" style={{ width: '110px' }}>
+                      {/* Unit Mode Toggle: Full Strip / Loose Tablet */}
+                      {(() => {
+                        const medDetails = getMedicineDetails(item.product);
+                        const isLoose = (item.unitMode || 'PACK') === 'LOOSE';
+                        if (medDetails.unitsPerPack <= 1) return null;
+                        return (
+                          <div className="flex items-center justify-center bg-slate-100 p-0.5 rounded-md border border-slate-200 mb-1 mx-auto" style={{ width: 'fit-content' }}>
+                            <button
+                              type="button"
+                              onClick={() => dispatch(updateCartItemUnitMode({ cartItemId: item.cartItemId, unitMode: 'PACK' }))}
+                              className={`text-[8.5px] font-bold px-1.5 py-0.5 rounded cursor-pointer transition-all ${
+                                !isLoose ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                              }`}
+                            >📦 Strip</button>
+                            <button
+                              type="button"
+                              onClick={() => dispatch(updateCartItemUnitMode({ cartItemId: item.cartItemId, unitMode: 'LOOSE' }))}
+                              className={`text-[8.5px] font-bold px-1.5 py-0.5 rounded cursor-pointer transition-all ${
+                                isLoose ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                              }`}
+                            >💊 Loose</button>
+                          </div>
+                        );
+                      })()}
+
                       <div className={`inline-flex items-center border rounded-md bg-white ${
                         stockExceeded ? 'border-rose-400 bg-rose-50' : 'border-slate-300'
                       }`}>
@@ -273,6 +340,26 @@ export const CartTable: React.FC = () => {
                           <Plus className="w-3 h-3" />
                         </button>
                       </div>
+
+                      {/* Total Units Calculated for this Item */}
+                      {(() => {
+                        const medDetails = getMedicineDetails(item.product);
+                        const isLoose = (item.unitMode || 'PACK') === 'LOOSE';
+                        const label = medDetails.dosageForm === 'Tablet' ? 'Tabs' : medDetails.dosageForm === 'Capsule' ? 'Caps' : 'Units';
+                        if (isLoose) {
+                          return (
+                            <div className="text-[9px] font-black text-purple-700 mt-0.5 font-mono">
+                              {item.quantity} {label} (Loose)
+                            </div>
+                          );
+                        }
+                        const lineTotalUnits = item.quantity * medDetails.unitsPerPack;
+                        return (
+                          <div className="text-[9.5px] font-black text-emerald-800 mt-0.5 font-mono">
+                            (= {lineTotalUnits} {label})
+                          </div>
+                        );
+                      })()}
                       {stockExceeded && (
                         <div className="text-[9px] font-bold text-rose-600 mt-0.5">
                           Max stock: {item.selectedBatch.stockQuantity}
@@ -282,7 +369,17 @@ export const CartTable: React.FC = () => {
 
                     {/* Unit Price */}
                     <td className="py-2.5 px-1 text-right font-bold text-slate-800 whitespace-nowrap" style={{ width: '68px' }}>
-                      ₹{item.unitPrice.toFixed(2)}
+                      {(() => {
+                        const isLoose = (item.unitMode || 'PACK') === 'LOOSE';
+                        return (
+                          <>
+                            ₹{item.unitPrice.toFixed(2)}
+                            {isLoose && (
+                              <div className="text-[9px] text-purple-600 font-bold">/tablet</div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </td>
 
                     {/* Discount Input */}
@@ -298,9 +395,16 @@ export const CartTable: React.FC = () => {
                             })
                           )
                         }
-                        className="w-10 text-center text-xs border border-slate-300 rounded py-0.5 focus:outline-hidden font-medium text-slate-700"
+                        className={`w-10 text-center text-xs border rounded py-0.5 focus:outline-hidden font-bold ${
+                          item.isSubstitute || item.discountPercent === 15
+                            ? 'bg-emerald-100 border-emerald-400 text-emerald-900 ring-2 ring-emerald-300/50'
+                            : item.discountPercent > 0
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                            : 'border-slate-300 text-slate-700'
+                        }`}
                         min="0"
                         max="100"
+                        title={item.isSubstitute ? '15% Out of Stock Substitution Discount' : 'Discount Percentage'}
                       />
                     </td>
 

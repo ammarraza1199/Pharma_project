@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import { addItemToCart } from '../store/posSlice';
+import { getMedicineDetails } from '../utils/medicineDetails';
 import type { Product, BatchInfo, ScheduleCategory } from '../types/pos';
 import {
   Search, ScanBarcode, AlertCircle, Plus, Zap,
@@ -49,6 +50,7 @@ export const ProductSearch: React.FC = () => {
   const [showSortMenu,     setShowSortMenu]     = useState<boolean>(false);
   const [selectedBatchMap, setSelectedBatchMap] = useState<Record<string, BatchInfo>>({});
   const [qtyMap,           setQtyMap]           = useState<Record<string, number>>({});
+  const [unitModeMap,      setUnitModeMap]      = useState<Record<string, SellingUnitMode>>({});
   const [barcodeFlash,     setBarcodeFlash]     = useState<string | null>(null);  // product._id flashing
 
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -138,8 +140,9 @@ export const ProductSearch: React.FC = () => {
     setTimeout(() => setBarcodeFlash(null), 600);
     const batch = selectedBatchMap[product._id] || product.batches[0];
     const qty   = qtyMap[product._id] || 1;
-    dispatch(addItemToCart({ product, selectedBatch: batch, quantity: qty }));
-  }, [selectedBatchMap, qtyMap, dispatch]);
+    const unitMode = unitModeMap[product._id] || 'PACK';
+    dispatch(addItemToCart({ product, selectedBatch: batch, quantity: qty, unitMode }));
+  }, [selectedBatchMap, qtyMap, unitModeMap, dispatch]);
 
   const handleAddToCart = (product: Product) => flashAndAdd(product);
 
@@ -361,6 +364,53 @@ export const ProductSearch: React.FC = () => {
                       </span>
                     </div>
 
+                    {/* Medicine Pack Size, Type Badges & Loose Tablet Mode Toggle */}
+                    {(() => {
+                      const medDetails = getMedicineDetails(product);
+                      const currentUnitMode = unitModeMap[product._id] || 'PACK';
+                      const perTabletPrice = product.sellingPrice / medDetails.unitsPerPack;
+
+                      return (
+                        <div className="flex items-center space-x-1.5 mt-1.5 flex-wrap gap-y-1">
+                          <span className="text-[9.5px] bg-slate-100 text-slate-800 font-bold px-1.5 py-0.5 rounded border border-slate-200">
+                            💊 Pack: {medDetails.packSize}
+                          </span>
+                          <span className="text-[9.5px] bg-blue-50 text-blue-800 font-extrabold px-1.5 py-0.5 rounded border border-blue-200">
+                            Type: {medDetails.medicineType}
+                          </span>
+
+                          {/* Loose Tablet vs Full Strip Mode Selector */}
+                          {medDetails.unitsPerPack > 1 && (
+                            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                              <button
+                                type="button"
+                                onClick={() => setUnitModeMap(prev => ({ ...prev, [product._id]: 'PACK' }))}
+                                className={`text-[9px] font-bold px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                                  currentUnitMode === 'PACK'
+                                    ? 'bg-emerald-600 text-white shadow-2xs'
+                                    : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                              >
+                                📦 Full Strip
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setUnitModeMap(prev => ({ ...prev, [product._id]: 'LOOSE' }))}
+                                className={`text-[9px] font-bold px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                                  currentUnitMode === 'LOOSE'
+                                    ? 'bg-emerald-600 text-white shadow-2xs'
+                                    : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                                title={`Sell loose tablets at ₹${perTabletPrice.toFixed(2)} per tablet`}
+                              >
+                                💊 Loose (₹{perTabletPrice.toFixed(2)}/tab)
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     {/* Batch selector */}
                     {!isOut && product.batches.length > 0 && (
                       <div className="mt-2 flex items-center space-x-2 flex-wrap gap-y-1">
@@ -387,7 +437,9 @@ export const ProductSearch: React.FC = () => {
                             onClick={() => setQty(product._id, qty - 1)}
                             className="px-1.5 py-0.5 text-slate-500 hover:bg-slate-100 text-xs font-bold cursor-pointer"
                           >−</button>
-                          <span className="px-2 text-xs font-bold text-slate-800 min-w-[24px] text-center">{qty}</span>
+                          <span className="px-2 text-xs font-bold text-slate-800 min-w-[24px] text-center">
+                            {qty} {(unitModeMap[product._id] || 'PACK') === 'LOOSE' ? 'Tab' : 'Pack'}
+                          </span>
                           <button
                             type="button"
                             onClick={() => setQty(product._id, qty + 1)}
@@ -399,18 +451,29 @@ export const ProductSearch: React.FC = () => {
                   </div>
 
                   {/* Right side: Price + Action button */}
-                  <div className="flex flex-col items-end justify-between self-stretch pl-2 border-l border-slate-100 min-w-[80px]">
-                    <div className="text-right">
-                      <div className="text-sm font-black text-emerald-700 font-heading leading-tight">
-                        ₹{product.sellingPrice.toFixed(2)}
-                      </div>
-                      <div className="text-[10px] text-slate-400 line-through">
-                        ₹{product.unitMRP.toFixed(2)}
-                      </div>
-                      <div className="text-[10px] text-emerald-600 font-semibold">
-                        Save {Math.round((1 - product.sellingPrice / product.unitMRP) * 100)}%
-                      </div>
-                    </div>
+                  <div className="flex flex-col items-end justify-between self-stretch pl-2 border-l border-slate-100 min-w-[85px]">
+                    {(() => {
+                      const medDetails = getMedicineDetails(product);
+                      const currentUnitMode = unitModeMap[product._id] || 'PACK';
+                      const perTabletPrice = product.sellingPrice / medDetails.unitsPerPack;
+                      const displayPrice = currentUnitMode === 'LOOSE' ? perTabletPrice : product.sellingPrice;
+
+                      return (
+                        <div className="text-right">
+                          <div className="text-sm font-black text-emerald-700 font-heading leading-tight">
+                            ₹{displayPrice.toFixed(2)}
+                            <span className="text-[9px] font-bold text-slate-500 block">
+                              {currentUnitMode === 'LOOSE' ? 'per tablet' : 'per strip'}
+                            </span>
+                          </div>
+                          {currentUnitMode === 'PACK' && medDetails.unitsPerPack > 1 && (
+                            <div className="text-[9px] text-slate-400">
+                              (₹{perTabletPrice.toFixed(2)}/tab)
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     <button
                       onClick={() => handleAddToCart(product)}
@@ -428,7 +491,7 @@ export const ProductSearch: React.FC = () => {
                       ) : (
                         <>
                           <Plus className="w-3 h-3" />
-                          <span>Add {qty > 1 ? `×${qty}` : ''}</span>
+                          <span>Add {qty > 1 ? `×${qty}` : ''} {(unitModeMap[product._id] || 'PACK') === 'LOOSE' ? 'Tab' : ''}</span>
                         </>
                       )}
                     </button>

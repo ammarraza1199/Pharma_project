@@ -19,10 +19,12 @@ import type {
   DisposalRecord,
   PatientRecord,
   SupplierRecord,
-  StoreSettings
+  StoreSettings,
+  SellingUnitMode
 } from '../types/pos';
 import { MOCK_PRODUCTS } from '../mock/products';
 import { calculateItemGST } from '../utils/gstCalculator';
+import { getMedicineDetails } from '../utils/medicineDetails';
 import { analyzeDrugInteractions } from '../utils/drugInteractionEngine';
 
 interface PosState {
@@ -260,7 +262,11 @@ const addProductToCartInternal = (
   state: PosState,
   product: Product,
   selectedBatch?: BatchInfo,
-  quantity: number = 1
+  quantity: number = 1,
+  discountPercent: number = 0,
+  isSubstitute: boolean = false,
+  substitutedFor?: string,
+  unitMode: SellingUnitMode = 'PACK'
 ) => {
   const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
   if (!currentSession) return;
@@ -278,32 +284,51 @@ const addProductToCartInternal = (
     }
   }
 
-  const existingItem = currentSession.items.find(item => item.productId === product._id && item.selectedBatch.batchNumber === batchToUse?.batchNumber);
+  const details = getMedicineDetails(product);
+  const effectiveUnitPrice = unitMode === 'LOOSE'
+    ? (product.sellingPrice / details.unitsPerPack)
+    : product.sellingPrice;
+
+  const existingItem = currentSession.items.find(
+    item => item.productId === product._id &&
+            item.selectedBatch.batchNumber === batchToUse?.batchNumber &&
+            (item.unitMode || 'PACK') === unitMode
+  );
 
   if (existingItem) {
     const newQty = existingItem.quantity + quantity;
-    const gst = calculateItemGST(product.sellingPrice, newQty, existingItem.discountPercent, product.gstRate);
+    const finalDiscount = Math.max(existingItem.discountPercent, discountPercent);
+    const gst = calculateItemGST(effectiveUnitPrice, newQty, finalDiscount, product.gstRate);
     existingItem.quantity = newQty;
+    existingItem.unitPrice = effectiveUnitPrice;
+    existingItem.discountPercent = finalDiscount;
     existingItem.taxableAmount = gst.taxableAmount;
     existingItem.cgstAmount = gst.cgstAmount;
     existingItem.sgstAmount = gst.sgstAmount;
     existingItem.totalGst = gst.totalGst;
     existingItem.lineTotal = gst.lineTotal;
+    if (isSubstitute) {
+      existingItem.isSubstitute = true;
+      if (substitutedFor) existingItem.substitutedFor = substitutedFor;
+    }
   } else {
-    const gst = calculateItemGST(product.sellingPrice, quantity, 0, product.gstRate);
+    const gst = calculateItemGST(effectiveUnitPrice, quantity, discountPercent, product.gstRate);
     const newItem: CartItem = {
       cartItemId: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       productId: product._id,
       product,
       selectedBatch: batchToUse,
       quantity,
-      unitPrice: product.sellingPrice,
-      discountPercent: 0,
+      unitMode,
+      unitPrice: effectiveUnitPrice,
+      discountPercent: discountPercent,
       taxableAmount: gst.taxableAmount,
       cgstAmount: gst.cgstAmount,
       sgstAmount: gst.sgstAmount,
       totalGst: gst.totalGst,
-      lineTotal: gst.lineTotal
+      lineTotal: gst.lineTotal,
+      isSubstitute,
+      substitutedFor
     };
     currentSession.items.push(newItem);
   }
@@ -481,8 +506,27 @@ export const posSlice = createSlice({
     },
 
     // Cart Management
-    addItemToCart: (state, action: PayloadAction<{ product: Product; selectedBatch?: BatchInfo; quantity?: number; isAuthorizedByPin?: boolean; skipSchHPrompt?: boolean }>) => {
-      const { product, selectedBatch, quantity = 1, isAuthorizedByPin = false } = action.payload;
+    addItemToCart: (state, action: PayloadAction<{
+      product: Product;
+      selectedBatch?: BatchInfo;
+      quantity?: number;
+      unitMode?: SellingUnitMode;
+      isAuthorizedByPin?: boolean;
+      skipSchHPrompt?: boolean;
+      discountPercent?: number;
+      isSubstitute?: boolean;
+      substitutedFor?: string;
+    }>) => {
+      const {
+        product,
+        selectedBatch,
+        quantity = 1,
+        unitMode = 'PACK',
+        isAuthorizedByPin = false,
+        discountPercent = 0,
+        isSubstitute = false,
+        substitutedFor
+      } = action.payload;
       const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
       if (!currentSession) return;
 
@@ -530,7 +574,7 @@ export const posSlice = createSlice({
       }
 
       // 4. Batch Selection & Cart addition
-      addProductToCartInternal(state, product, selectedBatch, quantity);
+      addProductToCartInternal(state, product, selectedBatch, quantity, discountPercent, isSubstitute, substitutedFor, unitMode);
     },
 
     updateCartItemQuantity: (state, action: PayloadAction<{ cartItemId: string; quantity: number }>) => {
@@ -550,6 +594,33 @@ export const posSlice = createSlice({
           item.totalGst = gst.totalGst;
           item.lineTotal = gst.lineTotal;
         }
+      }
+    },
+
+    updateCartItemUnitMode: (state, action: PayloadAction<{ cartItemId: string; unitMode: SellingUnitMode }>) => {
+      const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
+      if (!currentSession) return;
+
+      const item = currentSession.items.find(i => i.cartItemId === action.payload.cartItemId);
+      if (item && (item.unitMode || 'PACK') !== action.payload.unitMode) {
+        const details = getMedicineDetails(item.product);
+        const newMode = action.payload.unitMode;
+        item.unitMode = newMode;
+
+        if (newMode === 'LOOSE') {
+          item.quantity = Math.max(1, Math.round(item.quantity * details.unitsPerPack));
+          item.unitPrice = item.product.sellingPrice / details.unitsPerPack;
+        } else {
+          item.quantity = Math.max(1, Math.ceil(item.quantity / details.unitsPerPack));
+          item.unitPrice = item.product.sellingPrice;
+        }
+
+        const gst = calculateItemGST(item.unitPrice, item.quantity, item.discountPercent, item.product.gstRate);
+        item.taxableAmount = gst.taxableAmount;
+        item.cgstAmount = gst.cgstAmount;
+        item.sgstAmount = gst.sgstAmount;
+        item.totalGst = gst.totalGst;
+        item.lineTotal = gst.lineTotal;
       }
     },
 
@@ -841,6 +912,7 @@ export const {
   closeTab,
   addItemToCart,
   updateCartItemQuantity,
+  updateCartItemUnitMode,
   updateCartItemDiscount,
   removeFromCart,
   clearActiveCart,

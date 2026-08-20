@@ -5,6 +5,7 @@ import { clearFinalizedInvoice, setInvoiceHistoryModalOpen } from '../store/posS
 import { useReactToPrint } from 'react-to-print';
 import { Printer, CheckCircle, X, FileText, History } from 'lucide-react';
 import { numberToWords } from '../utils/numberToWords';
+import { getMedicineDetails } from '../utils/medicineDetails';
 
 export const ReceiptPrintView: React.FC = () => {
   const dispatch = useDispatch();
@@ -22,7 +23,14 @@ export const ReceiptPrintView: React.FC = () => {
   // Extract / calculate invoice level values
   const items = invoice.billingSession.items || [];
 
-  const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalPacksCount = items.filter(i => (i.unitMode || 'PACK') === 'PACK').reduce((sum, item) => sum + item.quantity, 0);
+  const totalLooseCount = items.filter(i => (i.unitMode || 'PACK') === 'LOOSE').reduce((sum, item) => sum + item.quantity, 0);
+  const totalQty = totalPacksCount + (totalLooseCount > 0 ? 1 : 0); // packs + 1 group for loose
+  const totalTabletsCount = items.reduce((sum, item) => {
+    const details = getMedicineDetails(item.product);
+    const isLoose = (item.unitMode || 'PACK') === 'LOOSE';
+    return sum + (isLoose ? item.quantity : item.quantity * details.unitsPerPack);
+  }, 0);
   const grossAmount = items.reduce((sum, item) => {
     const mrp = item.selectedBatch?.mrp || item.product?.unitMRP || item.unitPrice;
     return sum + (mrp * item.quantity);
@@ -140,21 +148,39 @@ export const ReceiptPrintView: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {items.map(item => (
-                      <tr key={item.cartItemId} className="border-b border-slate-100">
-                        <td className="py-1 pr-1">
-                          <div className="font-bold">{item.product.name}</div>
-                          <div className="text-[8px] text-slate-500">Batch: {item.selectedBatch.batchNumber} (Exp: {item.selectedBatch.expiryDate})</div>
-                        </td>
-                        <td className="py-1 text-center font-bold">{item.quantity}</td>
-                        <td className="py-1 text-right">₹{item.unitPrice.toFixed(2)}</td>
-                        <td className="py-1 text-right font-bold">₹{item.lineTotal.toFixed(2)}</td>
-                      </tr>
-                    ))}
+                    {items.map(item => {
+                      const medDetails = getMedicineDetails(item.product);
+                      const isLoose = (item.unitMode || 'PACK') === 'LOOSE';
+                      const totalUnits = isLoose ? item.quantity : item.quantity * medDetails.unitsPerPack;
+                      const unitLabel = medDetails.dosageForm === 'Tablet' ? 'Tab' : medDetails.dosageForm === 'Capsule' ? 'Cap' : 'Unit';
+                      return (
+                        <tr key={item.cartItemId} className="border-b border-slate-100">
+                          <td className="py-1 pr-1">
+                            <div className="font-bold">{item.product.name} ({medDetails.medicineType})</div>
+                            <div className="text-[8px] text-slate-600">
+                              {isLoose
+                                ? `Loose: ${totalUnits} ${unitLabel}s @ ₹${item.unitPrice.toFixed(2)}/tab`
+                                : `Pack: ${medDetails.packSize} • Total: ${totalUnits} ${medDetails.dosageForm}s`
+                              }
+                            </div>
+                            <div className="text-[8px] text-slate-500">Batch: {item.selectedBatch.batchNumber} (Exp: {item.selectedBatch.expiryDate})</div>
+                          </td>
+                          <td className="py-1 text-center font-bold">
+                            {isLoose ? `${item.quantity} ${unitLabel}` : item.quantity}
+                          </td>
+                          <td className="py-1 text-right">
+                            ₹{item.unitPrice.toFixed(2)}
+                            {isLoose && <div className="text-[7px]">/tab</div>}
+                          </td>
+                          <td className="py-1 text-right font-bold">₹{item.lineTotal.toFixed(2)}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
 
                 <div className="space-y-0.5 text-right font-semibold text-[10px] pb-2 border-b border-dashed border-slate-400">
+                  <div>Total Quantity: {totalQty} Packs ({totalTabletsCount} Tablets/Units)</div>
                   <div>Subtotal: ₹{invoice.subtotal.toFixed(2)}</div>
                   <div>Total Discount: -₹{invoice.totalDiscount.toFixed(2)}</div>
                   <div>CGST: ₹{invoice.totalCGST.toFixed(2)}</div>
@@ -245,12 +271,12 @@ export const ReceiptPrintView: React.FC = () => {
                   <thead>
                     <tr className="border-b border-black font-bold uppercase text-[8px] bg-slate-50 text-center">
                       <th className="border-r border-black p-1 w-5">SR.</th>
-                      <th className="border-r border-black p-1 text-left">PRODUCT NAME</th>
+                      <th className="border-r border-black p-1 text-left">PRODUCT NAME &amp; TYPE</th>
                       <th className="border-r border-black p-1 text-left">Mfr. Name</th>
                       <th className="border-r border-black p-1">BATCH NO.</th>
                       <th className="border-r border-black p-1">EXP. DATE</th>
-                      <th className="border-r border-black p-1">QTY (Unit)</th>
-                      <th className="border-r border-black p-1">UOM (Unit)</th>
+                      <th className="border-r border-black p-1">QTY (Pack)</th>
+                      <th className="border-r border-black p-1">UOM</th>
                       <th className="border-r border-black p-1">Pack Size</th>
                       <th className="border-r border-black p-1 text-right">MRP (₹)</th>
                       <th className="border-r border-black p-1 text-right">DISC AMT. (₹)</th>
@@ -265,6 +291,10 @@ export const ReceiptPrintView: React.FC = () => {
                     {items.map((item, idx) => {
                       const mrp = item.selectedBatch?.mrp || item.product?.unitMRP || item.unitPrice;
                       const discAmt = (item.unitPrice * item.quantity * item.discountPercent) / 100;
+                      const medDetails = getMedicineDetails(item.product);
+                      const isLoose = (item.unitMode || 'PACK') === 'LOOSE';
+                      const totalUnitsForLine = isLoose ? item.quantity : item.quantity * medDetails.unitsPerPack;
+                      const unitLabel = medDetails.dosageForm === 'Tablet' ? 'Tab' : medDetails.dosageForm === 'Capsule' ? 'Cap' : 'Unit';
 
                       // Expiry Date formatting (e.g. 2028-03-31 -> 03/28)
                       let expFormatted = item.selectedBatch?.expiryDate || '03/28';
@@ -278,13 +308,25 @@ export const ReceiptPrintView: React.FC = () => {
                       return (
                         <tr key={item.cartItemId} className="border-b border-black text-center align-top">
                           <td className="border-r border-black p-1">{idx + 1}</td>
-                          <td className="border-r border-black p-1 text-left font-semibold">{item.product.name}</td>
+                          <td className="border-r border-black p-1 text-left">
+                            <div className="font-semibold">{item.product.name}</div>
+                            {isLoose
+                              ? <div className="text-[7.5px] text-purple-700 font-bold">LOOSE: {totalUnitsForLine} {unitLabel}s @ ₹{item.unitPrice.toFixed(2)}/tab ({medDetails.medicineType})</div>
+                              : <div className="text-[7.5px] text-slate-700 font-mono">Form: {medDetails.medicineType} • ({totalUnitsForLine} {medDetails.dosageForm}s)</div>
+                            }
+                          </td>
                           <td className="border-r border-black p-1 text-left text-[8px]">{item.product.brand || 'Pharma Ltd'}</td>
                           <td className="border-r border-black p-1 font-mono text-[8px]">{item.selectedBatch.batchNumber}</td>
                           <td className="border-r border-black p-1 font-mono text-[8px]">{expFormatted}</td>
-                          <td className="border-r border-black p-1 font-bold">{item.quantity}</td>
-                          <td className="border-r border-black p-1">15</td>
-                          <td className="border-r border-black p-1">15</td>
+                          <td className="border-r border-black p-1 font-bold">
+                            {isLoose ? `${item.quantity} ${unitLabel}` : item.quantity}
+                          </td>
+                          <td className="border-r border-black p-1 text-[8px]">
+                            {isLoose ? 'Loose' : medDetails.packType}
+                          </td>
+                          <td className="border-r border-black p-1 text-[8px]">
+                            {isLoose ? '1' : medDetails.unitsPerPack}
+                          </td>
                           <td className="border-r border-black p-1 text-right">{mrp.toFixed(2)}</td>
                           <td className="border-r border-black p-1 text-right">{discAmt.toFixed(2)}</td>
                           <td className="border-r border-black p-1 text-right">{item.taxableAmount.toFixed(2)}</td>
@@ -381,7 +423,7 @@ export const ReceiptPrintView: React.FC = () => {
                   <div className="col-span-5 border border-black text-[8.5px]">
                     <div className="flex justify-between border-b border-black p-0.5 px-1 font-bold">
                       <span>TOTAL QUANTITY:</span>
-                      <span>{totalQty}</span>
+                      <span>{totalQty} Packs ({totalTabletsCount} Tablets/Units)</span>
                     </div>
                     <div className="flex justify-between border-b border-black p-0.5 px-1 font-bold">
                       <span>GROSS AMOUNT:</span>
