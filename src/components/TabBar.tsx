@@ -9,9 +9,8 @@ import {
   setHeldBillsModalOpen,
   setCustomerDisplayModalOpen,
   setInvoiceHistoryModalOpen,
-  navigateTo
 } from '../store/posSlice';
-import { Plus, X, PauseCircle, Monitor, ShoppingBag, History, FileText, Siren } from 'lucide-react';
+import { Plus, X, PauseCircle, Monitor, ShoppingBag, History, FileText } from 'lucide-react';
 
 export const TabBar: React.FC = () => {
   const dispatch = useDispatch();
@@ -98,15 +97,7 @@ export const TabBar: React.FC = () => {
           <span>New Customer</span>
         </button>
 
-        {/* Emergency Fast Delivery Quick Tab */}
-        <button
-          onClick={() => dispatch(navigateTo('EMERGENCY_DELIVERY'))}
-          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-t-lg bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white text-xs font-black transition-all shadow-sm cursor-pointer ml-2 animate-pulse"
-          title="Go to Emergency Fast Delivery (Snake Bite, Cardiac, Anaphylaxis)"
-        >
-          <Siren className="w-3.5 h-3.5" />
-          <span>🚨 Emergency Fast Delivery</span>
-        </button>
+
       </div>
 
       {/* Right: Park / Hold Bill & Customer Display Actions */}

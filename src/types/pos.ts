@@ -109,13 +109,27 @@ export interface DrugInteraction {
   management: string;
 }
 
+export type PaymentMethodType = 'CASH' | 'UPI' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'AUTO_PAY' | 'CARD' | 'SPLIT';
+
 export interface PaymentDetails {
-  method: 'CASH' | 'UPI' | 'CARD' | 'SPLIT';
+  method: PaymentMethodType;
   cashAmount: number;
   upiAmount: number;
   cardAmount: number;
+  creditCardAmount?: number;
+  debitCardAmount?: number;
+  autoPayAmount?: number;
   totalPaid: number;
   changeDue: number;
+  cardLast4?: string;
+  cardNetwork?: string;
+  cardType?: 'CREDIT' | 'DEBIT';
+  autoPayDetails?: {
+    mandateId: string;
+    authMode: 'UPI_AUTOPAY' | 'E_NACH' | 'STANDING_INSTRUCTION';
+    frequency: 'MONTHLY_REFILL' | 'BI_WEEKLY' | 'ON_DEMAND';
+    customerVpaOrAcc?: string;
+  };
   razorpayQrUrl?: string;
   paymentStatus: 'IDLE' | 'PROCESSING' | 'SUCCESS' | 'FAILED';
 }

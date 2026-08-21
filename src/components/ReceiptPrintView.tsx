@@ -45,7 +45,7 @@ export const ReceiptPrintView: React.FC = () => {
   const amountInWordsStr = numberToWords(payableAmount);
 
   // Store & Patient Info
-  const storeName = invoice.storeInfo.name || 'TATA 1MG Healthcare Solutions Private Limited';
+  const storeName = invoice.storeInfo.name || 'GENQUANTAA MEDPLUS PHARMACY';
   const dlNo = invoice.storeInfo.dlNo || '20:TG/MDL/2025-139382,21:TG/MDL/2025-139382,20B:TG/MDL/2025-139382,21B:TG/MDL/2025-139382';
   const fssaiNo = invoice.storeInfo.fssaiNo || '13625038000104';
   const gstin = invoice.storeInfo.gstin || '36AAFCD7691C1ZK';
@@ -61,6 +61,29 @@ export const ReceiptPrintView: React.FC = () => {
   const doctorInfo = invoice.billingSession.doctorDetails?.doctorName || 'akhil dadi';
 
   const orderId = `PO${invoice.invoiceNumber.replace(/\D/g, '') || '21426134789588'}`;
+
+  const getPaymentLabel = () => {
+    const p = invoice.payment;
+    if (!p) return 'Cash';
+    switch (p.method) {
+      case 'CREDIT_CARD':
+        return `Credit Card (${p.cardNetwork || 'Visa/Mastercard'}${p.cardLast4 ? ` •••• ${p.cardLast4}` : ''})`;
+      case 'DEBIT_CARD':
+        return `Debit Card (${p.cardNetwork || 'RuPay/Visa'}${p.cardLast4 ? ` •••• ${p.cardLast4}` : ''})`;
+      case 'AUTO_PAY':
+        return `AutoPay Refill Mandate (${p.autoPayDetails?.mandateId || 'e-Mandate'})`;
+      case 'UPI':
+        return 'Dynamic UPI QR';
+      case 'CASH':
+        return 'Cash';
+      case 'CARD':
+        return 'Card / EDC POS';
+      case 'SPLIT':
+        return 'Split Payment';
+      default:
+        return String(p.method).replace('_', ' ');
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fadeIn">
@@ -189,14 +212,14 @@ export const ReceiptPrintView: React.FC = () => {
                 </div>
 
                 <div className="pt-2 text-center text-[9px] text-slate-500 space-y-0.5">
-                  <div>Payment Mode: <strong>{invoice.payment.method}</strong></div>
+                  <div>Payment Mode: <strong>{getPaymentLabel()}</strong></div>
                   <div>Thank you! Get well soon.</div>
                   <div>Powered by GENQUANTAA POS Platform</div>
                 </div>
               </div>
             )}
 
-            {/* ── A4 OFFICIAL TAX INVOICE FORMAT (TATA 1MG STYLE) ── */}
+            {/* ── A4 OFFICIAL TAX INVOICE FORMAT (GENQUANTAA POS) ── */}
             {printFormat === 'A4' && (
               <div className="bg-white text-black p-5 rounded shadow-sm font-sans text-xs max-w-[210mm] mx-auto border border-black leading-tight">
                 {/* 1. Header Section */}
@@ -445,9 +468,13 @@ export const ReceiptPrintView: React.FC = () => {
                       <span>ROUND OFF:</span>
                       <span>₹{roundOff}</span>
                     </div>
-                    <div className="flex justify-between p-0.5 px-1 font-black text-[9.5px] bg-slate-50">
+                    <div className="flex justify-between p-0.5 px-1 font-black text-[9.5px] bg-slate-50 border-b border-black">
                       <span>PAYABLE AMOUNT:</span>
                       <span>₹{payableAmount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between p-0.5 px-1 text-[8px] font-bold bg-slate-100/60">
+                      <span>PAYMENT MODE:</span>
+                      <span className="uppercase font-extrabold">{getPaymentLabel()}</span>
                     </div>
                   </div>
                 </div>
@@ -485,12 +512,12 @@ export const ReceiptPrintView: React.FC = () => {
                 {/* 7. Bottom Bar */}
                 <div className="flex justify-between items-end text-[8.5px] text-black pt-1">
                   <div>Transit mode: By Road/Air</div>
-                  <div className="font-bold">For Support Contact: care@1mg.com</div>
+                  <div className="font-bold">For Support Contact: support@genquantaa.com</div>
                   <div className="text-right">
                     <div className="text-sm font-black tracking-tight leading-none text-black font-heading">
-                      TATA <span className="text-teal-700">1mg</span>
+                      GENQUANTAA <span className="text-emerald-700">POS</span>
                     </div>
-                    <div className="text-[7.5px] italic text-slate-700">Bringing care to health</div>
+                    <div className="text-[7.5px] italic text-slate-700">Smart Pharmacy Management</div>
                   </div>
                 </div>
 

@@ -165,18 +165,26 @@ export const InvoiceHistoryModal: React.FC = () => {
           </div>
 
           {/* Payment Method Filter Pills */}
-          <div className="flex items-center bg-slate-100 p-1 rounded-xl space-x-1 border border-slate-200 text-xs font-semibold">
-            {(['ALL', 'CASH', 'UPI', 'CARD', 'SPLIT'] as const).map(mode => (
+          <div className="flex items-center bg-slate-100 p-1 rounded-xl space-x-1 border border-slate-200 text-xs font-semibold overflow-x-auto">
+            {[
+              { id: 'ALL', label: 'All' },
+              { id: 'UPI', label: 'UPI' },
+              { id: 'CASH', label: 'Cash' },
+              { id: 'CREDIT_CARD', label: 'Credit Card' },
+              { id: 'DEBIT_CARD', label: 'Debit Card' },
+              { id: 'AUTO_PAY', label: 'AutoPay' },
+              { id: 'SPLIT', label: 'Split' },
+            ].map(mode => (
               <button
-                key={mode}
-                onClick={() => setPaymentFilter(mode)}
-                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                  paymentFilter === mode
+                key={mode.id}
+                onClick={() => setPaymentFilter(mode.id as any)}
+                className={`px-2.5 py-1 rounded-lg transition-all whitespace-nowrap cursor-pointer ${
+                  paymentFilter === mode.id
                     ? 'bg-white text-emerald-800 shadow-2xs font-bold'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                {mode}
+                {mode.label}
               </button>
             ))}
           </div>
@@ -245,11 +253,17 @@ export const InvoiceHistoryModal: React.FC = () => {
                             ? 'bg-indigo-100 text-indigo-700 border border-indigo-200'
                             : inv.payment.method === 'CASH'
                             ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                            : inv.payment.method === 'CREDIT_CARD'
+                            ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                            : inv.payment.method === 'DEBIT_CARD'
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                            : inv.payment.method === 'AUTO_PAY'
+                            ? 'bg-teal-100 text-teal-800 border border-teal-200'
                             : inv.payment.method === 'CARD'
                             ? 'bg-blue-100 text-blue-800 border border-blue-200'
                             : 'bg-purple-100 text-purple-800 border border-purple-200'
                         }`}>
-                          {inv.payment.method}
+                          {inv.payment.method.replace('_', ' ')}
                         </span>
                       </td>
 

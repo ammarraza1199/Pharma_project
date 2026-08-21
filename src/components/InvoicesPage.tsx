@@ -30,7 +30,7 @@ export const InvoicesPage: React.FC = () => {
   const totalRevenue = invoices.reduce((sum, inv) => sum + inv.grandTotal, 0);
   const upiRevenue = invoices.filter(inv => inv.payment.method === 'UPI').reduce((sum, inv) => sum + inv.grandTotal, 0);
   const cashRevenue = invoices.filter(inv => inv.payment.method === 'CASH').reduce((sum, inv) => sum + inv.grandTotal, 0);
-  const cardRevenue = invoices.filter(inv => inv.payment.method === 'CARD').reduce((sum, inv) => sum + inv.grandTotal, 0);
+  const cardRevenue = invoices.filter(inv => ['CARD', 'CREDIT_CARD', 'DEBIT_CARD'].includes(inv.payment.method)).reduce((sum, inv) => sum + inv.grandTotal, 0);
   const avgOrderValue = totalInvoices > 0 ? totalRevenue / totalInvoices : 0;
   const totalGstCollected = invoices.reduce((sum, inv) => sum + inv.totalCGST + inv.totalSGST, 0);
 
@@ -271,17 +271,25 @@ export const InvoicesPage: React.FC = () => {
           {/* Payment Method Pills */}
           <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
             <span className="text-[11px] font-bold text-slate-500 mr-1">Payment:</span>
-            {(['ALL', 'UPI', 'CASH', 'CARD', 'SPLIT'] as const).map(mode => (
+            {[
+              { id: 'ALL', label: 'All' },
+              { id: 'UPI', label: 'UPI' },
+              { id: 'CASH', label: 'Cash' },
+              { id: 'CREDIT_CARD', label: 'Credit Card' },
+              { id: 'DEBIT_CARD', label: 'Debit Card' },
+              { id: 'AUTO_PAY', label: 'AutoPay' },
+              { id: 'SPLIT', label: 'Split' },
+            ].map(mode => (
               <button
-                key={mode}
-                onClick={() => setPaymentFilter(mode)}
+                key={mode.id}
+                onClick={() => setPaymentFilter(mode.id as any)}
                 className={`px-3 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
-                  paymentFilter === mode
+                  paymentFilter === mode.id
                     ? 'bg-emerald-600 text-white shadow-2xs'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                {mode}
+                {mode.label}
               </button>
             ))}
           </div>
@@ -408,11 +416,17 @@ export const InvoicesPage: React.FC = () => {
                               ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
                               : inv.payment.method === 'CASH'
                               ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                              : inv.payment.method === 'CREDIT_CARD'
+                              ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                              : inv.payment.method === 'DEBIT_CARD'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                              : inv.payment.method === 'AUTO_PAY'
+                              ? 'bg-teal-100 text-teal-800 border border-teal-200'
                               : inv.payment.method === 'CARD'
                               ? 'bg-blue-100 text-blue-800 border border-blue-200'
                               : 'bg-purple-100 text-purple-800 border border-purple-200'
                           }`}>
-                            {inv.payment.method}
+                            {inv.payment.method.replace('_', ' ')}
                           </span>
                         </td>
 
