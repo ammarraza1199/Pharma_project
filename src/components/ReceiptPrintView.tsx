@@ -47,11 +47,11 @@ export const ReceiptPrintView: React.FC = () => {
   // Store & Patient Info
   const storeName = invoice.storeInfo.name || 'GENQUANTAA MEDPLUS PHARMACY';
   const dlNo = invoice.storeInfo.dlNo || '20:TG/MDL/2025-139382,21:TG/MDL/2025-139382,20B:TG/MDL/2025-139382,21B:TG/MDL/2025-139382';
-  const fssaiNo = invoice.storeInfo.fssaiNo || '13625038000104';
+  const fssaiNo = (invoice.storeInfo as any).fssaiNo || '13625038000104';
   const gstin = invoice.storeInfo.gstin || '36AAFCD7691C1ZK';
-  const cin = invoice.storeInfo.cin || 'U47721DL2016PTC302634';
-  const registeredAddress = invoice.storeInfo.registeredAddress || '2nd Floor, Plot No. B-225, Okhla Industrial Area, Phase-I, South Delhi, New Delhi-110020, Delhi';
-  const premiseAddress = invoice.storeInfo.premiseAddress || invoice.storeInfo.address || 'House no 2-22-310/190C/NR, Addagutta Society, KPHB, Addagutta, Hyderabad, Telangana, 500032, India';
+  const cin = (invoice.storeInfo as any).cin || 'U47721DL2016PTC302634';
+  const registeredAddress = (invoice.storeInfo as any).registeredAddress || '2nd Floor, Plot No. B-225, Okhla Industrial Area, Phase-I, South Delhi, New Delhi-110020, Delhi';
+  const premiseAddress = (invoice.storeInfo as any).premiseAddress || invoice.storeInfo.address || 'House no 2-22-310/190C/NR, Addagutta Society, KPHB, Addagutta, Hyderabad, Telangana, 500032, India';
 
   const patientName = invoice.billingSession.patientDetails?.patientName || 'K Shobha Rani';
   const patientAddress = invoice.billingSession.patientDetails?.phone
@@ -157,6 +157,7 @@ export const ReceiptPrintView: React.FC = () => {
                 <div className="py-2 border-b border-dashed border-slate-400 space-y-0.5 text-[10px]">
                   <div>Invoice #: <strong>{invoice.invoiceNumber}</strong></div>
                   <div>Date: {invoice.invoiceDate}</div>
+                  <div>Pharmacist: <strong>{invoice.pharmacistName || 'Ramesh Kumar'}</strong> (Counter {invoice.counterNumber || 1})</div>
                   <div>Doctor: {invoice.billingSession.doctorDetails?.doctorName || 'Direct Purchase'}</div>
                   <div>Patient: {invoice.billingSession.patientDetails?.patientName || 'Walk-in Customer'}</div>
                 </div>
@@ -283,9 +284,10 @@ export const ReceiptPrintView: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Doctor Row */}
-                  <div className="p-1.5 font-bold">
-                    Doctor name &amp; address: <span className="font-semibold uppercase">{doctorInfo}</span>
+                  {/* Doctor & Pharmacist Row */}
+                  <div className="p-1.5 font-bold flex justify-between items-center text-[9px]">
+                    <div>Doctor name &amp; address: <span className="font-semibold uppercase">{doctorInfo}</span></div>
+                    <div>Dispensing Pharmacist: <span className="font-semibold uppercase">{invoice.pharmacistName || 'Ramesh Kumar'} (Counter {invoice.counterNumber || 1})</span></div>
                   </div>
                 </div>
 

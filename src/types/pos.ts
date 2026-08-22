@@ -79,9 +79,22 @@ export interface PatientDetails {
   gender: 'MALE' | 'FEMALE' | 'OTHER';
 }
 
+export interface PharmacistCounter {
+  id: string;
+  name: string;
+  role: string;
+  counterNumber: number;
+  colorTheme: string;
+  avatarInitials: string;
+}
+
 export interface BillingSession {
   id: string;
   tabTitle: string;
+  assignedPharmacistId: string;
+  transferredFromPharmacistId?: string;
+  transferredFromName?: string;
+  transferNote?: string;
   items: CartItem[];
   doctorDetails: DoctorDetails;
   patientDetails: PatientDetails;
@@ -96,6 +109,9 @@ export interface HeldBill {
   customerName: string;
   customerPhone: string;
   heldAt: string;
+  assignedPharmacistId: string;
+  transferredFromPharmacistId?: string;
+  transferredFromName?: string;
   billingSession: BillingSession;
   totalAmount: number;
 }
@@ -144,6 +160,8 @@ export interface FinalizedInvoice {
   totalSGST: number;
   grandTotal: number;
   payment: PaymentDetails;
+  pharmacistName?: string;
+  counterNumber?: number;
   storeInfo: {
     name: string;
     dlNo: string;

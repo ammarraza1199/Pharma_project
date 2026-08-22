@@ -27,6 +27,7 @@ import { SuppliersPage } from './components/SuppliersPage';
 import { SettingsPage } from './components/SettingsPage';
 import { EmergencyDeliveryPage } from './components/EmergencyDeliveryPage';
 import { InvoicesPage } from './components/InvoicesPage';
+import { AssignBillModal } from './components/AssignBillModal';
 
 export const App: React.FC = () => {
   const currentView = useSelector((state: RootState) => state.pos.currentView);
@@ -126,6 +127,7 @@ export const App: React.FC = () => {
           <PaymentModal />
           <HeldBillsModal />
           <CustomerDisplayModal />
+          <AssignBillModal />
         </>
       )}
 

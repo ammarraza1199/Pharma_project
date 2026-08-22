@@ -5,9 +5,10 @@ import {
   navigateTo,
   setAuthMode,
   loginUser,
-  registerUser
+  registerUser,
+  switchActivePharmacist
 } from '../store/posSlice';
-import { Store, Lock, Mail, UserCheck, ArrowLeft, ShieldCheck, ArrowRight, Building, AlertCircle, CheckCircle, KeyRound, X, Check, Send, ExternalLink, RefreshCw, Loader2 } from 'lucide-react';
+import { Store, Lock, Mail, UserCheck, ArrowLeft, ShieldCheck, ArrowRight, Building, AlertCircle, CheckCircle, KeyRound, X, Check, Send, ExternalLink, RefreshCw, Loader2, Users } from 'lucide-react';
 
 // --- Registered Accounts Store (simulates backend MongoDB user collection) ---
 // When a new user signs up, their credentials are saved here.
@@ -30,12 +31,15 @@ const registeredAccounts: RegisteredAccount[] = [
 export const AuthPage: React.FC = () => {
   const dispatch = useDispatch();
   const authMode = useSelector((state: RootState) => state.pos.authMode);
+  const pharmacists = useSelector((state: RootState) => state.pos.pharmacists);
+  const activePharmacistId = useSelector((state: RootState) => state.pos.activePharmacistId);
 
   // Sign In Form State — empty by default, user must type credentials
   const [loginEmail, setLoginEmail] = useState<string>('');
   const [loginPassword, setLoginPassword] = useState<string>('');
   const [loginError, setLoginError] = useState<string>('');
   const [loginAttempts, setLoginAttempts] = useState<number>(0);
+  const [selectedCounterId, setSelectedCounterId] = useState<string>(activePharmacistId || 'pharm-1');
 
   // Sign Up Form State
   const [regPharmacistName, setRegPharmacistName] = useState<string>('');
@@ -68,7 +72,8 @@ export const AuthPage: React.FC = () => {
     );
 
     if (match) {
-      // ✅ Correct credentials — launch POS Dashboard page
+      // ✅ Correct credentials — launch POS Dashboard page and activate chosen counter
+      dispatch(switchActivePharmacist(selectedCounterId));
       dispatch(loginUser({
         email: match.email,
         password: match.password,
@@ -337,6 +342,41 @@ export const AuthPage: React.FC = () => {
                     placeholder="••••••••"
                     required
                   />
+                </div>
+              </div>
+
+              {/* Workstation / Shift Counter Selection */}
+              <div className="pt-1">
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                  <span className="flex items-center space-x-1">
+                    <Users className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>My Shift Counter / Workstation</span>
+                  </span>
+                  <span className="text-[10px] text-emerald-700 font-semibold">Auto-assigns tab</span>
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {pharmacists.map((pharm) => {
+                    const isSelected = selectedCounterId === pharm.id;
+                    return (
+                      <button
+                        key={pharm.id}
+                        type="button"
+                        onClick={() => setSelectedCounterId(pharm.id)}
+                        className={`p-2 rounded-xl border text-left transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/20 text-emerald-900 shadow-2xs'
+                            : 'bg-white border-slate-200 hover:border-slate-300 text-slate-600'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-0.5">
+                          <span className="text-[10px] font-black uppercase text-emerald-700">C-{pharm.counterNumber}</span>
+                          <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                        </div>
+                        <div className="text-xs font-bold truncate">{pharm.name.split(' ')[0]}</div>
+                        <div className="text-[9px] text-slate-400 truncate">{pharm.role.split(' ')[0]}</div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

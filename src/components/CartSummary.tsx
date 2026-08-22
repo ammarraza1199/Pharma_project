@@ -112,28 +112,31 @@ export const CartSummary: React.FC = () => {
           </div>
         )}
 
-        <button
-          onClick={handleCheckoutClick}
-          disabled={items.length === 0 || isSubmittingBill}
-          className={`w-full py-3 px-4 rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center space-x-2 cursor-pointer ${
-            items.length === 0 || isSubmittingBill
-              ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-              : 'bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white'
-          }`}
-        >
-          {isSubmittingBill ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin text-white" />
-              <span>Processing Transaction...</span>
-            </>
-          ) : (
-            <>
-              <CreditCard className="w-4 h-4" />
-              <span>Finalize & Collect Payment (₹{grandTotal.toFixed(2)})</span>
-              <ArrowRight className="w-4 h-4 ml-1" />
-            </>
-          )}
-        </button>
+        {/* Checkout Button & Delegate Option */}
+        <div className="space-y-2">
+          <button
+            onClick={handleCheckoutClick}
+            disabled={items.length === 0 || isSubmittingBill}
+            className={`w-full py-3 px-4 rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center space-x-2 cursor-pointer ${
+              items.length === 0 || isSubmittingBill
+                ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                : 'bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white'
+            }`}
+          >
+            {isSubmittingBill ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin text-white" />
+                <span>Processing Transaction...</span>
+              </>
+            ) : (
+              <>
+                <CreditCard className="w-4 h-4" />
+                <span>Finalize &amp; Collect Payment (₹{grandTotal.toFixed(2)})</span>
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

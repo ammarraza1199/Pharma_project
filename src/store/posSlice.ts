@@ -20,12 +20,19 @@ import type {
   PatientRecord,
   SupplierRecord,
   StoreSettings,
+  PharmacistCounter,
   SellingUnitMode
 } from '../types/pos';
 import { MOCK_PRODUCTS } from '../mock/products';
 import { calculateItemGST } from '../utils/gstCalculator';
 import { getMedicineDetails } from '../utils/medicineDetails';
 import { analyzeDrugInteractions } from '../utils/drugInteractionEngine';
+
+export const DEFAULT_PHARMACISTS: PharmacistCounter[] = [
+  { id: 'pharm-1', name: 'Ramesh Kumar', role: 'Lead Pharmacist', counterNumber: 1, colorTheme: 'emerald', avatarInitials: 'RK' },
+  { id: 'pharm-2', name: 'Priya Sharma', role: 'Dispenser', counterNumber: 2, colorTheme: 'blue', avatarInitials: 'PS' },
+  { id: 'pharm-3', name: 'Anand Verma', role: 'Clinical Pharmacist', counterNumber: 3, colorTheme: 'purple', avatarInitials: 'AV' },
+];
 
 interface PosState {
   currentView: AppView;
@@ -38,12 +45,23 @@ interface PosState {
   disposalRecords: DisposalRecord[];
   patients: PatientRecord[];
   suppliers: SupplierRecord[];
+  pharmacists: PharmacistCounter[];
+  activePharmacistId: string;
   sessions: BillingSession[];
   activeSessionId: string;
   heldBills: HeldBill[];
   isManagerAuthenticated: boolean;
   
   // Modals & Overlays
+  assignBillModal: {
+    isOpen: boolean;
+    sessionId?: string;
+    heldBillId?: string;
+  };
+  transferNotification: {
+    message: string;
+    type: 'ASSIGN' | 'AUTO_BALANCE';
+  } | null;
   substitutionModal: {
     isOpen: boolean;
     originalProduct?: Product;
@@ -79,9 +97,10 @@ interface PosState {
   isSubmittingBill: boolean;
 }
 
-const createInitialSession = (index: number): BillingSession => ({
-  id: `session-${Date.now()}-${index}`,
+const createInitialSession = (index: number, pharmacistId: string = 'pharm-1'): BillingSession => ({
+  id: `session-${Date.now()}-${index}-${Math.floor(Math.random() * 1000)}`,
   tabTitle: `Customer ${index}`,
+  assignedPharmacistId: pharmacistId,
   items: [],
   doctorDetails: { doctorName: '', regNo: '' },
   patientDetails: { patientName: '', phone: '', age: '', gender: 'MALE' },
@@ -109,6 +128,7 @@ const getInitialInvoices = (): FinalizedInvoice[] => {
       billingSession: {
         id: 'session-prev-1',
         tabTitle: 'Customer 1',
+        assignedPharmacistId: 'pharm-1',
         items: [
           {
             cartItemId: 'item-001',
@@ -145,6 +165,8 @@ const getInitialInvoices = (): FinalizedInvoice[] => {
         changeDue: 0,
         paymentStatus: 'SUCCESS'
       },
+      pharmacistName: 'Ramesh Kumar',
+      counterNumber: 1,
       storeInfo: {
         name: 'GENQUANTAA MEDPLUS PHARMACY',
         dlNo: 'DL-2024/HYD/889201',
@@ -205,11 +227,17 @@ const initialState: PosState = {
     { supplierId: 'sup-002', name: 'Sun Pharma Wholesale', contactPerson: 'Suresh Nair', phone: '+91 98490 12346', email: 'suresh@sunpharma.com', gstin: '36AAACS5512B1Z5', dlNumber: 'DL-1003/HYD', address: 'Block B, Industrial Area, Hyderabad', pendingBalance: 0 },
     { supplierId: 'sup-003', name: 'Cipla Regional Depot', contactPerson: 'Venkat Rao', phone: '+91 98490 12347', email: 'venkat@cipladepot.com', gstin: '36AAACC4488C1Z9', dlNumber: 'DL-1004/HYD', address: 'Sector 4, Logistics Park, Hyderabad', pendingBalance: 8200 }
   ],
+  pharmacists: DEFAULT_PHARMACISTS,
+  activePharmacistId: 'pharm-1',
   sessions: [initialSession],
   activeSessionId: initialSession.id,
   heldBills: [],
   isManagerAuthenticated: false,
   
+  assignBillModal: {
+    isOpen: false
+  },
+  transferNotification: null,
   substitutionModal: {
     isOpen: false,
     alternatives: []
@@ -487,21 +515,160 @@ export const posSlice = createSlice({
       }
     },
 
-    // Tab Management
-    addNewTab: (state) => {
-      const nextIndex = state.sessions.length + 1;
-      const newSession = createInitialSession(nextIndex);
-      state.sessions.push(newSession);
-      state.activeSessionId = newSession.id;
+    // Tab Management & Counter Workload
+    switchActivePharmacist: (state, action: PayloadAction<string>) => {
+      state.activePharmacistId = action.payload;
+      const pharmacistSessions = state.sessions.filter(s => s.assignedPharmacistId === action.payload);
+      if (pharmacistSessions.length === 0) {
+        const newSession = createInitialSession(1, action.payload);
+        state.sessions.push(newSession);
+        state.activeSessionId = newSession.id;
+      } else {
+        const current = pharmacistSessions.find(s => s.id === state.activeSessionId);
+        state.activeSessionId = current ? current.id : pharmacistSessions[0].id;
+      }
     },
+
+    addNewTab: (state, action: PayloadAction<string | undefined>) => {
+      const targetPharmacistId = action.payload || state.activePharmacistId;
+      const countForPharm = state.sessions.filter(s => s.assignedPharmacistId === targetPharmacistId).length + 1;
+      const newSession = createInitialSession(countForPharm, targetPharmacistId);
+      state.sessions.push(newSession);
+      if (targetPharmacistId === state.activePharmacistId) {
+        state.activeSessionId = newSession.id;
+      }
+    },
+
     switchTab: (state, action: PayloadAction<string>) => {
       state.activeSessionId = action.payload;
+      const session = state.sessions.find(s => s.id === action.payload);
+      if (session && session.assignedPharmacistId) {
+        state.activePharmacistId = session.assignedPharmacistId;
+      }
     },
+
     closeTab: (state, action: PayloadAction<string>) => {
-      if (state.sessions.length <= 1) return;
+      const targetSession = state.sessions.find(s => s.id === action.payload);
+      if (!targetSession) return;
+      const pharmId = targetSession.assignedPharmacistId;
+      const remainingForPharm = state.sessions.filter(s => s.assignedPharmacistId === pharmId && s.id !== action.payload);
+
       state.sessions = state.sessions.filter(s => s.id !== action.payload);
-      if (state.activeSessionId === action.payload) {
-        state.activeSessionId = state.sessions[0].id;
+
+      if (remainingForPharm.length === 0) {
+        const freshSession = createInitialSession(1, pharmId);
+        state.sessions.push(freshSession);
+        if (state.activePharmacistId === pharmId) {
+          state.activeSessionId = freshSession.id;
+        }
+      } else if (state.activeSessionId === action.payload) {
+        state.activeSessionId = remainingForPharm[0].id;
+      }
+    },
+
+    openAssignBillModal: (state, action: PayloadAction<{ sessionId?: string; heldBillId?: string } | undefined>) => {
+      state.assignBillModal = {
+        isOpen: true,
+        sessionId: action?.payload?.sessionId || state.activeSessionId,
+        heldBillId: action?.payload?.heldBillId
+      };
+    },
+
+    closeAssignBillModal: (state) => {
+      state.assignBillModal.isOpen = false;
+    },
+
+    dismissTransferNotification: (state) => {
+      state.transferNotification = null;
+    },
+
+    assignBillToPharmacist: (state, action: PayloadAction<{ sessionId?: string; heldBillId?: string; targetPharmacistId: string; note?: string }>) => {
+      const { sessionId, heldBillId, targetPharmacistId, note } = action.payload;
+      const targetPharm = state.pharmacists.find(p => p.id === targetPharmacistId);
+      const sourcePharm = state.pharmacists.find(p => p.id === state.activePharmacistId);
+      if (!targetPharm) return;
+
+      if (sessionId) {
+        const session = state.sessions.find(s => s.id === sessionId);
+        if (session) {
+          const prevPharmId = session.assignedPharmacistId;
+          session.assignedPharmacistId = targetPharmacistId;
+          session.transferredFromPharmacistId = sourcePharm?.id || prevPharmId;
+          session.transferredFromName = sourcePharm?.name || 'Previous Pharmacist';
+          session.transferNote = note || undefined;
+
+          // If the session was active, pick or create another session for the source pharmacist
+          if (state.activeSessionId === sessionId) {
+            const remainingForSource = state.sessions.filter(s => s.assignedPharmacistId === prevPharmId && s.id !== sessionId);
+            if (remainingForSource.length > 0) {
+              state.activeSessionId = remainingForSource[0].id;
+            } else {
+              const freshSession = createInitialSession(1, prevPharmId);
+              state.sessions.push(freshSession);
+              state.activeSessionId = freshSession.id;
+            }
+          }
+
+          state.transferNotification = {
+            message: `Transferred "${session.tabTitle}" (${session.items.length} items) to Counter ${targetPharm.counterNumber} (${targetPharm.name})`,
+            type: 'ASSIGN'
+          };
+        }
+      } else if (heldBillId) {
+        const held = state.heldBills.find(h => h.id === heldBillId);
+        if (held) {
+          held.assignedPharmacistId = targetPharmacistId;
+          held.transferredFromPharmacistId = sourcePharm?.id;
+          held.transferredFromName = sourcePharm?.name;
+          held.billingSession.assignedPharmacistId = targetPharmacistId;
+
+          state.transferNotification = {
+            message: `Assigned Parked Bill for "${held.customerName}" to Counter ${targetPharm.counterNumber} (${targetPharm.name})`,
+            type: 'ASSIGN'
+          };
+        }
+      }
+      state.assignBillModal.isOpen = false;
+    },
+
+    autoBalanceQueues: (state) => {
+      const counts = state.pharmacists.map(pharm => ({
+        pharm,
+        sessions: state.sessions.filter(s => s.assignedPharmacistId === pharm.id),
+        heldCount: state.heldBills.filter(h => h.assignedPharmacistId === pharm.id).length
+      }));
+
+      // Sort by total sessions descending
+      counts.sort((a, b) => b.sessions.length - a.sessions.length);
+      const busiest = counts[0];
+      const freest = counts[counts.length - 1];
+
+      if (busiest.sessions.length > freest.sessions.length + 1) {
+        const transferCount = Math.floor((busiest.sessions.length - freest.sessions.length) / 2);
+        const transferable = busiest.sessions.filter(s => s.id !== state.activeSessionId);
+        const toMove = (transferable.length >= transferCount ? transferable : busiest.sessions).slice(0, Math.max(1, transferCount));
+
+        toMove.forEach(session => {
+          session.assignedPharmacistId = freest.pharm.id;
+          session.transferredFromPharmacistId = busiest.pharm.id;
+          session.transferredFromName = busiest.pharm.name;
+          session.transferNote = 'Auto-balanced workload across counters';
+        });
+
+        // Ensure source pharmacist has an active session
+        const remainingForActivePharm = state.sessions.filter(s => s.assignedPharmacistId === state.activePharmacistId);
+        if (remainingForActivePharm.length === 0) {
+          const fresh = createInitialSession(1, state.activePharmacistId);
+          state.sessions.push(fresh);
+          state.activeSessionId = fresh.id;
+        } else if (!remainingForActivePharm.some(s => s.id === state.activeSessionId)) {
+          state.activeSessionId = remainingForActivePharm[0].id;
+        }
+
+        state.transferNotification = {
+          message: `Auto-balanced: Transferred ${toMove.length} pending bill(s) from ${busiest.pharm.name} to ${freest.pharm.name} (Counter ${freest.pharm.counterNumber})`,
+          type: 'AUTO_BALANCE'
+        };
       }
     },
 
@@ -761,6 +928,7 @@ export const posSlice = createSlice({
         customerName: action.payload.customerName || 'Walk-in Customer',
         customerPhone: action.payload.customerPhone || 'N/A',
         heldAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        assignedPharmacistId: currentSession.assignedPharmacistId || state.activePharmacistId,
         billingSession: JSON.parse(JSON.stringify(currentSession)),
         totalAmount: total
       };
@@ -838,6 +1006,7 @@ export const posSlice = createSlice({
       const totalCGST = currentSession.items.reduce((sum, item) => sum + item.cgstAmount, 0);
       const totalSGST = currentSession.items.reduce((sum, item) => sum + item.sgstAmount, 0);
       const grandTotal = currentSession.items.reduce((sum, item) => sum + item.lineTotal, 0);
+      const currentPharm = state.pharmacists.find(p => p.id === (currentSession.assignedPharmacistId || state.activePharmacistId));
 
       const invoice: FinalizedInvoice = {
         invoiceNumber: `INV-2026-${Math.floor(100000 + Math.random() * 900000)}`,
@@ -849,6 +1018,8 @@ export const posSlice = createSlice({
         totalSGST: Number(totalSGST.toFixed(2)),
         grandTotal: Number(grandTotal.toFixed(2)),
         payment: action.payload,
+        pharmacistName: currentPharm?.name || 'Ramesh Kumar',
+        counterNumber: currentPharm?.counterNumber || 1,
         storeInfo: {
           name: 'GENQUANTAA MEDPLUS PHARMACY',
           dlNo: 'DL-2024/HYD/889201',
@@ -907,9 +1078,15 @@ export const {
   addPatient,
   addSupplier,
   updateStoreSettings,
+  switchActivePharmacist,
   addNewTab,
   switchTab,
   closeTab,
+  openAssignBillModal,
+  closeAssignBillModal,
+  dismissTransferNotification,
+  assignBillToPharmacist,
+  autoBalanceQueues,
   addItemToCart,
   updateCartItemQuantity,
   updateCartItemUnitMode,

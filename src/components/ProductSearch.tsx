@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import { addItemToCart } from '../store/posSlice';
 import { getMedicineDetails } from '../utils/medicineDetails';
-import type { Product, BatchInfo, ScheduleCategory } from '../types/pos';
+import type { Product, BatchInfo, ScheduleCategory, SellingUnitMode } from '../types/pos';
 import {
   Search, ScanBarcode, AlertCircle, Plus, Zap,
   X, ArrowUpDown, PackageX, TrendingUp, ChevronDown

@@ -75,11 +75,11 @@ export function getMedicineDetails(product: Product): MedicineDetailsInfo {
   }
 
   return {
-    packSize: product.packSize || packSize,
-    unitsPerPack: product.unitsPerPack || unitsPerPack,
-    packType: product.packType || packType,
-    medicineType: product.medicineType || medicineType,
-    dosageForm: product.dosageForm || dosageForm,
+    packSize: product.packSize || packSize || '10 Tablets in a Strip',
+    unitsPerPack: product.unitsPerPack || unitsPerPack || 10,
+    packType: product.packType || packType || 'Strip',
+    medicineType: product.medicineType || medicineType || 'Oral',
+    dosageForm: product.dosageForm || dosageForm || 'Tablet',
   };
 }
 

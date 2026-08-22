@@ -112,7 +112,7 @@ export const InvoicesPage: React.FC = () => {
     if (invoices.length === 0) return;
     let csv = 'Invoice Number,Date,Patient Name,Phone,Doctor,Items Count,Subtotal,Discount,CGST,SGST,Grand Total,Payment Method,Pharmacist\n';
     invoices.forEach(inv => {
-      csv += `"${inv.invoiceNumber}","${inv.invoiceDate}","${inv.billingSession.patientDetails?.patientName || 'Walk-in'}","${inv.billingSession.patientDetails?.phone || ''}","${inv.billingSession.doctorDetails?.doctorName || 'Direct'}",${inv.billingSession.items.length},${inv.subtotal.toFixed(2)},${inv.totalDiscount.toFixed(2)},${inv.totalCGST.toFixed(2)},${inv.totalSGST.toFixed(2)},${inv.grandTotal.toFixed(2)},"${inv.payment.method}","${inv.pharmacistSignature?.pharmacistName || 'Staff'}"\n`;
+      csv += `"${inv.invoiceNumber}","${inv.invoiceDate}","${inv.billingSession.patientDetails?.patientName || 'Walk-in'}","${inv.billingSession.patientDetails?.phone || ''}","${inv.billingSession.doctorDetails?.doctorName || 'Direct'}",${inv.billingSession.items.length},${inv.subtotal.toFixed(2)},${inv.totalDiscount.toFixed(2)},${inv.totalCGST.toFixed(2)},${inv.totalSGST.toFixed(2)},${inv.grandTotal.toFixed(2)},"${inv.payment.method}","${inv.pharmacistName || 'Ramesh Kumar'}"\n`;
     });
 
     const encodedUri = encodeURI('data:text/csv;charset=utf-8,' + csv);
@@ -392,9 +392,12 @@ export const InvoicesPage: React.FC = () => {
                           )}
                         </td>
 
-                        {/* Doctor Name */}
+                        {/* Doctor & Pharmacist */}
                         <td className="p-3.5">
                           <div className="text-slate-700 font-semibold">{doctorName}</div>
+                          <div className="text-[10px] text-emerald-700 font-bold mt-0.5">
+                            Pharmacist: {inv.pharmacistName || 'Ramesh Kumar'} (C-{inv.counterNumber || 1})
+                          </div>
                         </td>
 
                         {/* Items Count & Total Units */}
@@ -496,7 +499,7 @@ export const InvoicesPage: React.FC = () => {
                                   <span>Invoice Line Items Breakdown ({inv.billingSession.items.length} Medicines)</span>
                                 </h4>
                                 <span className="text-[11px] text-slate-500">
-                                  Pharmacist: <strong className="text-slate-800">{inv.pharmacistSignature?.pharmacistName || 'Staff Pharmacist'}</strong>
+                                  Pharmacist: <strong className="text-slate-800">{inv.pharmacistName || 'Ramesh Kumar'} (Counter {inv.counterNumber || 1})</strong>
                                 </span>
                               </div>
 

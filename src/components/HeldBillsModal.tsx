@@ -1,13 +1,19 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { setHeldBillsModalOpen, restoreHeldBill, discardHeldBill } from '../store/posSlice';
-import { ShoppingBag, Play, X, User, Phone, Clock, Trash2, ChevronDown, ChevronUp, Tag } from 'lucide-react';
+import {
+  setHeldBillsModalOpen,
+  restoreHeldBill,
+  discardHeldBill,
+  openAssignBillModal
+} from '../store/posSlice';
+import { ShoppingBag, Play, X, User, Phone, Clock, Trash2, ChevronDown, ChevronUp, Tag, UserCheck, ArrowRightCircle } from 'lucide-react';
 
 export const HeldBillsModal: React.FC = () => {
   const dispatch = useDispatch();
   const modal = useSelector((state: RootState) => state.pos.heldBillsModal);
   const heldBills = useSelector((state: RootState) => state.pos.heldBills);
+  const pharmacists = useSelector((state: RootState) => state.pos.pharmacists);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   if (!modal.isOpen) return null;
@@ -22,7 +28,7 @@ export const HeldBillsModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fadeIn">
-      <div className="glass-modal rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 relative max-h-[85vh] flex flex-col">
+      <div className="glass-modal rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 relative max-h-[85vh] flex flex-col">
 
         {/* Top Header */}
         <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200 flex-shrink-0">
@@ -32,10 +38,10 @@ export const HeldBillsModal: React.FC = () => {
             </div>
             <div>
               <h3 className="text-sm font-extrabold text-slate-900 font-heading leading-tight">
-                Parked Customer Bills ({heldBills.length})
+                Store Parked Customer Bills ({heldBills.length})
               </h3>
               <p className="text-[11px] text-slate-500 font-medium">
-                Total Held Value: <strong className="text-amber-800 font-bold">₹{totalHeldAmount.toFixed(2)}</strong>
+                Total Held Value: <strong className="text-amber-800 font-bold">₹{totalHeldAmount.toFixed(2)}</strong> across all store counters
               </p>
             </div>
           </div>
@@ -60,6 +66,7 @@ export const HeldBillsModal: React.FC = () => {
           ) : (
             heldBills.map((held) => {
               const isExpanded = expandedId === held.id;
+              const assignedPharm = pharmacists.find(p => p.id === held.assignedPharmacistId) || pharmacists[0];
 
               return (
                 <div
@@ -68,7 +75,7 @@ export const HeldBillsModal: React.FC = () => {
                 >
                   <div className="flex items-center justify-between">
                     <div className="space-y-1">
-                      <div className="flex items-center space-x-3 text-xs font-bold text-slate-900 font-heading">
+                      <div className="flex items-center space-x-2.5 text-xs font-bold text-slate-900 font-heading">
                         <span className="flex items-center space-x-1">
                           <User className="w-3.5 h-3.5 text-emerald-600" />
                           <span>{held.customerName}</span>
@@ -77,6 +84,14 @@ export const HeldBillsModal: React.FC = () => {
                           <span className="flex items-center space-x-1 text-slate-500 font-normal">
                             <Phone className="w-3 h-3 text-slate-400" />
                             <span>{held.customerPhone}</span>
+                          </span>
+                        )}
+                        <span className="bg-slate-100 text-slate-700 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                          Counter {assignedPharm.counterNumber} ({assignedPharm.name.split(' ')[0]})
+                        </span>
+                        {held.transferredFromName && (
+                          <span className="bg-indigo-50 text-indigo-700 text-[10px] px-1.5 py-0.2 rounded font-semibold">
+                            From {held.transferredFromName.split(' ')[0]}
                           </span>
                         )}
                       </div>
@@ -102,6 +117,19 @@ export const HeldBillsModal: React.FC = () => {
                         title="View itemized medicines"
                       >
                         {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
+
+                      {/* Delegate to other counter action */}
+                      <button
+                        onClick={() => {
+                          dispatch(setHeldBillsModalOpen(false));
+                          dispatch(openAssignBillModal({ heldBillId: held.id }));
+                        }}
+                        className="flex items-center space-x-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer border border-indigo-200"
+                        title="Delegate this held bill to another counter"
+                      >
+                        <UserCheck className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Delegate</span>
                       </button>
 
                       {/* Discard Action */}
