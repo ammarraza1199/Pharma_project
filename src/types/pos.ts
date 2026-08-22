@@ -162,6 +162,8 @@ export interface FinalizedInvoice {
   payment: PaymentDetails;
   pharmacistName?: string;
   counterNumber?: number;
+  isEmergencyInvoice?: boolean;
+  emergencyCondition?: string;
   storeInfo: {
     name: string;
     dlNo: string;

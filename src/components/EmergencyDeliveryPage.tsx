@@ -1,8 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import type { RootState } from '../store';
+import { finalizeEmergencyInvoice } from '../store/posSlice';
+import type { FinalizedInvoice, PaymentDetails, PaymentMethodType, CartItem } from '../types/pos';
 import {
   AlertTriangle, Zap, Phone, Clock, CheckCircle2, ChevronRight,
   User, MapPin, PackageCheck, Printer, RotateCcw, HeartPulse,
-  Bug, Siren, Wind, Flame, Pill, Activity, ShieldAlert, Sparkles
+  Bug, Siren, Wind, Flame, Pill, Activity, ShieldAlert, Sparkles,
+  QrCode, CreditCard, Banknote, Split, Repeat, ShieldCheck,
+  Check, X, FileText, Loader2, Smartphone
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -14,6 +20,9 @@ interface EmergencyDrug {
   route: string;
   qty: number;
   unit: string;
+  unitPrice: number;
+  gstRate: number;
+  hsnCode: string;
   critical: boolean;
   notes: string;
 }
@@ -32,7 +41,7 @@ interface EmergencyKit {
   drugs: EmergencyDrug[];
 }
 
-// ─── Emergency Kit Data (Light Theme Palette) ─────────────────────────────────
+// ─── Emergency Kit Data (With Medicine Prices & GST Codes) ───────────────────
 
 const EMERGENCY_KITS: EmergencyKit[] = [
   {
@@ -53,12 +62,12 @@ const EMERGENCY_KITS: EmergencyKit[] = [
       'Note snake type, color, head shape if safely observed',
     ],
     drugs: [
-      { name: 'Polyvalent Anti-Snake Venom Serum', genericName: 'Anti-Venom Injection', dose: '10 vials IV over 1 hr', route: 'IV', qty: 10, unit: 'Vials', critical: true, notes: 'Dilute in NS 100ml per vial; pre-load Adrenaline first' },
-      { name: 'Adrenaline (Epinephrine) 1mg/1ml', genericName: 'Epinephrine', dose: '0.5 ml SC', route: 'SC', qty: 2, unit: 'Amp', critical: true, notes: 'Pre-load before anti-venom to prevent anaphylaxis' },
-      { name: 'Hydrocortisone Sodium Succinate 100mg', genericName: 'Hydrocortisone', dose: '100mg IV stat', route: 'IV', qty: 4, unit: 'Vials', critical: true, notes: '' },
-      { name: 'Promethazine 25mg/1ml', genericName: 'Promethazine HCl', dose: '25mg IM', route: 'IM', qty: 2, unit: 'Amp', critical: false, notes: 'Anti-histamine pre-medication' },
-      { name: 'Normal Saline 500ml', genericName: 'Sodium Chloride 0.9%', dose: '500ml IV drip', route: 'IV', qty: 4, unit: 'Bottles', critical: true, notes: '' },
-      { name: 'Tetanus Toxoid 0.5ml', genericName: 'Tetanus Vaccine', dose: '0.5ml IM', route: 'IM', qty: 1, unit: 'Amp', critical: false, notes: '' },
+      { name: 'Polyvalent Anti-Snake Venom Serum', genericName: 'Anti-Venom Injection', dose: '10 vials IV over 1 hr', route: 'IV', qty: 10, unit: 'Vials', unitPrice: 450, gstRate: 12, hsnCode: '30021200', critical: true, notes: 'Dilute in NS 100ml per vial; pre-load Adrenaline first' },
+      { name: 'Adrenaline (Epinephrine) 1mg/1ml', genericName: 'Epinephrine', dose: '0.5 ml SC', route: 'SC', qty: 2, unit: 'Amp', unitPrice: 85, gstRate: 12, hsnCode: '30049099', critical: true, notes: 'Pre-load before anti-venom to prevent anaphylaxis' },
+      { name: 'Hydrocortisone Sodium Succinate 100mg', genericName: 'Hydrocortisone', dose: '100mg IV stat', route: 'IV', qty: 4, unit: 'Vials', unitPrice: 65, gstRate: 12, hsnCode: '30043200', critical: true, notes: '' },
+      { name: 'Promethazine 25mg/1ml', genericName: 'Promethazine HCl', dose: '25mg IM', route: 'IM', qty: 2, unit: 'Amp', unitPrice: 30, gstRate: 12, hsnCode: '30049099', critical: false, notes: 'Anti-histamine pre-medication' },
+      { name: 'Normal Saline 500ml', genericName: 'Sodium Chloride 0.9%', dose: '500ml IV drip', route: 'IV', qty: 4, unit: 'Bottles', unitPrice: 45, gstRate: 12, hsnCode: '30049099', critical: true, notes: '' },
+      { name: 'Tetanus Toxoid 0.5ml', genericName: 'Tetanus Vaccine', dose: '0.5ml IM', route: 'IM', qty: 1, unit: 'Amp', unitPrice: 25, gstRate: 5, hsnCode: '30022019', critical: false, notes: '' },
     ],
   },
   {
@@ -79,11 +88,11 @@ const EMERGENCY_KITS: EmergencyKit[] = [
       'Start IV line — infuse fluids rapidly if BP drops',
     ],
     drugs: [
-      { name: 'Adrenaline (Epinephrine) 1mg/1ml', genericName: 'Epinephrine', dose: '0.5mg IM outer thigh', route: 'IM', qty: 3, unit: 'Amp', critical: true, notes: 'First-line treatment — administer immediately' },
-      { name: 'Chlorpheniramine 10mg/1ml', genericName: 'Chlorpheniramine Maleate', dose: '10mg IM', route: 'IM', qty: 2, unit: 'Amp', critical: true, notes: '' },
-      { name: 'Hydrocortisone Sodium Succinate 100mg', genericName: 'Hydrocortisone', dose: '200mg IV', route: 'IV', qty: 4, unit: 'Vials', critical: true, notes: '' },
-      { name: 'Salbutamol Inhaler 100mcg', genericName: 'Salbutamol', dose: '4 puffs via spacer', route: 'Inhalation', qty: 1, unit: 'Inhaler', critical: false, notes: 'For bronchospasm / wheezing' },
-      { name: 'Ringer Lactate 500ml', genericName: "Ringer's Lactate", dose: '1L IV rapid bolus', route: 'IV', qty: 2, unit: 'Bottles', critical: true, notes: '' },
+      { name: 'Adrenaline (Epinephrine) 1mg/1ml', genericName: 'Epinephrine', dose: '0.5mg IM outer thigh', route: 'IM', qty: 3, unit: 'Amp', unitPrice: 85, gstRate: 12, hsnCode: '30049099', critical: true, notes: 'First-line treatment — administer immediately' },
+      { name: 'Chlorpheniramine 10mg/1ml', genericName: 'Chlorpheniramine Maleate', dose: '10mg IM', route: 'IM', qty: 2, unit: 'Amp', unitPrice: 20, gstRate: 12, hsnCode: '30049099', critical: true, notes: '' },
+      { name: 'Hydrocortisone Sodium Succinate 100mg', genericName: 'Hydrocortisone', dose: '200mg IV', route: 'IV', qty: 4, unit: 'Vials', unitPrice: 65, gstRate: 12, hsnCode: '30043200', critical: true, notes: '' },
+      { name: 'Salbutamol Inhaler 100mcg', genericName: 'Salbutamol', dose: '4 puffs via spacer', route: 'Inhalation', qty: 1, unit: 'Inhaler', unitPrice: 165, gstRate: 12, hsnCode: '30049099', critical: false, notes: 'For bronchospasm / wheezing' },
+      { name: 'Ringer Lactate 500ml', genericName: "Ringer's Lactate", dose: '1L IV rapid bolus', route: 'IV', qty: 2, unit: 'Bottles', unitPrice: 55, gstRate: 12, hsnCode: '30049099', critical: true, notes: '' },
     ],
   },
   {
@@ -104,11 +113,11 @@ const EMERGENCY_KITS: EmergencyKit[] = [
       'Start IV access — do not give large fluid bolus unless hypotensive',
     ],
     drugs: [
-      { name: 'Aspirin 325mg', genericName: 'Acetylsalicylic Acid', dose: '325mg chew stat', route: 'Oral', qty: 4, unit: 'Tabs', critical: true, notes: 'Patient must CHEW — not swallow whole' },
-      { name: 'Isosorbide Dinitrate (Sorbitrate) 5mg', genericName: 'Isosorbide Dinitrate', dose: '5mg sub-lingual', route: 'Sub-lingual', qty: 3, unit: 'Tabs', critical: true, notes: 'Repeat every 5 min up to 3 doses' },
-      { name: 'Clopidogrel 300mg', genericName: 'Clopidogrel', dose: '300mg loading dose', route: 'Oral', qty: 2, unit: 'Tabs', critical: true, notes: '' },
-      { name: 'Atropine Sulphate 0.6mg/1ml', genericName: 'Atropine', dose: '0.6mg IV', route: 'IV', qty: 3, unit: 'Amp', critical: false, notes: 'For bradycardia only' },
-      { name: 'Normal Saline 100ml', genericName: 'Sodium Chloride 0.9%', dose: 'For drug dilution', route: 'IV', qty: 2, unit: 'Bottles', critical: false, notes: '' },
+      { name: 'Aspirin 325mg', genericName: 'Acetylsalicylic Acid', dose: '325mg chew stat', route: 'Oral', qty: 4, unit: 'Tabs', unitPrice: 14, gstRate: 12, hsnCode: '30049099', critical: true, notes: 'Patient must CHEW — not swallow whole' },
+      { name: 'Isosorbide Dinitrate (Sorbitrate) 5mg', genericName: 'Isosorbide Dinitrate', dose: '5mg sub-lingual', route: 'Sub-lingual', qty: 3, unit: 'Tabs', unitPrice: 18, gstRate: 12, hsnCode: '30049099', critical: true, notes: 'Repeat every 5 min up to 3 doses' },
+      { name: 'Clopidogrel 300mg', genericName: 'Clopidogrel', dose: '300mg loading dose', route: 'Oral', qty: 2, unit: 'Tabs', unitPrice: 45, gstRate: 12, hsnCode: '30049099', critical: true, notes: '' },
+      { name: 'Atropine Sulphate 0.6mg/1ml', genericName: 'Atropine', dose: '0.6mg IV', route: 'IV', qty: 3, unit: 'Amp', unitPrice: 28, gstRate: 12, hsnCode: '30049099', critical: false, notes: 'For bradycardia only' },
+      { name: 'Normal Saline 100ml', genericName: 'Sodium Chloride 0.9%', dose: 'For drug dilution', route: 'IV', qty: 2, unit: 'Bottles', unitPrice: 25, gstRate: 12, hsnCode: '30049099', critical: false, notes: '' },
     ],
   },
   {
@@ -129,10 +138,10 @@ const EMERGENCY_KITS: EmergencyKit[] = [
       'Do NOT force anything into patient mouth during seizure',
     ],
     drugs: [
-      { name: 'Diazepam 10mg/2ml', genericName: 'Diazepam', dose: '10mg IV slow or PR', route: 'IV / PR', qty: 3, unit: 'Amp', critical: true, notes: 'Max rate 2mg/min IV; can give rectally if no IV access' },
-      { name: 'Phenytoin Sodium 250mg/5ml', genericName: 'Phenytoin', dose: '15-20 mg/kg IV', route: 'IV', qty: 4, unit: 'Amp', critical: true, notes: 'Slow infusion over 30 min — monitor ECG' },
-      { name: 'Dextrose 25% 50ml', genericName: 'Dextrose', dose: '50ml IV push', route: 'IV', qty: 2, unit: 'Vials', critical: false, notes: 'Rule out hypoglycemia as cause' },
-      { name: 'Oxygen Cylinder Portable', genericName: 'Medical Oxygen', dose: '4-6 L/min via mask', route: 'Mask', qty: 1, unit: 'Cylinder', critical: true, notes: '' },
+      { name: 'Diazepam 10mg/2ml', genericName: 'Diazepam', dose: '10mg IV slow or PR', route: 'IV / PR', qty: 3, unit: 'Amp', unitPrice: 35, gstRate: 12, hsnCode: '30049099', critical: true, notes: 'Max rate 2mg/min IV; can give rectally if no IV access' },
+      { name: 'Phenytoin Sodium 250mg/5ml', genericName: 'Phenytoin', dose: '15-20 mg/kg IV', route: 'IV', qty: 4, unit: 'Amp', unitPrice: 60, gstRate: 12, hsnCode: '30049099', critical: true, notes: 'Slow infusion over 30 min — monitor ECG' },
+      { name: 'Dextrose 25% 50ml', genericName: 'Dextrose', dose: '50ml IV push', route: 'IV', qty: 2, unit: 'Vials', unitPrice: 38, gstRate: 12, hsnCode: '30049099', critical: false, notes: 'Rule out hypoglycemia as cause' },
+      { name: 'Oxygen Cylinder Portable', genericName: 'Medical Oxygen', dose: '4-6 L/min via mask', route: 'Mask', qty: 1, unit: 'Cylinder', unitPrice: 450, gstRate: 12, hsnCode: '28044090', critical: true, notes: '' },
     ],
   },
   {
@@ -153,10 +162,10 @@ const EMERGENCY_KITS: EmergencyKit[] = [
       'Call ambulance if no response after 3 rounds of bronchodilator',
     ],
     drugs: [
-      { name: 'Salbutamol Inhaler 100mcg', genericName: 'Salbutamol Sulphate', dose: '4-8 puffs every 20 min', route: 'Inhalation', qty: 2, unit: 'Inhalers', critical: true, notes: '' },
-      { name: 'Ipratropium Bromide Inhaler 20mcg', genericName: 'Ipratropium', dose: '4 puffs every 20 min', route: 'Inhalation', qty: 1, unit: 'Inhaler', critical: true, notes: 'Combine with Salbutamol for synergy' },
-      { name: 'Prednisolone 40mg', genericName: 'Prednisolone', dose: '40mg oral stat', route: 'Oral', qty: 2, unit: 'Tabs', critical: true, notes: '' },
-      { name: 'Aminophylline 250mg/10ml', genericName: 'Aminophylline', dose: '250mg IV over 30 min', route: 'IV', qty: 2, unit: 'Amp', critical: false, notes: 'Only if no response to inhaler therapy' },
+      { name: 'Salbutamol Inhaler 100mcg', genericName: 'Salbutamol Sulphate', dose: '4-8 puffs every 20 min', route: 'Inhalation', qty: 2, unit: 'Inhalers', unitPrice: 165, gstRate: 12, hsnCode: '30049099', critical: true, notes: '' },
+      { name: 'Ipratropium Bromide Inhaler 20mcg', genericName: 'Ipratropium', dose: '4 puffs every 20 min', route: 'Inhalation', qty: 1, unit: 'Inhaler', unitPrice: 220, gstRate: 12, hsnCode: '30049099', critical: true, notes: 'Combine with Salbutamol for synergy' },
+      { name: 'Prednisolone 40mg', genericName: 'Prednisolone', dose: '40mg oral stat', route: 'Oral', qty: 2, unit: 'Tabs', unitPrice: 22, gstRate: 12, hsnCode: '30043200', critical: true, notes: '' },
+      { name: 'Aminophylline 250mg/10ml', genericName: 'Aminophylline', dose: '250mg IV over 30 min', route: 'IV', qty: 2, unit: 'Amp', unitPrice: 42, gstRate: 12, hsnCode: '30049099', critical: false, notes: 'Only if no response to inhaler therapy' },
     ],
   },
   {
@@ -177,11 +186,11 @@ const EMERGENCY_KITS: EmergencyKit[] = [
       'For chemical burn — brush off dry chemicals first, then flush with water',
     ],
     drugs: [
-      { name: 'Silver Sulfadiazine Cream 1%', genericName: 'Silver Sulfadiazine', dose: 'Apply generously to wound', route: 'Topical', qty: 2, unit: 'Tubes', critical: true, notes: '' },
-      { name: 'Tramadol 50mg/1ml', genericName: 'Tramadol HCl', dose: '100mg IM', route: 'IM', qty: 2, unit: 'Amp', critical: true, notes: 'Pain management — first line' },
-      { name: 'Tetanus Toxoid 0.5ml', genericName: 'Tetanus Vaccine', dose: '0.5ml IM', route: 'IM', qty: 1, unit: 'Amp', critical: true, notes: '' },
-      { name: 'Ringer Lactate 500ml', genericName: "Ringer's Lactate", dose: 'Per Parkland formula IV', route: 'IV', qty: 4, unit: 'Bottles', critical: true, notes: '4ml/kg/% burn area in first 24hrs' },
-      { name: 'Cefazolin 1g', genericName: 'Cefazolin Sodium', dose: '1g IV every 8 hours', route: 'IV', qty: 6, unit: 'Vials', critical: false, notes: 'Prophylactic antibiotic cover' },
+      { name: 'Silver Sulfadiazine Cream 1%', genericName: 'Silver Sulfadiazine', dose: 'Apply generously to wound', route: 'Topical', qty: 2, unit: 'Tubes', unitPrice: 95, gstRate: 12, hsnCode: '30049099', critical: true, notes: '' },
+      { name: 'Tramadol 50mg/1ml', genericName: 'Tramadol HCl', dose: '100mg IM', route: 'IM', qty: 2, unit: 'Amp', unitPrice: 48, gstRate: 12, hsnCode: '30049099', critical: true, notes: 'Pain management — first line' },
+      { name: 'Tetanus Toxoid 0.5ml', genericName: 'Tetanus Vaccine', dose: '0.5ml IM', route: 'IM', qty: 1, unit: 'Amp', unitPrice: 25, gstRate: 5, hsnCode: '30022019', critical: true, notes: '' },
+      { name: 'Ringer Lactate 500ml', genericName: "Ringer's Lactate", dose: 'Per Parkland formula IV', route: 'IV', qty: 4, unit: 'Bottles', unitPrice: 55, gstRate: 12, hsnCode: '30049099', critical: true, notes: '4ml/kg/% burn area in first 24hrs' },
+      { name: 'Cefazolin 1g', genericName: 'Cefazolin Sodium', dose: '1g IV every 8 hours', route: 'IV', qty: 6, unit: 'Vials', unitPrice: 75, gstRate: 12, hsnCode: '30042099', critical: false, notes: 'Prophylactic antibiotic cover' },
     ],
   },
   {
@@ -202,18 +211,45 @@ const EMERGENCY_KITS: EmergencyKit[] = [
       'Monitor breathing closely — be ready to perform CPR',
     ],
     drugs: [
-      { name: 'Activated Charcoal 50g', genericName: 'Activated Charcoal', dose: '50g in 200ml water oral', route: 'Oral', qty: 2, unit: 'Sachets', critical: true, notes: 'Only within 1 hour of ingestion; patient must be conscious' },
-      { name: 'Atropine Sulphate 0.6mg/1ml', genericName: 'Atropine', dose: '2-4mg IV repeat every 10 min', route: 'IV', qty: 10, unit: 'Amp', critical: true, notes: 'For organophosphate / nerve agent poisoning' },
-      { name: 'Pralidoxime Chloride 1g', genericName: 'Pralidoxime', dose: '1-2g IV slow infusion', route: 'IV', qty: 4, unit: 'Vials', critical: true, notes: 'Organophosphate antidote — always with Atropine' },
-      { name: 'Naloxone 0.4mg/1ml', genericName: 'Naloxone HCl', dose: '0.4-2mg IV or IM', route: 'IV / IM', qty: 4, unit: 'Amp', critical: true, notes: 'Opioid overdose reversal — may repeat every 2-3 min' },
-      { name: 'N-Acetylcysteine 600mg', genericName: 'Acetylcysteine', dose: '150mg/kg IV over 15min', route: 'IV', qty: 10, unit: 'Amp', critical: false, notes: 'Paracetamol/Tylenol overdose antidote' },
+      { name: 'Activated Charcoal 50g', genericName: 'Activated Charcoal', dose: '50g in 200ml water oral', route: 'Oral', qty: 2, unit: 'Sachets', unitPrice: 85, gstRate: 12, hsnCode: '38021000', critical: true, notes: 'Only within 1 hour of ingestion; patient must be conscious' },
+      { name: 'Atropine Sulphate 0.6mg/1ml', genericName: 'Atropine', dose: '2-4mg IV repeat every 10 min', route: 'IV', qty: 10, unit: 'Amp', unitPrice: 28, gstRate: 12, hsnCode: '30049099', critical: true, notes: 'For organophosphate / nerve agent poisoning' },
+      { name: 'Pralidoxime Chloride 1g', genericName: 'Pralidoxime', dose: '1-2g IV slow infusion', route: 'IV', qty: 4, unit: 'Vials', unitPrice: 380, gstRate: 12, hsnCode: '30049099', critical: true, notes: 'Organophosphate antidote — always with Atropine' },
+      { name: 'Naloxone 0.4mg/1ml', genericName: 'Naloxone HCl', dose: '0.4-2mg IV or IM', route: 'IV / IM', qty: 4, unit: 'Amp', unitPrice: 290, gstRate: 12, hsnCode: '30049099', critical: true, notes: 'Opioid overdose reversal — may repeat every 2-3 min' },
+      { name: 'N-Acetylcysteine 600mg', genericName: 'Acetylcysteine', dose: '150mg/kg IV over 15min', route: 'IV', qty: 10, unit: 'Amp', unitPrice: 120, gstRate: 12, hsnCode: '30049099', critical: false, notes: 'Paracetamol/Tylenol overdose antidote' },
     ],
+  },
+];
+
+interface EmergencySpecialist {
+  id: string;
+  name: string;
+  role: string;
+  regNo: string;
+  qualification: string;
+  phone: string;
+  avatarInitials: string;
+  isLead?: boolean;
+}
+
+const EMERGENCY_SPECIALISTS: EmergencySpecialist[] = [
+  {
+    id: 'spec-1',
+    name: 'Dr. S. Reddy',
+    role: 'Chief Emergency Pharmacist (Critical Care & Toxicology)',
+    regNo: 'TG-PH-99214',
+    qualification: 'Pharm.D (Critical Care), Toxicology Certified',
+    phone: '+91 94401 23456',
+    avatarInitials: 'SR',
+    isLead: true
   },
 ];
 
 // ─── Main Component (Light Theme) ─────────────────────────────────────────────
 
 export const EmergencyDeliveryPage: React.FC = () => {
+  const dispatch = useDispatch();
+  const [selectedSpecialistId, setSelectedSpecialistId] = useState<string>('spec-1');
+  const [pharmacistVerified, setPharmacistVerified] = useState<boolean>(true);
   const [selectedKit, setSelectedKit] = useState<EmergencyKit | null>(null);
   const [checkedSet, setCheckedSet] = useState<Set<string>>(new Set());
   const [dispatchedDrugs, setDispatchedDrugs] = useState<EmergencyDrug[]>([]);
@@ -225,11 +261,48 @@ export const EmergencyDeliveryPage: React.FC = () => {
   const [billGenerated, setBillGenerated] = useState(false);
   const [showFirstAid, setShowFirstAid] = useState(true);
 
+  // ── Multi-Mode Payment Modal State (Pic 1 Match) ──
+  const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>('UPI');
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState<boolean>(false);
+  const [cashTendered, setCashTendered] = useState<number>(0);
+  const [upiCountdown, setUpiCountdown] = useState<number>(30);
+  const [isUpiSimulated, setIsUpiSimulated] = useState<boolean>(false);
+  const [latestEmergencyInvoice, setLatestEmergencyInvoice] = useState<FinalizedInvoice | null>(null);
+
+  const currentSpecialist = EMERGENCY_SPECIALISTS.find(s => s.id === selectedSpecialistId) || EMERGENCY_SPECIALISTS[0];
+
+  // Calculate live pricing and GST for selected drugs
+  const selectedDrugs = selectedKit ? selectedKit.drugs.filter(d => checkedSet.has(`${selectedKit.id}_${d.name}`)) : [];
+  const subtotal = selectedDrugs.reduce((sum, d) => sum + (d.unitPrice * d.qty), 0);
+  const totalCGST = selectedDrugs.reduce((sum, d) => sum + ((d.unitPrice * d.qty * (d.gstRate / 2)) / 100), 0);
+  const totalSGST = selectedDrugs.reduce((sum, d) => sum + ((d.unitPrice * d.qty * (d.gstRate / 2)) / 100), 0);
+  const grandTotal = subtotal + totalCGST + totalSGST;
+
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
     if (timerActive) interval = setInterval(() => setElapsedSeconds(s => s + 1), 1000);
     return () => clearInterval(interval);
   }, [timerActive]);
+
+  // UPI countdown timer in payment modal
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval>;
+    if (showPaymentModal && paymentMethod === 'UPI' && !isUpiSimulated) {
+      setUpiCountdown(30);
+      timer = setInterval(() => {
+        setUpiCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            setIsUpiSimulated(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [showPaymentModal, paymentMethod, isUpiSimulated]);
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
@@ -242,6 +315,7 @@ export const EmergencyDeliveryPage: React.FC = () => {
     setCheckedSet(new Set());
     setDispatchedDrugs([]);
     setBillGenerated(false);
+    setLatestEmergencyInvoice(null);
     setElapsedSeconds(0);
     setTimerActive(true);
     setShowFirstAid(true);
@@ -263,12 +337,129 @@ export const EmergencyDeliveryPage: React.FC = () => {
     else setCheckedSet(allKeys);
   };
 
-  const handleDispatch = () => {
+  const handleOpenPayment = () => {
+    if (!selectedKit || checkedSet.size === 0 || !pharmacistVerified) return;
+    setCashTendered(Math.round(grandTotal));
+    setIsUpiSimulated(false);
+    setShowPaymentModal(true);
+  };
+
+  const handleConfirmPayment = () => {
     if (!selectedKit) return;
-    const dispatched = selectedKit.drugs.filter(d => checkedSet.has(`${selectedKit.id}_${d.name}`));
-    setDispatchedDrugs(dispatched);
-    setBillGenerated(true);
-    setTimerActive(false);
+    setIsSubmittingPayment(true);
+
+    setTimeout(() => {
+      const dispatched = selectedKit.drugs.filter(d => checkedSet.has(`${selectedKit.id}_${d.name}`));
+      setDispatchedDrugs(dispatched);
+      setBillGenerated(true);
+      setTimerActive(false);
+
+      const items: CartItem[] = dispatched.map((d, idx) => ({
+        cartItemId: `item-sos-${idx}-${Date.now()}`,
+        productId: `prod-sos-${idx}`,
+        product: {
+          _id: `prod-sos-${idx}`,
+          name: d.name,
+          brand: 'EMERGENCY PROTOCOL',
+          saltComposition: d.genericName,
+          barcode: `890123456${idx}`,
+          hsnCode: d.hsnCode,
+          gstRate: d.gstRate,
+          unitMRP: Number((d.unitPrice * 1.15).toFixed(2)),
+          sellingPrice: d.unitPrice,
+          grossMarginPercent: 20,
+          scheduleCategory: 'REGULAR',
+          stockStatus: 'IN_STOCK',
+          totalStock: 50,
+          packSize: d.unit,
+          batches: [{
+            batchNumber: `EM-B${Math.floor(100 + Math.random() * 900)}`,
+            expiryDate: '2028-12-31',
+            stockQuantity: 50,
+            location: 'EMERGENCY_RACK_01',
+            mrp: Number((d.unitPrice * 1.15).toFixed(2))
+          }]
+        },
+        selectedBatch: {
+          batchNumber: `EM-B${Math.floor(100 + Math.random() * 900)}`,
+          expiryDate: '2028-12-31',
+          stockQuantity: 50,
+          location: 'EMERGENCY_RACK_01',
+          mrp: Number((d.unitPrice * 1.15).toFixed(2))
+        },
+        quantity: d.qty,
+        unitMode: 'PACK',
+        unitPrice: d.unitPrice,
+        discountPercent: 0,
+        taxableAmount: d.unitPrice * d.qty,
+        cgstAmount: (d.unitPrice * d.qty * (d.gstRate / 2)) / 100,
+        sgstAmount: (d.unitPrice * d.qty * (d.gstRate / 2)) / 100,
+        totalGst: (d.unitPrice * d.qty * d.gstRate) / 100,
+        lineTotal: (d.unitPrice * d.qty) + ((d.unitPrice * d.qty * d.gstRate) / 100)
+      }));
+
+      const payment: PaymentDetails = {
+        method: paymentMethod,
+        cashAmount: paymentMethod === 'CASH' ? grandTotal : 0,
+        upiAmount: paymentMethod === 'UPI' ? grandTotal : 0,
+        cardAmount: paymentMethod === 'CREDIT_CARD' || paymentMethod === 'DEBIT_CARD' ? grandTotal : 0,
+        creditCardAmount: paymentMethod === 'CREDIT_CARD' ? grandTotal : 0,
+        debitCardAmount: paymentMethod === 'DEBIT_CARD' ? grandTotal : 0,
+        autoPayAmount: paymentMethod === 'AUTO_PAY' ? grandTotal : 0,
+        totalPaid: grandTotal,
+        changeDue: paymentMethod === 'CASH' ? Math.max(0, cashTendered - grandTotal) : 0,
+        cardLast4: paymentMethod === 'CREDIT_CARD' ? '4242' : '5588',
+        cardNetwork: paymentMethod === 'CREDIT_CARD' ? 'VISA' : 'RUPAY',
+        paymentStatus: 'SUCCESS'
+      };
+
+      const invoice: FinalizedInvoice = {
+        invoiceNumber: `INV-SOS-${Math.floor(100000 + Math.random() * 900000)}`,
+        invoiceDate: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+        billingSession: {
+          id: `session-sos-${Date.now()}`,
+          tabTitle: `🚨 SOS: ${patientName || 'Emergency Patient'}`,
+          assignedPharmacistId: 'pharm-emergency',
+          items,
+          doctorDetails: {
+            doctorName: `${currentSpecialist.name} (Emergency Protocol)`,
+            regNo: currentSpecialist.regNo
+          },
+          patientDetails: {
+            patientName: patientName || 'Emergency Patient',
+            phone: contact || '9999999999',
+            age: '35',
+            gender: 'MALE'
+          },
+          scheduleXVerified: false,
+          pharmacistSignatureAcknowledged: true,
+          createdAt: new Date().toISOString()
+        },
+        subtotal: Number(subtotal.toFixed(2)),
+        totalDiscount: 0,
+        totalCGST: Number(totalCGST.toFixed(2)),
+        totalSGST: Number(totalSGST.toFixed(2)),
+        grandTotal: Number(grandTotal.toFixed(2)),
+        payment,
+        pharmacistName: currentSpecialist.name,
+        counterNumber: 4,
+        isEmergencyInvoice: true,
+        emergencyCondition: selectedKit.name,
+        storeInfo: {
+          name: 'GENQUANTAA MEDPLUS PHARMACY',
+          dlNo: 'DL-2024/HYD/889201',
+          gstin: '36AAACG1234F1Z8',
+          address: 'Plot 42, Innovation Corridor, Tech City, Hyderabad - 500081',
+          phone: '+91 98765 43210'
+        }
+      };
+
+      // Save to store and open the Tax Invoice & Print View Modal (Image 2)
+      dispatch(finalizeEmergencyInvoice(invoice));
+      setLatestEmergencyInvoice(invoice);
+      setIsSubmittingPayment(false);
+      setShowPaymentModal(false);
+    }, 700);
   };
 
   const handleReset = () => {
@@ -276,6 +467,7 @@ export const EmergencyDeliveryPage: React.FC = () => {
     setCheckedSet(new Set());
     setDispatchedDrugs([]);
     setBillGenerated(false);
+    setLatestEmergencyInvoice(null);
     setPatientName('');
     setLocation('');
     setContact('');
@@ -283,14 +475,8 @@ export const EmergencyDeliveryPage: React.FC = () => {
     setTimerActive(false);
   };
 
-  const urgencyColors: Record<string, string> = {
-    CRITICAL: 'bg-red-100 text-red-800 border border-red-200',
-    HIGH: 'bg-amber-100 text-amber-800 border border-amber-200',
-    MODERATE: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
-  };
-
   return (
-    <div className="flex-1 overflow-y-auto bg-slate-100 min-h-screen p-4 space-y-4">
+    <div className="flex-1 overflow-y-auto bg-slate-100 min-h-screen p-4 space-y-4 font-sans">
 
       {/* ── Top Emergency Header Banner (Clean Light-Accented) ── */}
       <div className="bg-white rounded-2xl border border-red-200 shadow-sm p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 bg-gradient-to-r from-red-50/60 via-white to-rose-50/60">
@@ -301,14 +487,14 @@ export const EmergencyDeliveryPage: React.FC = () => {
           <div>
             <div className="flex items-center space-x-2">
               <h1 className="text-lg font-black text-slate-900 tracking-tight font-heading uppercase">
-                🚨 Emergency Fast Dispensing
+                🚨 Emergency Fast Dispensing &amp; Billing
               </h1>
               <span className="bg-red-100 text-red-800 text-[10px] font-black px-2 py-0.5 rounded-full border border-red-200">
                 LIFE CRITICAL
               </span>
             </div>
             <p className="text-slate-500 text-xs font-medium mt-0.5">
-              Rapid life-saving drug dispatch protocols for snake bites, cardiac emergencies, anaphylaxis &amp; poisoning
+              Rapid life-saving drug dispatch protocols with instant multi-mode payment and official tax invoices
             </p>
           </div>
         </div>
@@ -344,6 +530,40 @@ export const EmergencyDeliveryPage: React.FC = () => {
         </div>
       </div>
 
+      {/* ── 👨‍⚕️ Assigned Emergency Specialist Pharmacist on Duty Banner ── */}
+      <div className="bg-gradient-to-r from-red-950 via-slate-900 to-red-950 text-white rounded-2xl border border-red-800 p-4 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center space-x-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-red-600 to-rose-500 text-white font-black flex items-center justify-center text-sm shadow-md ring-2 ring-red-400/40 flex-shrink-0">
+            {currentSpecialist.avatarInitials}
+          </div>
+          <div>
+            <div className="flex items-center space-x-2 flex-wrap">
+              <span className="text-[10px] bg-red-600/90 text-white font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center space-x-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-ping"></span>
+                <span>Assigned Emergency Specialist</span>
+              </span>
+              <span className="text-xs text-red-200 font-bold">Reg: {currentSpecialist.regNo}</span>
+            </div>
+            <h3 className="text-sm font-black text-white mt-1 flex items-center space-x-2">
+              <span>{currentSpecialist.name}</span>
+              <span className="text-xs text-red-200 font-medium hidden md:inline">({currentSpecialist.qualification})</span>
+            </h3>
+            <p className="text-[11px] text-slate-300">{currentSpecialist.role} • 📞 {currentSpecialist.phone}</p>
+          </div>
+        </div>
+
+        {/* Chief Emergency Pharmacist — Fixed (No Dropdown) */}
+        <div className="flex items-center space-x-2 w-full sm:w-auto bg-black/40 border border-red-800/80 px-3 py-2 rounded-xl">
+          <span className="text-xs text-red-300 font-bold whitespace-nowrap">Specialist:</span>
+          <div className="flex items-center space-x-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+            <span className="text-xs font-black text-white whitespace-nowrap">
+              Dr. S. Reddy (Chief) - Reg: TG-PH-99214
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* ── Main 3-Column Light Layout ── */}
       <div className="grid grid-cols-12 gap-4">
 
@@ -361,23 +581,23 @@ export const EmergencyDeliveryPage: React.FC = () => {
                   <button
                     key={kit.id}
                     onClick={() => handleSelectKit(kit)}
-                    className={`w-full text-left p-2.5 rounded-xl border transition-all cursor-pointer ${
+                    className={`w-full text-left p-3 rounded-xl border transition-all cursor-pointer flex items-center space-x-3 ${
                       isSelected
-                        ? kit.activeBg + ' shadow-xs'
-                        : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                        ? kit.activeBg
+                        : 'bg-white hover:bg-slate-50 border-slate-200'
                     }`}
                   >
-                    <div className="flex items-center space-x-2.5">
-                      <span className="text-xl flex-shrink-0">{kit.emoji}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className={`text-xs font-bold truncate ${isSelected ? kit.color : 'text-slate-800'}`}>
-                          {kit.name}
-                        </div>
-                        <div className="text-[9.5px] text-slate-500 truncate">{kit.description}</div>
+                    <span className="text-xl flex-shrink-0">{kit.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-900 truncate">{kit.name}</span>
+                        <span className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded uppercase ${
+                          kit.urgencyLevel === 'CRITICAL' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {kit.urgencyLevel}
+                        </span>
                       </div>
-                      <span className={`text-[8.5px] font-extrabold px-1.5 py-0.5 rounded-full flex-shrink-0 ${urgencyColors[kit.urgencyLevel]}`}>
-                        {kit.urgencyLevel}
-                      </span>
+                      <p className="text-[11px] text-slate-500 truncate mt-0.5">{kit.description}</p>
                     </div>
                   </button>
                 );
@@ -412,145 +632,73 @@ export const EmergencyDeliveryPage: React.FC = () => {
           </div>
         </div>
 
-        {/* ── CENTER: Protocol + Drug Checklist ── */}
+        {/* ── CENTER: Selected Kit Details & Drug Protocol ── */}
         <div className="col-span-12 lg:col-span-5 space-y-3">
-          {!selectedKit ? (
-            <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center space-y-4 shadow-2xs min-h-[480px] flex flex-col items-center justify-center">
-              <div className="w-20 h-20 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-600 animate-bounce">
-                <AlertTriangle className="w-10 h-10" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-slate-800 font-heading">
-                  Select an Emergency Type
-                </h3>
-                <p className="text-xs text-slate-500 max-w-sm mt-1">
-                  Choose an emergency scenario from the left panel to load immediate first-aid protocols and drug dispensing checklists.
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-2 max-w-xs w-full pt-2">
-                {['🐍 Snake Bite', '❤️ Heart Attack', '🚨 Anaphylaxis', '☠️ Poisoning'].map(e => (
-                  <div key={e} className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-center text-xs font-semibold text-slate-700">
-                    {e}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
+          {selectedKit ? (
             <div className="space-y-3">
-              {/* Selected Kit Header Card */}
-              <div className={`bg-white border-2 ${selectedKit.borderColor} rounded-2xl p-4 shadow-2xs`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <span className="text-3xl">{selectedKit.emoji}</span>
+              {/* Protocol Details Header */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-2xl">{selectedKit.emoji}</span>
                     <div>
-                      <h2 className={`text-base font-black ${selectedKit.color} font-heading`}>
-                        {selectedKit.name}
-                      </h2>
-                      <p className="text-slate-600 text-xs mt-0.5">{selectedKit.description}</p>
+                      <h2 className="text-sm font-black text-slate-900">{selectedKit.name} Protocol</h2>
+                      <p className="text-xs text-slate-500">{selectedKit.description}</p>
                     </div>
                   </div>
-                  <span className={`text-[10px] font-black px-3 py-1 rounded-full ${urgencyColors[selectedKit.urgencyLevel]}`}>
-                    ⚡ {selectedKit.urgencyLevel}
-                  </span>
-                </div>
-              </div>
-
-              {/* Immediate First Aid Steps (Collapsible) */}
-              <div className="bg-amber-50/80 border border-amber-200 rounded-2xl overflow-hidden shadow-2xs">
-                <button
-                  onClick={() => setShowFirstAid(!showFirstAid)}
-                  className="w-full text-left px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-amber-100/50 transition-colors"
-                >
-                  <div className="flex items-center space-x-2">
-                    <Zap className="w-4 h-4 text-amber-600" />
-                    <span className="text-amber-900 font-extrabold text-xs uppercase tracking-wide">
-                      Immediate First Aid Action Steps
-                    </span>
-                  </div>
-                  <span className="text-amber-700 text-[10px] font-bold">
-                    {showFirstAid ? 'Hide ▲' : 'Show ▼'}
-                  </span>
-                </button>
-
-                {showFirstAid && (
-                  <div className="px-4 pb-4 pt-1 space-y-2 border-t border-amber-200/60">
-                    {selectedKit.firstAidSteps.map((step, i) => (
-                      <div key={i} className="flex items-start space-x-2.5">
-                        <span className="flex-shrink-0 w-5 h-5 bg-amber-600 text-white text-[10px] font-black rounded-full flex items-center justify-center mt-0.5">
-                          {i + 1}
-                        </span>
-                        <p className="text-amber-950 text-xs font-medium leading-relaxed">{step}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Drug Protocol Checklist Card */}
-              <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center space-x-1.5">
-                    <Pill className="w-4 h-4 text-emerald-600" />
-                    <span>Emergency Drug Protocol ({selectedKit.drugs.length} Medicines)</span>
-                  </h3>
                   <button
                     onClick={handleSelectAll}
-                    className="text-xs text-emerald-700 hover:text-emerald-800 font-extrabold cursor-pointer hover:underline"
+                    className="text-xs font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
                   >
-                    {checkedSet.size === selectedKit.drugs.length ? 'Uncheck All' : 'Select All'}
+                    {checkedSet.size === selectedKit.drugs.length ? 'Deselect All' : 'Select All'}
                   </button>
                 </div>
 
+                {/* Drugs Checkbox List */}
                 <div className="space-y-2">
-                  {selectedKit.drugs.map(drug => {
+                  {selectedKit.drugs.map((drug) => {
                     const key = `${selectedKit.id}_${drug.name}`;
                     const isChecked = checkedSet.has(key);
+                    const itemTotal = drug.unitPrice * drug.qty;
+
                     return (
                       <div
                         key={drug.name}
                         onClick={() => handleToggleDrug(drug)}
-                        className={`relative p-3 rounded-xl border-2 cursor-pointer transition-all select-none active:scale-[0.99] ${
+                        className={`p-3 rounded-xl border transition-all cursor-pointer flex items-start space-x-3 select-none ${
                           isChecked
-                            ? 'bg-emerald-50/80 border-emerald-500 shadow-2xs'
-                            : drug.critical
-                            ? 'bg-red-50/40 border-red-200 hover:border-red-400'
-                            : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                            ? 'bg-emerald-50/70 border-emerald-400 ring-1 ring-emerald-300'
+                            : 'bg-white border-slate-200 hover:border-slate-300'
                         }`}
                       >
-                        {drug.critical && (
-                          <span className="absolute top-2.5 right-2.5 text-[8.5px] font-black text-red-700 bg-red-100 border border-red-200 px-1.5 py-0.5 rounded-md">
-                            ⚡ CRITICAL
-                          </span>
-                        )}
-                        <div className="flex items-start space-x-3">
-                          <div className={`flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center mt-0.5 transition-all ${
-                            isChecked ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 bg-white'
-                          }`}>
-                            {isChecked && <CheckCircle2 className="w-3.5 h-3.5" />}
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {}}
+                          className="mt-1 rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-xs font-bold text-slate-900">{drug.name}</h4>
+                            <span className="text-xs font-black text-slate-900">₹{itemTotal.toFixed(2)}</span>
                           </div>
-                          <div className="flex-1 min-w-0 pr-12">
-                            <div className={`text-xs font-bold leading-tight ${isChecked ? 'text-emerald-950' : 'text-slate-900'}`}>
-                              {drug.name}
-                            </div>
-                            <div className="text-[10px] text-slate-500 mt-0.5">{drug.genericName}</div>
-                            <div className="flex items-center flex-wrap gap-1 mt-1.5 text-[10px]">
-                              <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md font-mono border border-slate-200">
-                                💊 {drug.dose}
+                          <p className="text-[11px] text-slate-500">{drug.genericName} • {drug.dose} ({drug.route})</p>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <span className="text-[10px] bg-slate-100 text-slate-700 font-semibold px-2 py-0.5 rounded">
+                              Qty: {drug.qty} {drug.unit} @ ₹{drug.unitPrice}
+                            </span>
+                            <span className="text-[10px] text-slate-400">GST: {drug.gstRate}%</span>
+                            {drug.critical && (
+                              <span className="text-[9px] bg-red-100 text-red-700 font-extrabold px-1.5 py-0.2 rounded uppercase">
+                                ⚡ Critical
                               </span>
-                              <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200">
-                                🩺 {drug.route}
-                              </span>
-                              <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-bold border border-emerald-200">
-                                Qty: {drug.qty} {drug.unit}
-                              </span>
-                            </div>
-                            {drug.notes && (
-                              <div className="text-[9.5px] text-amber-800 mt-1.5 flex items-start space-x-1 font-medium">
-                                <span className="flex-shrink-0">⚠️</span>
-                                <span>{drug.notes}</span>
-                              </div>
                             )}
                           </div>
+                          {drug.notes && (
+                            <p className="text-[10px] text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 mt-1 border border-amber-200">
+                              ⚠️ {drug.notes}
+                            </p>
+                          )}
                         </div>
                       </div>
                     );
@@ -558,10 +706,16 @@ export const EmergencyDeliveryPage: React.FC = () => {
                 </div>
               </div>
             </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center text-slate-400 space-y-2">
+              <Siren className="w-10 h-10 mx-auto text-slate-300" />
+              <p className="text-xs font-bold text-slate-600">Select an emergency protocol on the left to begin dispensing</p>
+              <p className="text-[11px] text-slate-400">Snake bite, cardiac arrest, anaphylaxis, asthma crisis &amp; overdose</p>
+            </div>
           )}
         </div>
 
-        {/* ── RIGHT: Patient Details + Dispatch Action ── */}
+        {/* ── RIGHT: Patient Details + Multi-Mode Billing Action ── */}
         <div className="col-span-12 lg:col-span-4 space-y-3">
 
           {/* Patient Details Form Card */}
@@ -606,12 +760,12 @@ export const EmergencyDeliveryPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Dispatch Summary Panel */}
-          {selectedKit && !billGenerated && (
+          {/* Dispatch & Billing Summary Panel */}
+          {selectedKit && (
             <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-3">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center space-x-1.5 border-b border-slate-100 pb-2">
                 <PackageCheck className="w-4 h-4 text-emerald-600" />
-                <span>Dispatch Summary</span>
+                <span>Emergency Billing Summary</span>
               </h3>
               <div className="space-y-2 text-xs">
                 <div className="flex justify-between text-slate-600">
@@ -625,105 +779,384 @@ export const EmergencyDeliveryPage: React.FC = () => {
                   </span>
                 </div>
                 <div className="flex justify-between text-slate-600">
-                  <span>Critical Life-Saving Items</span>
-                  <span className="text-red-700 font-bold">
-                    {selectedKit.drugs.filter(d => d.critical && checkedSet.has(`${selectedKit.id}_${d.name}`)).length} selected
-                  </span>
+                  <span>Subtotal</span>
+                  <span className="font-semibold text-slate-900">₹{subtotal.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-slate-600 pt-1 border-t border-slate-100">
-                  <span>Response Timer</span>
-                  <span className="text-red-600 font-mono font-black">{formatTime(elapsedSeconds)}</span>
+                <div className="flex justify-between text-slate-600">
+                  <span>GST (CGST + SGST)</span>
+                  <span className="font-semibold text-slate-900">₹{(totalCGST + totalSGST).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-slate-900 pt-2 border-t border-slate-200 font-extrabold text-sm">
+                  <span>Grand Total (Payable)</span>
+                  <span className="text-emerald-700 font-heading text-base font-black">₹{grandTotal.toFixed(2)}</span>
                 </div>
               </div>
 
+              {/* Specialist Verification Sign-Off Card */}
+              <div className="bg-red-50/80 border border-red-200 rounded-xl p-3 space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-bold text-red-950">
+                  <span className="flex items-center space-x-1">
+                    <ShieldAlert className="w-3.5 h-3.5 text-red-600" />
+                    <span>Specialist Verification</span>
+                  </span>
+                  <span className="text-[10px] bg-red-200 text-red-900 px-1.5 py-0.2 rounded font-black">{currentSpecialist.regNo}</span>
+                </div>
+                <label className="flex items-center space-x-2 text-[11px] text-slate-700 cursor-pointer font-medium pt-1 select-none">
+                  <input
+                    type="checkbox"
+                    checked={pharmacistVerified}
+                    onChange={e => setPharmacistVerified(e.target.checked)}
+                    className="rounded text-red-600 focus:ring-red-500 w-4 h-4 cursor-pointer"
+                  />
+                  <span>Verified by <strong>{currentSpecialist.name}</strong></span>
+                </label>
+              </div>
+
+              {/* 💳 Proceed to Payment & Tax Invoice Button (Opens Multi-Mode Terminal) */}
               <button
-                onClick={handleDispatch}
-                disabled={checkedSet.size === 0}
-                className={`w-full py-3 rounded-xl font-black text-xs uppercase tracking-wide flex items-center justify-center space-x-2 transition-all ${
-                  checkedSet.size > 0
-                    ? 'bg-red-600 hover:bg-red-700 text-white shadow-md active:scale-95 cursor-pointer'
+                onClick={handleOpenPayment}
+                disabled={checkedSet.size === 0 || !pharmacistVerified}
+                className={`w-full py-3.5 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-2 transition-all shadow-md active:scale-95 ${
+                  checkedSet.size > 0 && pharmacistVerified
+                    ? 'bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white cursor-pointer animate-pulse'
                     : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                 }`}
               >
-                <Zap className="w-4 h-4" />
-                <span>🚨 Dispatch Emergency Drugs Now</span>
+                <CreditCard className="w-4 h-4" />
+                <span>💳 Pay ₹{grandTotal.toFixed(2)} &amp; Generate Invoice</span>
               </button>
             </div>
           )}
 
-          {/* ── Generated Dispatch Bill Card (Clean Light Style) ── */}
+          {/* ── Generated Dispatch Bill Card ── */}
           {billGenerated && dispatchedDrugs.length > 0 && (
-            <div className="bg-white rounded-2xl border-2 border-red-300 shadow-xl overflow-hidden">
+            <div className="bg-white rounded-2xl border-2 border-emerald-400 shadow-xl overflow-hidden animate-fadeIn">
               {/* Bill Header */}
-              <div className="bg-gradient-to-r from-red-600 to-rose-700 p-4 text-white">
-                <div className="flex items-center space-x-2">
-                  <AlertTriangle className="w-4 h-4" />
-                  <h3 className="font-black text-sm uppercase tracking-wide">Emergency Dispatch Bill</h3>
+              <div className="bg-gradient-to-r from-emerald-700 to-teal-800 p-4 text-white">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-300" />
+                    <h3 className="font-black text-sm uppercase tracking-wide">Emergency Bill Finalized</h3>
+                  </div>
+                  <span className="bg-emerald-900/80 text-emerald-200 text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-400/40">
+                    PAID &amp; INVOICED
+                  </span>
                 </div>
-                <div className="text-red-100 text-[10px] space-y-0.5 mt-1.5">
-                  <div>Emergency: <strong className="text-white">{selectedKit?.emoji} {selectedKit?.name}</strong></div>
-                  <div>Dispatched: <strong className="text-white">{new Date().toLocaleString('en-IN')}</strong></div>
-                  <div>Response Time: <strong className="text-white font-mono">{formatTime(elapsedSeconds)}</strong></div>
+                <div className="text-emerald-100 text-[10px] space-y-0.5 mt-2">
+                  <div>Invoice #: <strong className="text-white">{latestEmergencyInvoice?.invoiceNumber || 'INV-SOS-RECENT'}</strong></div>
+                  <div>Scenario: <strong className="text-white">{selectedKit?.emoji} {selectedKit?.name}</strong></div>
+                  <div>Grand Total: <strong className="text-white text-xs">₹{grandTotal.toFixed(2)}</strong></div>
                 </div>
               </div>
 
-              {/* Patient Info */}
-              {(patientName || location || contact) && (
-                <div className="px-4 py-2.5 bg-red-50/70 border-b border-red-100 text-xs space-y-0.5 text-slate-800">
-                  {patientName && <div><span className="text-slate-500">Patient:</span> <strong>{patientName}</strong></div>}
-                  {location && <div><span className="text-slate-500">Location:</span> <strong>{location}</strong></div>}
-                  {contact && <div><span className="text-slate-500">Contact:</span> <strong>{contact}</strong></div>}
-                </div>
-              )}
-
-              {/* Dispatched Drugs List */}
-              <div className="p-4 space-y-2">
-                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                  Dispatched Medicines ({dispatchedDrugs.length})
-                </div>
-                <div className="space-y-1.5 divide-y divide-slate-100">
-                  {dispatchedDrugs.map((drug, i) => (
-                    <div key={i} className="pt-1.5 first:pt-0 flex items-start justify-between">
-                      <div>
-                        <div className="text-xs font-bold text-slate-900">{drug.name}</div>
-                        <div className="text-[10px] text-slate-500">{drug.dose} · {drug.route}</div>
-                      </div>
-                      <div className="text-xs font-black text-slate-800 text-right">
-                        {drug.qty} {drug.unit}
-                        {drug.critical && <div className="text-[8.5px] text-red-600 font-bold">⚡ Critical</div>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-3 pt-2 border-t border-slate-200">
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-2 text-[10px] text-red-800 font-bold text-center">
-                    ⚠️ EMERGENCY DISPATCH PROTOCOL — PRIORITY HANDLING
+              {/* 👨‍⚕️ Assigned Specialist Verification Stamp */}
+              <div className="px-4 py-2 bg-slate-900 text-white flex items-center justify-between text-xs border-b border-slate-800">
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                  <div>
+                    <div className="text-[9px] text-slate-400 font-bold uppercase">Dispensing Specialist</div>
+                    <div className="font-bold text-white leading-tight">{currentSpecialist.name} ({currentSpecialist.regNo})</div>
                   </div>
                 </div>
+                <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">
+                  ✓ SIGNED OFF
+                </span>
               </div>
 
               {/* Actions */}
-              <div className="p-4 pt-0 flex space-x-2">
+              <div className="p-4 space-y-2">
                 <button
-                  onClick={() => window.print()}
-                  className="flex-1 flex items-center justify-center space-x-1.5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold cursor-pointer transition-colors active:scale-95"
+                  onClick={() => {
+                    if (latestEmergencyInvoice) {
+                      dispatch(finalizeEmergencyInvoice(latestEmergencyInvoice));
+                    }
+                  }}
+                  className="w-full flex items-center justify-center space-x-2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer transition-all shadow-md active:scale-98"
                 >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Print Slip</span>
+                  <FileText className="w-4 h-4" />
+                  <span>📄 View &amp; Print Official Tax Invoice (A4 / Thermal)</span>
                 </button>
-                <button
-                  onClick={handleReset}
-                  className="flex-1 flex items-center justify-center space-x-1.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-colors active:scale-95"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>New Emergency</span>
-                </button>
+
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => window.print()}
+                    className="flex-1 flex items-center justify-center space-x-1.5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold cursor-pointer transition-colors active:scale-95"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>Print Slip</span>
+                  </button>
+                  <button
+                    onClick={handleReset}
+                    className="flex-1 flex items-center justify-center space-x-1.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold cursor-pointer transition-colors active:scale-95 border border-slate-300"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>New Emergency</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* ── 💳 MULTI-MODE PAYMENT TERMINAL MODAL (Image 1 Match) ── */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 relative overflow-hidden max-h-[95vh] flex flex-col">
+            
+            {/* Modal Top Header */}
+            <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200 flex-shrink-0">
+              <div>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  MULTI-MODE PAYMENT TERMINAL
+                </span>
+                <h3 className="text-base font-extrabold text-slate-900 font-heading mt-1">
+                  Select Billing Payment Method
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto pr-1 flex-1 space-y-4">
+              
+              {/* Grand Total Display Card (Image 1 Banner) */}
+              <div className="bg-gradient-to-r from-emerald-600 via-teal-700 to-slate-900 text-white rounded-2xl p-4 flex items-center justify-between shadow-md">
+                <div>
+                  <p className="text-xs text-emerald-100 font-medium">Payable Amount (GST &amp; Discounts Applied)</p>
+                  <h2 className="text-3xl font-black font-heading tracking-tight">₹{grandTotal.toFixed(2)}</h2>
+                </div>
+                <div className="text-right space-y-1">
+                  <div className="bg-white/15 backdrop-blur-md px-3 py-1 rounded-lg border border-white/20 text-xs font-bold inline-block">
+                    {selectedDrugs.length} Cart Items
+                  </div>
+                  <div className="text-[10px] text-emerald-200">
+                    Patient: <span className="font-bold text-white">{patientName || 'Walk-in Customer'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Method Selector Grid (6 buttons matching Image 1) */}
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                {/* 1. Dynamic UPI */}
+                <button
+                  onClick={() => setPaymentMethod('UPI')}
+                  className={`flex flex-col items-center justify-center py-2.5 px-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                    paymentMethod === 'UPI'
+                      ? 'bg-indigo-50 border-indigo-600 text-indigo-700 ring-2 ring-indigo-600/20 shadow-xs'
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <QrCode className="w-5 h-5 mb-1 text-indigo-600" />
+                  <span className="text-[11px] leading-tight text-center">Dynamic UPI QR</span>
+                </button>
+
+                {/* 2. Cash */}
+                <button
+                  onClick={() => setPaymentMethod('CASH')}
+                  className={`flex flex-col items-center justify-center py-2.5 px-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                    paymentMethod === 'CASH'
+                      ? 'bg-emerald-50 border-emerald-600 text-emerald-700 ring-2 ring-emerald-600/20 shadow-xs'
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Banknote className="w-5 h-5 mb-1 text-emerald-600" />
+                  <span className="text-[11px] leading-tight text-center">Cash</span>
+                </button>
+
+                {/* 3. Credit Card */}
+                <button
+                  onClick={() => setPaymentMethod('CREDIT_CARD')}
+                  className={`flex flex-col items-center justify-center py-2.5 px-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                    paymentMethod === 'CREDIT_CARD'
+                      ? 'bg-blue-50 border-blue-600 text-blue-700 ring-2 ring-blue-600/20 shadow-xs'
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <CreditCard className="w-5 h-5 mb-1 text-blue-600" />
+                  <span className="text-[11px] leading-tight text-center">Credit Card</span>
+                </button>
+
+                {/* 4. Debit Card */}
+                <button
+                  onClick={() => setPaymentMethod('DEBIT_CARD')}
+                  className={`flex flex-col items-center justify-center py-2.5 px-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                    paymentMethod === 'DEBIT_CARD'
+                      ? 'bg-sky-50 border-sky-600 text-sky-700 ring-2 ring-sky-600/20 shadow-xs'
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <ShieldCheck className="w-5 h-5 mb-1 text-sky-600" />
+                  <span className="text-[11px] leading-tight text-center">Debit Card</span>
+                </button>
+
+                {/* 5. Auto Pay Refill */}
+                <button
+                  onClick={() => setPaymentMethod('AUTO_PAY')}
+                  className={`flex flex-col items-center justify-center py-2.5 px-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                    paymentMethod === 'AUTO_PAY'
+                      ? 'bg-purple-50 border-purple-600 text-purple-700 ring-2 ring-purple-600/20 shadow-xs'
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Repeat className="w-5 h-5 mb-1 text-purple-600" />
+                  <span className="text-[11px] leading-tight text-center">Auto Pay Refill</span>
+                </button>
+
+                {/* 6. Split Bill */}
+                <button
+                  onClick={() => setPaymentMethod('SPLIT')}
+                  className={`flex flex-col items-center justify-center py-2.5 px-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                    paymentMethod === 'SPLIT'
+                      ? 'bg-amber-50 border-amber-600 text-amber-700 ring-2 ring-amber-600/20 shadow-xs'
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Split className="w-5 h-5 mb-1 text-amber-600" />
+                  <span className="text-[11px] leading-tight text-center">Split Bill</span>
+                </button>
+              </div>
+
+              {/* Dynamic Content based on selected payment method */}
+              {paymentMethod === 'UPI' && (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center space-y-4">
+                  {/* Stylized QR Code Visual (Exact Image 1 Match) */}
+                  <div className="p-4 bg-white rounded-2xl shadow-sm border border-slate-200 flex items-center justify-center">
+                    <svg className="w-36 h-36" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect x="10" y="10" width="30" height="30" rx="4" fill="#0f172a" />
+                      <rect x="60" y="10" width="30" height="30" rx="4" fill="#0f172a" />
+                      <rect x="10" y="60" width="30" height="30" rx="4" fill="#0f172a" />
+                      <rect x="18" y="18" width="14" height="14" rx="2" fill="white" />
+                      <rect x="68" y="18" width="14" height="14" rx="2" fill="white" />
+                      <rect x="18" y="68" width="14" height="14" rx="2" fill="white" />
+                      <rect x="48" y="48" width="16" height="16" rx="2" fill="#0f172a" />
+                      <rect x="48" y="20" width="8" height="16" rx="2" fill="#0f172a" />
+                      <rect x="20" y="48" width="16" height="8" rx="2" fill="#0f172a" />
+                      <rect x="70" y="48" width="18" height="8" rx="2" fill="#0f172a" />
+                      <rect x="70" y="68" width="12" height="8" rx="2" fill="#0f172a" />
+                      <rect x="68" y="78" width="18" height="10" rx="2" fill="#0f172a" />
+                    </svg>
+                  </div>
+
+                  <div className="text-center space-y-1">
+                    <div className="flex items-center justify-center space-x-1.5 text-xs text-slate-600 font-semibold">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                      <span>
+                        {isUpiSimulated
+                          ? '✅ UPI Payment Received & Verified!'
+                          : `Waiting for customer scan... Auto-verifying in ${upiCountdown}s`}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setIsUpiSimulated(true)}
+                    className="w-full max-w-sm py-2.5 px-4 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold flex items-center justify-center space-x-2 transition-all cursor-pointer"
+                  >
+                    <Zap className="w-3.5 h-3.5 text-indigo-600 fill-current" />
+                    <span>⚡ Simulate Instant UPI Scan (PhonePe / GPay / Paytm)</span>
+                  </button>
+                </div>
+              )}
+
+              {paymentMethod === 'CASH' && (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] text-slate-500 font-bold uppercase mb-1 block">Cash Tendered (₹)</label>
+                      <input
+                        type="number"
+                        value={cashTendered || ''}
+                        onChange={e => setCashTendered(Number(e.target.value))}
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm font-black text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 font-bold uppercase mb-1 block">Change Due (₹)</label>
+                      <div className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-sm font-black text-emerald-700">
+                        ₹{Math.max(0, cashTendered - grandTotal).toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex space-x-1.5">
+                    {[100, 200, 500, 1000, 2000, 5000].map(val => (
+                      <button
+                        key={val}
+                        onClick={() => setCashTendered(val)}
+                        className="flex-1 py-1 bg-white border border-slate-200 hover:border-emerald-500 rounded-lg text-xs font-bold text-slate-700 cursor-pointer"
+                      >
+                        ₹{val}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(paymentMethod === 'CREDIT_CARD' || paymentMethod === 'DEBIT_CARD') && (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2 text-center">
+                  <CreditCard className="w-8 h-8 mx-auto text-blue-600" />
+                  <p className="text-xs font-bold text-slate-800">Card Terminal Ready (EDC Swiped / Chip Read)</p>
+                  <p className="text-[11px] text-slate-500">Card ending with •••• 4242 (Visa) — Auth Code: AUTH-{Math.floor(100000 + Math.random() * 900000)}</p>
+                </div>
+              )}
+
+              {paymentMethod === 'AUTO_PAY' && (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2 text-center">
+                  <Repeat className="w-8 h-8 mx-auto text-purple-600" />
+                  <p className="text-xs font-bold text-slate-800">AutoPay Monthly Refill Mandate</p>
+                  <p className="text-[11px] text-slate-500">e-Mandate: MN-2026-884920 • Patient VPA: {contact ? `${contact}@upi` : 'customer@okhdfcbank'}</p>
+                </div>
+              )}
+
+              {paymentMethod === 'SPLIT' && (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2 text-xs">
+                  <div className="flex justify-between">
+                    <span>Cash Portion:</span>
+                    <span className="font-bold">₹{(grandTotal / 2).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>UPI / Card Portion:</span>
+                    <span className="font-bold">₹{(grandTotal / 2).toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Bottom Actions (Image 1 Bottom Bar) */}
+            <div className="pt-4 border-t border-slate-200 flex items-center justify-end space-x-3 flex-shrink-0">
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleConfirmPayment}
+                disabled={isSubmittingPayment}
+                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl shadow-md flex items-center space-x-2 transition-all cursor-pointer active:scale-95"
+              >
+                {isSubmittingPayment ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Processing Payment...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 stroke-[3]" />
+                    <span>Confirm {paymentMethod} &amp; Generate Invoice</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

@@ -51,7 +51,7 @@ interface PosState {
   activeSessionId: string;
   heldBills: HeldBill[];
   isManagerAuthenticated: boolean;
-  
+
   // Modals & Overlays
   assignBillModal: {
     isOpen: boolean;
@@ -90,7 +90,7 @@ interface PosState {
   invoiceHistoryModal: {
     isOpen: boolean;
   };
-  
+
   // Printing & Finalization
   invoices: FinalizedInvoice[];
   latestFinalizedInvoice: FinalizedInvoice | null;
@@ -233,7 +233,7 @@ const initialState: PosState = {
   activeSessionId: initialSession.id,
   heldBills: [],
   isManagerAuthenticated: false,
-  
+
   assignBillModal: {
     isOpen: false
   },
@@ -262,7 +262,7 @@ const initialState: PosState = {
   invoiceHistoryModal: {
     isOpen: false
   },
-  
+
   invoices: getInitialInvoices(),
   latestFinalizedInvoice: null,
   isSubmittingBill: false
@@ -319,8 +319,8 @@ const addProductToCartInternal = (
 
   const existingItem = currentSession.items.find(
     item => item.productId === product._id &&
-            item.selectedBatch.batchNumber === batchToUse?.batchNumber &&
-            (item.unitMode || 'PACK') === unitMode
+      item.selectedBatch.batchNumber === batchToUse?.batchNumber &&
+      (item.unitMode || 'PACK') === unitMode
   );
 
   if (existingItem) {
@@ -541,10 +541,6 @@ export const posSlice = createSlice({
 
     switchTab: (state, action: PayloadAction<string>) => {
       state.activeSessionId = action.payload;
-      const session = state.sessions.find(s => s.id === action.payload);
-      if (session && session.assignedPharmacistId) {
-        state.activePharmacistId = session.assignedPharmacistId;
-      }
     },
 
     closeTab: (state, action: PayloadAction<string>) => {
@@ -703,7 +699,7 @@ export const posSlice = createSlice({
           .filter(p => p._id !== product._id && p.saltComposition.toLowerCase() === product.saltComposition.toLowerCase() && p.totalStock > 0)
           .sort((a, b) => b.grossMarginPercent - a.grossMarginPercent)
           .slice(0, 3);
-        
+
         state.substitutionModal = {
           isOpen: true,
           originalProduct: product,
@@ -877,7 +873,7 @@ export const posSlice = createSlice({
       const validPin = state.settings.managerPin || '1234';
       if (action.payload === validPin) {
         state.isManagerAuthenticated = true;
-        
+
         // Handle authorized pending Schedule X / Narcotic drug addition
         if (state.complianceModal.isOpen && state.complianceModal.type === 'SCHEDULE_X' && state.complianceModal.targetProduct) {
           const targetProd = state.complianceModal.targetProduct;
@@ -934,7 +930,7 @@ export const posSlice = createSlice({
       };
 
       state.heldBills.push(heldBill);
-      
+
       // Reset active tab items
       currentSession.items = [];
       currentSession.doctorDetails = { doctorName: '', regNo: '' };
@@ -1041,6 +1037,11 @@ export const posSlice = createSlice({
       currentSession.doctorDetails = { doctorName: '', regNo: '' };
       currentSession.patientDetails = { patientName: '', phone: '', age: '', gender: 'MALE' };
     },
+    finalizeEmergencyInvoice: (state, action: PayloadAction<FinalizedInvoice>) => {
+      state.invoices.unshift(action.payload);
+      saveInvoicesToStorage(state.invoices);
+      state.latestFinalizedInvoice = action.payload;
+    },
     clearFinalizedInvoice: (state) => {
       state.latestFinalizedInvoice = null;
     },
@@ -1112,6 +1113,7 @@ export const {
   openScheduleHDetailsPrompt,
   startSubmittingBill,
   finalizeBillSuccess,
+  finalizeEmergencyInvoice,
   clearFinalizedInvoice,
   setInvoiceHistoryModalOpen,
   reprintInvoice,

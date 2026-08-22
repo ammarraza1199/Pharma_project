@@ -115,11 +115,10 @@ export const ReceiptPrintView: React.FC = () => {
           <button
             type="button"
             onClick={() => setPrintFormat('THERMAL')}
-            className={`py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${
-              printFormat === 'THERMAL'
+            className={`py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${printFormat === 'THERMAL'
                 ? 'bg-white text-emerald-800 shadow-2xs'
                 : 'text-slate-600 hover:text-slate-900'
-            }`}
+              }`}
           >
             <Printer className="w-3.5 h-3.5" />
             <span>80mm ESC/POS Thermal Receipt</span>
@@ -128,11 +127,10 @@ export const ReceiptPrintView: React.FC = () => {
           <button
             type="button"
             onClick={() => setPrintFormat('A4')}
-            className={`py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${
-              printFormat === 'A4'
+            className={`py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${printFormat === 'A4'
                 ? 'bg-white text-emerald-800 shadow-2xs'
                 : 'text-slate-600 hover:text-slate-900'
-            }`}
+              }`}
           >
             <FileText className="w-3.5 h-3.5" />
             <span>A4 Official Tax Invoice</span>
@@ -540,7 +538,7 @@ export const ReceiptPrintView: React.FC = () => {
             <History className="w-3.5 h-3.5 text-emerald-600" />
             <span>View All Saved Invoices</span>
           </button>
-          
+
           <div className="flex space-x-2">
             <button
               onClick={() => dispatch(clearFinalizedInvoice())}

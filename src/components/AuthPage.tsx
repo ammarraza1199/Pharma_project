@@ -8,7 +8,7 @@ import {
   registerUser,
   switchActivePharmacist
 } from '../store/posSlice';
-import { Store, Lock, Mail, UserCheck, ArrowLeft, ShieldCheck, ArrowRight, Building, AlertCircle, CheckCircle, KeyRound, X, Check, Send, ExternalLink, RefreshCw, Loader2, Users } from 'lucide-react';
+import { Store, Lock, Mail, UserCheck, ArrowLeft, ShieldCheck, ArrowRight, Building, AlertCircle, CheckCircle, KeyRound, X, Check, Send, ExternalLink, RefreshCw, Loader2, Users, Siren } from 'lucide-react';
 
 // --- Registered Accounts Store (simulates backend MongoDB user collection) ---
 // When a new user signs up, their credentials are saved here.
@@ -72,14 +72,22 @@ export const AuthPage: React.FC = () => {
     );
 
     if (match) {
-      // ✅ Correct credentials — launch POS Dashboard page and activate chosen counter
-      dispatch(switchActivePharmacist(selectedCounterId));
+      // ✅ Correct credentials — check if Emergency Desk was selected
+      const isEmergencyDesk = selectedCounterId === 'emergency-desk';
+
       dispatch(loginUser({
         email: match.email,
         password: match.password,
-        pharmacistName: match.pharmacistName,
+        pharmacistName: isEmergencyDesk ? 'Dr. S. Reddy (Chief Emergency)' : match.pharmacistName,
         pharmacyName: match.pharmacyName
       }));
+
+      if (isEmergencyDesk) {
+        // Route directly to Emergency page
+        dispatch(navigateTo('EMERGENCY_DELIVERY'));
+      } else {
+        dispatch(switchActivePharmacist(selectedCounterId));
+      }
     } else {
       // ❌ Wrong credentials — show inline error, increment attempt counter
       const attempts = loginAttempts + 1;
@@ -352,8 +360,10 @@ export const AuthPage: React.FC = () => {
                     <Users className="w-3.5 h-3.5 text-emerald-600" />
                     <span>My Shift Counter / Workstation</span>
                   </span>
-                  <span className="text-[10px] text-emerald-700 font-semibold">Auto-assigns tab</span>
+                  <span className="text-[10px] text-emerald-700 font-semibold">Auto-assigns shift</span>
                 </label>
+
+                {/* Billing Counter Cards */}
                 <div className="grid grid-cols-3 gap-2">
                   {pharmacists.map((pharm) => {
                     const isSelected = selectedCounterId === pharm.id;
@@ -362,21 +372,62 @@ export const AuthPage: React.FC = () => {
                         key={pharm.id}
                         type="button"
                         onClick={() => setSelectedCounterId(pharm.id)}
-                        className={`p-2 rounded-xl border text-left transition-all cursor-pointer ${
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                           isSelected
                             ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/20 text-emerald-900 shadow-2xs'
                             : 'bg-white border-slate-200 hover:border-slate-300 text-slate-600'
                         }`}
                       >
-                        <div className="flex items-center justify-between mb-0.5">
-                          <span className="text-[10px] font-black uppercase text-emerald-700">C-{pharm.counterNumber}</span>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-black uppercase text-emerald-700">
+                            C-{pharm.counterNumber}
+                          </span>
                           <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-emerald-500' : 'bg-slate-300'}`} />
                         </div>
-                        <div className="text-xs font-bold truncate">{pharm.name.split(' ')[0]}</div>
-                        <div className="text-[9px] text-slate-400 truncate">{pharm.role.split(' ')[0]}</div>
+                        <div className="text-xs font-bold truncate">{pharm.name}</div>
+                        <div className="text-[9px] text-slate-400 truncate">{pharm.role}</div>
                       </button>
                     );
                   })}
+                </div>
+
+                {/* ── Emergency Desk Sign-In Card ── */}
+                <div className="mt-2">
+                  <div className="flex items-center space-x-2 mb-1.5">
+                    <div className="flex-1 h-px bg-slate-200" />
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Or</span>
+                    <div className="flex-1 h-px bg-slate-200" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCounterId('emergency-desk')}
+                    className={`w-full p-3 rounded-xl border-2 text-left transition-all cursor-pointer ${
+                      selectedCounterId === 'emergency-desk'
+                        ? 'bg-rose-50 border-rose-500 ring-2 ring-rose-500/20 text-rose-950 shadow-sm'
+                        : 'bg-white border-rose-200 hover:border-rose-400 hover:bg-rose-50/40 text-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2.5">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                          selectedCounterId === 'emergency-desk' ? 'bg-rose-600 text-white' : 'bg-rose-100 text-rose-700'
+                        }`}>
+                          <Siren className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs font-black text-slate-900">Dr. S. Reddy</span>
+                            <span className="text-[9px] font-black uppercase bg-rose-100 text-rose-700 px-1.5 py-0.2 rounded">SOS / Chief</span>
+                          </div>
+                          <div className="text-[9px] text-slate-500 font-medium">Chief Emergency Pharmacist · Reg: TG-PH-99214</div>
+                          <div className="text-[9px] text-rose-600 font-bold mt-0.5">🚨 Routes directly to Emergency Desk</div>
+                        </div>
+                      </div>
+                      <span className={`w-3 h-3 rounded-full flex-shrink-0 ${
+                        selectedCounterId === 'emergency-desk' ? 'bg-rose-600 ring-2 ring-rose-300' : 'bg-slate-200'
+                      }`} />
+                    </div>
+                  </button>
                 </div>
               </div>
 

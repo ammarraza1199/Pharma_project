@@ -11,6 +11,7 @@ import {
   setCustomerDisplayModalOpen,
   navigateTo,
   openAssignBillModal,
+  assignBillToPharmacist,
   autoBalanceQueues,
   dismissTransferNotification
 } from '../store/posSlice';
@@ -44,7 +45,7 @@ export const TabBar: React.FC = () => {
   const [showHoldPrompt, setShowHoldPrompt] = useState<boolean>(false);
 
   const activePharmacist = pharmacists.find(p => p.id === activePharmacistId) || pharmacists[0];
-  
+
   // Filter sessions assigned to current pharmacist
   const currentPharmacistSessions = sessions.filter(s => s.assignedPharmacistId === activePharmacistId);
   const currentSession = sessions.find(s => s.id === activeSessionId) || currentPharmacistSessions[0];
@@ -87,25 +88,38 @@ export const TabBar: React.FC = () => {
               return (
                 <button
                   key={pharm.id}
-                  onClick={() => dispatch(switchActivePharmacist(pharm.id))}
+                  onClick={() => {
+                    if (!isActiveCounter) {
+                      // Open Delegate Bill modal so user chooses which customer to delegate
+                      dispatch(openAssignBillModal());
+                    }
+                  }}
+                  title={
+                    isActiveCounter
+                      ? `Your active terminal: Counter ${pharm.counterNumber} (${pharm.name})`
+                      : `Open delegation tool for Counter ${pharm.counterNumber} (${pharm.name})`
+                  }
                   className={`group relative flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
                     isActiveCounter
                       ? 'bg-emerald-600 text-white border-emerald-400 shadow-sm ring-2 ring-emerald-400/30'
-                      : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750 hover:text-white hover:border-slate-600'
+                      : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white hover:border-indigo-400'
                   }`}
                 >
                   <span className={`w-2 h-2 rounded-full ${
                     isFree ? 'bg-emerald-400' : isBusy ? 'bg-rose-400 animate-ping' : 'bg-amber-400'
                   }`} />
-                  <span className="font-bold">Counter {pharm.counterNumber}: {pharm.name.split(' ')[0]}</span>
-                  
+                  <span className="font-bold">
+                    Counter {pharm.counterNumber}: {pharm.name.split(' ')[0]}
+                    {isActiveCounter ? ' (You)' : ''}
+                  </span>
+
                   {/* Workload badge */}
                   <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
                     isFree
                       ? isActiveCounter ? 'bg-emerald-700 text-emerald-100' : 'bg-emerald-950 text-emerald-300 border border-emerald-700/50'
                       : isBusy
-                      ? 'bg-rose-900 text-rose-200 border border-rose-600 animate-pulse'
-                      : isActiveCounter ? 'bg-emerald-700 text-emerald-100' : 'bg-slate-700 text-slate-300'
+                        ? 'bg-rose-900 text-rose-200 border border-rose-600 animate-pulse'
+                        : isActiveCounter ? 'bg-emerald-700 text-emerald-100' : 'bg-slate-700 text-slate-300'
                   }`}>
                     {count} {count === 1 ? 'bill' : 'bills'}
                     {isFree ? ' (Free)' : isBusy ? ' (Busy)' : ''}
@@ -170,11 +184,10 @@ export const TabBar: React.FC = () => {
               <div
                 key={session.id}
                 onClick={() => dispatch(switchTab(session.id))}
-                className={`group relative flex items-center space-x-2 px-3.5 py-2 rounded-t-lg text-xs font-semibold cursor-pointer border-t border-x transition-all duration-150 select-none ${
-                  isActive
+                className={`group relative flex items-center space-x-2 px-3.5 py-2 rounded-t-lg text-xs font-semibold cursor-pointer border-t border-x transition-all duration-150 select-none ${isActive
                     ? 'bg-white text-emerald-800 border-slate-300 border-b-white -mb-[1px] shadow-2xs'
                     : 'bg-slate-200/70 text-slate-600 border-transparent hover:bg-slate-200 hover:text-slate-900'
-                }`}
+                  }`}
               >
                 <div className="flex items-center space-x-1.5">
                   <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
@@ -191,9 +204,8 @@ export const TabBar: React.FC = () => {
                 )}
 
                 {itemCount > 0 && (
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                    isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-300 text-slate-700'
-                  }`}>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-300 text-slate-700'
+                    }`}>
                     {itemCount}
                   </span>
                 )}
@@ -263,11 +275,10 @@ export const TabBar: React.FC = () => {
                   setShowHoldPrompt(true);
                 }}
                 disabled={cartItemCount === 0}
-                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-2xs border ${
-                  cartItemCount > 0
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-2xs border ${cartItemCount > 0
                     ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100 cursor-pointer'
                     : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60'
-                }`}
+                  }`}
               >
                 <PauseCircle className="w-3.5 h-3.5 text-amber-600" />
                 <span>Hold Bill</span>

@@ -16,11 +16,15 @@ export const Navbar: React.FC = () => {
 
   const activePharmacist = pharmacists.find(p => p.id === activePharmacistId) || pharmacists[0];
 
-  // Dynamically derive signed-in account details
+  // Store account initial — always from the STORE LOGIN email, never from the pharmacist name
   const accountEmail = currentUser?.email || 'navyasri@genquantaa.com';
   const emailPrefixName = accountEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   const accountName = currentUser?.pharmacistName || emailPrefixName || 'User';
-  const accountInitial = accountName.trim().charAt(0).toUpperCase() || 'U';
+  // Always show first letter of the EMAIL prefix (store account), not the pharmacist/role name
+  const accountInitial = emailPrefixName.trim().charAt(0).toUpperCase() || 'N';
+
+  // Emergency desk mode: signed in with Emergency Desk option
+  const isEmergencyDesk = currentView === 'EMERGENCY_DELIVERY' && accountName.includes('Dr. S. Reddy');
 
   useEffect(() => {
     const updateClock = () => {
@@ -74,11 +78,10 @@ export const Navbar: React.FC = () => {
         {/* Dashboard Nav */}
         <button
           onClick={() => dispatch(navigateTo('DASHBOARD'))}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-            currentView === 'DASHBOARD'
+          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'DASHBOARD'
               ? 'bg-violet-100 text-violet-800 font-bold'
               : 'text-slate-500 hover:text-violet-700 hover:bg-violet-50'
-          }`}
+            }`}
           title="Dashboard"
         >
           <LayoutDashboard className="w-4 h-4" />
@@ -87,11 +90,10 @@ export const Navbar: React.FC = () => {
         {/* POS Terminal Nav */}
         <button
           onClick={() => dispatch(navigateTo('POS_TERMINAL'))}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-            currentView === 'POS_TERMINAL'
+          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'POS_TERMINAL'
               ? 'bg-emerald-100 text-emerald-800 font-bold'
               : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
-          }`}
+            }`}
           title="POS Billing Terminal"
         >
           <ShoppingCart className="w-4 h-4" />
@@ -100,11 +102,10 @@ export const Navbar: React.FC = () => {
         {/* Saved Invoices History Nav */}
         <button
           onClick={() => dispatch(navigateTo('INVOICES'))}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-            currentView === 'INVOICES'
+          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'INVOICES'
               ? 'bg-emerald-100 text-emerald-800 font-bold'
               : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
-          }`}
+            }`}
           title="Invoices & Sales History"
         >
           <History className="w-4 h-4" />
@@ -113,11 +114,10 @@ export const Navbar: React.FC = () => {
         {/* Inventory Catalog Nav */}
         <button
           onClick={() => dispatch(navigateTo('INVENTORY'))}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-            currentView === 'INVENTORY'
+          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'INVENTORY'
               ? 'bg-emerald-100 text-emerald-800 font-bold'
               : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
-          }`}
+            }`}
           title="Inventory Catalog"
         >
           <Package className="w-4 h-4" />
@@ -126,11 +126,10 @@ export const Navbar: React.FC = () => {
         {/* Stock Purchase GRN Nav */}
         <button
           onClick={() => dispatch(navigateTo('PURCHASE_GRN'))}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-            currentView === 'PURCHASE_GRN'
+          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'PURCHASE_GRN'
               ? 'bg-amber-100 text-amber-800 font-bold'
               : 'text-slate-500 hover:text-amber-700 hover:bg-amber-50'
-          }`}
+            }`}
           title="Stock Purchase (GRN)"
         >
           <Truck className="w-4 h-4" />
@@ -139,11 +138,10 @@ export const Navbar: React.FC = () => {
         {/* Reports Nav */}
         <button
           onClick={() => dispatch(navigateTo('REPORTS'))}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-            currentView === 'REPORTS'
+          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'REPORTS'
               ? 'bg-blue-100 text-blue-800 font-bold'
               : 'text-slate-500 hover:text-blue-700 hover:bg-blue-50'
-          }`}
+            }`}
           title="Sales Reports & GST Analytics"
         >
           <BarChart3 className="w-4 h-4" />
@@ -152,11 +150,10 @@ export const Navbar: React.FC = () => {
         {/* Returns & Refunds Nav */}
         <button
           onClick={() => dispatch(navigateTo('RETURNS'))}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-            currentView === 'RETURNS'
+          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'RETURNS'
               ? 'bg-rose-100 text-rose-800 font-bold'
               : 'text-slate-500 hover:text-rose-700 hover:bg-rose-50'
-          }`}
+            }`}
           title="Returns & Refund Credit Notes"
         >
           <RotateCcw className="w-4 h-4" />
@@ -165,11 +162,10 @@ export const Navbar: React.FC = () => {
         {/* Expiry Management Nav */}
         <button
           onClick={() => dispatch(navigateTo('EXPIRY_MANAGEMENT'))}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-            currentView === 'EXPIRY_MANAGEMENT'
+          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'EXPIRY_MANAGEMENT'
               ? 'bg-amber-100 text-amber-800 font-bold'
               : 'text-slate-500 hover:text-amber-700 hover:bg-amber-50'
-          }`}
+            }`}
           title="Expiry & Stock Disposal Management"
         >
           <Clock className="w-4 h-4 text-amber-600" />
@@ -178,11 +174,10 @@ export const Navbar: React.FC = () => {
         {/* Patients Directory Nav */}
         <button
           onClick={() => dispatch(navigateTo('PATIENTS'))}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-            currentView === 'PATIENTS'
+          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'PATIENTS'
               ? 'bg-orange-100 text-orange-800 font-bold'
               : 'text-slate-500 hover:text-orange-700 hover:bg-orange-50'
-          }`}
+            }`}
           title="Patients History Directory"
         >
           <Users className="w-4 h-4" />
@@ -191,11 +186,10 @@ export const Navbar: React.FC = () => {
         {/* Suppliers Directory Nav */}
         <button
           onClick={() => dispatch(navigateTo('SUPPLIERS'))}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-            currentView === 'SUPPLIERS'
+          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'SUPPLIERS'
               ? 'bg-emerald-100 text-emerald-800 font-bold'
               : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
-          }`}
+            }`}
           title="Suppliers & Vendors Directory"
         >
           <Building className="w-4 h-4" />
@@ -204,11 +198,10 @@ export const Navbar: React.FC = () => {
         {/* Store Settings & Hardware Nav */}
         <button
           onClick={() => dispatch(navigateTo('SETTINGS'))}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-            currentView === 'SETTINGS'
+          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'SETTINGS'
               ? 'bg-slate-800 text-white font-bold shadow-xs'
               : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
-          }`}
+            }`}
           title="Store Settings & Hardware Config"
         >
           <Settings className="w-4 h-4" />
@@ -217,69 +210,79 @@ export const Navbar: React.FC = () => {
         {/* Emergency Delivery Nav */}
         <button
           onClick={() => dispatch(navigateTo('EMERGENCY_DELIVERY'))}
-          className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer shadow-xs ${
-            currentView === 'EMERGENCY_DELIVERY'
+          className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer shadow-xs ${currentView === 'EMERGENCY_DELIVERY'
               ? 'bg-red-600 text-white ring-2 ring-red-300 shadow-sm shadow-red-600/40'
               : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
-          }`}
+            }`}
           title="Emergency Fast Delivery"
         >
           <Siren className="w-3.5 h-3.5 text-red-600 animate-pulse" />
           <span className="font-heading tracking-tight">🚨 Emergency</span>
         </button>
 
-        {/* 🏪 Active Shift Counter Badge & Fast Switcher Dropdown */}
+        {/* 🏪 Active Shift Counter Badge — or Emergency Desk Badge */}
         <div className="relative">
-          <button
-            onClick={() => setShowCounterDropdown(!showCounterDropdown)}
-            className="flex items-center space-x-1.5 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs"
-            title="Active Shift Counter - Click to switch"
-          >
-            <Users className="w-3.5 h-3.5 text-emerald-600" />
-            <span className="font-black">Counter {activePharmacist.counterNumber}:</span>
-            <span className="font-semibold text-emerald-900">{activePharmacist.name.split(' ')[0]}</span>
-            <ChevronDown className="w-3 h-3 text-emerald-600" />
-          </button>
-
-          {showCounterDropdown && (
+          {isEmergencyDesk ? (
+            // Emergency Desk identity badge — no dropdown, fixed to Dr. S. Reddy
+            <div className="flex items-center space-x-1.5 px-2.5 py-1 bg-rose-50 text-rose-800 border border-rose-300 rounded-lg text-xs font-bold shadow-2xs">
+              <Siren className="w-3.5 h-3.5 text-rose-600 animate-pulse" />
+              <span className="font-black">Emergency Desk:</span>
+              <span className="font-semibold text-rose-900">Dr. S. Reddy</span>
+            </div>
+          ) : (
+            // Normal billing counter badge with switcher dropdown
             <>
-              <div
-                className="fixed inset-0 z-40"
-                onClick={() => setShowCounterDropdown(false)}
-              />
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-200 p-2.5 z-50 animate-fadeIn">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1">
-                  Switch Shift Counter
-                </div>
-                <div className="space-y-1">
-                  {pharmacists.map((pharm) => {
-                    const isSelected = activePharmacistId === pharm.id;
-                    return (
-                      <button
-                        key={pharm.id}
-                        onClick={() => {
-                          dispatch(switchActivePharmacist(pharm.id));
-                          setShowCounterDropdown(false);
-                        }}
-                        className={`w-full flex items-center justify-between p-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
-                          isSelected
-                            ? 'bg-emerald-50 text-emerald-900 font-bold border border-emerald-300'
-                            : 'text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className="flex items-center space-x-2">
-                          <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                          <div>
-                            <div className="font-bold leading-tight">Counter {pharm.counterNumber}: {pharm.name}</div>
-                            <div className="text-[10px] text-slate-400 font-normal">{pharm.role}</div>
-                          </div>
-                        </div>
-                        {isSelected && <Check className="w-3.5 h-3.5 text-emerald-600" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              <button
+                onClick={() => setShowCounterDropdown(!showCounterDropdown)}
+                className="flex items-center space-x-1.5 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                title="Active Shift Counter - Click to switch"
+              >
+                <Users className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="font-black">Counter {activePharmacist.counterNumber}:</span>
+                <span className="font-semibold text-emerald-900">{activePharmacist.name.split(' ')[0]}</span>
+                <ChevronDown className="w-3 h-3 text-emerald-600" />
+              </button>
+
+              {showCounterDropdown && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowCounterDropdown(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-200 p-2.5 z-50 animate-fadeIn">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1">
+                      Switch Shift Counter
+                    </div>
+                    <div className="space-y-1">
+                      {pharmacists.map((pharm) => {
+                        const isSelected = activePharmacistId === pharm.id;
+                        return (
+                          <button
+                            key={pharm.id}
+                            onClick={() => {
+                              dispatch(switchActivePharmacist(pharm.id));
+                              setShowCounterDropdown(false);
+                            }}
+                            className={`w-full flex items-center justify-between p-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${isSelected
+                                ? 'bg-emerald-50 text-emerald-900 font-bold border border-emerald-300'
+                                : 'text-slate-700 hover:bg-slate-50'
+                              }`}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                              <div>
+                                <div className="font-bold leading-tight">Counter {pharm.counterNumber}: {pharm.name}</div>
+                                <div className="text-[10px] text-slate-400 font-normal">{pharm.role}</div>
+                              </div>
+                            </div>
+                            {isSelected && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>
