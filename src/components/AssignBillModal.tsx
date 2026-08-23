@@ -8,13 +8,13 @@ import {
 import {
   Users,
   X,
-  ArrowRightCircle,
   Clock,
   CheckCircle2,
   UserCheck,
-  ShoppingBag,
   ArrowRight,
-  Sparkles
+  CheckSquare,
+  Square,
+  Layers
 } from 'lucide-react';
 
 export const AssignBillModal: React.FC = () => {
@@ -23,46 +23,62 @@ export const AssignBillModal: React.FC = () => {
   const pharmacists = useSelector((state: RootState) => state.pos.pharmacists);
   const activePharmacistId = useSelector((state: RootState) => state.pos.activePharmacistId);
   const sessions = useSelector((state: RootState) => state.pos.sessions);
-  const heldBills = useSelector((state: RootState) => state.pos.heldBills);
   const activeSessionId = useSelector((state: RootState) => state.pos.activeSessionId);
 
-  // My current pharmacist sessions
   const currentPharm = pharmacists.find(p => p.id === activePharmacistId);
   const mySessions = sessions.filter(s => s.assignedPharmacistId === activePharmacistId);
 
-  const [selectedSessionId, setSelectedSessionId] = useState<string>(modal.sessionId || activeSessionId || (mySessions[0]?.id || ''));
+  // Multi-select: set of selected session IDs
+  const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [handoverNote, setHandoverNote] = useState('');
 
   useEffect(() => {
     if (modal.isOpen) {
-      setSelectedSessionId(modal.sessionId || activeSessionId || (mySessions[0]?.id || ''));
+      const preselect = modal.sessionId || activeSessionId || mySessions[0]?.id;
+      setSelectedSessionIds(preselect ? new Set([preselect]) : new Set());
       setSelectedTargetId(null);
       setHandoverNote('');
     }
-  }, [modal.isOpen, modal.sessionId, activeSessionId, mySessions]);
+  }, [modal.isOpen, modal.sessionId, activeSessionId]);
 
   if (!modal.isOpen) return null;
 
-  // Selected session stats
-  const activeChosenSession = sessions.find(s => s.id === selectedSessionId) || mySessions[0];
-  const itemsCount = activeChosenSession
-    ? activeChosenSession.items.reduce((sum, item) => sum + item.quantity, 0)
-    : 0;
-  const totalAmount = activeChosenSession
-    ? activeChosenSession.items.reduce((sum, item) => sum + item.lineTotal, 0)
-    : 0;
+  // Toggle a session in/out of selection
+  const toggleSession = (id: string) => {
+    setSelectedSessionIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
 
-  // Other destination pharmacists
+  // Select / deselect all
+  const allSelected = mySessions.length > 0 && mySessions.every(s => selectedSessionIds.has(s.id));
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelectedSessionIds(new Set());
+    } else {
+      setSelectedSessionIds(new Set(mySessions.map(s => s.id)));
+    }
+  };
+
+  // Aggregate stats for selected sessions
+  const selectedSessions = mySessions.filter(s => selectedSessionIds.has(s.id));
+  const totalItems = selectedSessions.reduce((sum, s) => sum + s.items.reduce((a, i) => a + i.quantity, 0), 0);
+  const totalAmount = selectedSessions.reduce((sum, s) => sum + s.items.reduce((a, i) => a + i.lineTotal, 0), 0);
+
   const destinationPharmacists = pharmacists.filter(p => p.id !== activePharmacistId);
 
   const handleExecuteAssign = (targetId: string) => {
-    if (!activeChosenSession) return;
-    dispatch(assignBillToPharmacist({
-      sessionId: activeChosenSession.id,
-      targetPharmacistId: targetId,
-      note: handoverNote.trim() || undefined
-    }));
+    if (selectedSessions.length === 0) return;
+    selectedSessions.forEach(session => {
+      dispatch(assignBillToPharmacist({
+        sessionId: session.id,
+        targetPharmacistId: targetId,
+        note: handoverNote.trim() || undefined
+      }));
+    });
     dispatch(closeAssignBillModal());
   };
 
@@ -78,7 +94,7 @@ export const AssignBillModal: React.FC = () => {
             </div>
             <div>
               <h3 className="text-base font-extrabold text-slate-900 leading-tight">
-                Delegate Customer Bill
+                Delegate Customer Bill{selectedSessionIds.size > 1 ? 's' : ''}
               </h3>
               <p className="text-xs text-slate-500 font-medium">
                 Logged in as: <strong className="text-slate-800">{currentPharm?.name}</strong> (Counter {currentPharm?.counterNumber})
@@ -95,19 +111,30 @@ export const AssignBillModal: React.FC = () => {
 
         <div className="overflow-y-auto pr-1 flex-1 py-3 space-y-4">
           
-          {/* ── STEP 1: Select Which Customer / Tab to Delegate ── */}
+          {/* ── STEP 1: Multi-select Customer Bills ── */}
           <div>
-            <label className="text-xs font-black text-slate-800 uppercase tracking-wider block mb-2 flex items-center justify-between">
-              <span className="flex items-center space-x-1.5">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center space-x-1.5">
                 <span className="w-4 h-4 rounded-full bg-indigo-600 text-white text-[10px] flex items-center justify-center font-black">1</span>
-                <span>Select Customer Bill to Delegate:</span>
-              </span>
-              <span className="text-[10px] text-slate-400 font-medium lowercase">({mySessions.length} active in your queue)</span>
-            </label>
+                <span>Select Customer Bills to Delegate:</span>
+              </label>
+              <div className="flex items-center space-x-2">
+                <span className="text-[10px] text-slate-400 font-medium lowercase">({mySessions.length} active in your queue)</span>
+                {mySessions.length > 1 && (
+                  <button
+                    onClick={toggleAll}
+                    className="flex items-center space-x-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                  >
+                    {allSelected ? <CheckSquare className="w-3 h-3" /> : <Square className="w-3 h-3" />}
+                    <span>{allSelected ? 'Deselect All' : 'Select All'}</span>
+                  </button>
+                )}
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {mySessions.map((session, idx) => {
-                const isSelected = selectedSessionId === session.id;
+                const isSelected = selectedSessionIds.has(session.id);
                 const count = session.items.reduce((sum, item) => sum + item.quantity, 0);
                 const total = session.items.reduce((sum, item) => sum + item.lineTotal, 0);
                 const title = session.patientDetails.patientName || session.tabTitle || `Customer ${idx + 1}`;
@@ -115,7 +142,7 @@ export const AssignBillModal: React.FC = () => {
                 return (
                   <div
                     key={session.id}
-                    onClick={() => setSelectedSessionId(session.id)}
+                    onClick={() => toggleSession(session.id)}
                     className={`p-3 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between select-none ${
                       isSelected
                         ? 'bg-indigo-50/90 border-indigo-500 ring-2 ring-indigo-500/20 shadow-xs'
@@ -123,8 +150,17 @@ export const AssignBillModal: React.FC = () => {
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-black text-slate-900 truncate">{title}</span>
-                      <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? 'bg-indigo-600' : 'bg-slate-300'}`} />
+                      <span className="text-xs font-black text-slate-900 truncate flex-1 mr-2">{title}</span>
+                      {/* Checkbox indicator */}
+                      <span className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${
+                        isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 bg-white'
+                      }`}>
+                        {isSelected && (
+                          <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 10 10">
+                            <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2 pt-1 border-t border-slate-200/60">
                       <span>{count} item{count !== 1 ? 's' : ''}</span>
@@ -136,21 +172,34 @@ export const AssignBillModal: React.FC = () => {
             </div>
           </div>
 
-          {/* ── Selected Bill Preview Banner ── */}
-          {activeChosenSession && (
+          {/* ── Selected Bills Summary Banner ── */}
+          {selectedSessions.length > 0 ? (
             <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-2xl p-3 flex items-center justify-between text-xs">
-              <div>
-                <span className="text-[10px] text-indigo-600 font-bold uppercase">Selected for Delegation:</span>
-                <div className="font-black text-slate-900 text-sm">
-                  {activeChosenSession.patientDetails.patientName || activeChosenSession.tabTitle}
+              <div className="flex items-center space-x-2.5">
+                <div className="bg-indigo-100 p-1.5 rounded-xl">
+                  <Layers className="w-4 h-4 text-indigo-600" />
                 </div>
-                <div className="text-[11px] text-slate-500">
-                  {itemsCount} medication{itemsCount !== 1 ? 's' : ''} • Grand Total: <strong className="text-emerald-700">₹{totalAmount.toFixed(2)}</strong>
+                <div>
+                  <span className="text-[10px] text-indigo-600 font-bold uppercase">Selected for Delegation:</span>
+                  <div className="font-black text-slate-900 text-sm">
+                    {selectedSessions.length === 1
+                      ? (selectedSessions[0].patientDetails.patientName || selectedSessions[0].tabTitle)
+                      : `${selectedSessions.length} customers selected`
+                    }
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    {totalItems} medication{totalItems !== 1 ? 's' : ''} • Grand Total:{' '}
+                    <strong className="text-emerald-700">₹{totalAmount.toFixed(2)}</strong>
+                  </div>
                 </div>
               </div>
               <span className="bg-indigo-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
-                Ready
+                {selectedSessions.length === 1 ? 'Ready' : `${selectedSessions.length} Bills`}
               </span>
+            </div>
+          ) : (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-xs text-amber-700 font-semibold text-center">
+              ☝️ Select at least one customer bill above to delegate
             </div>
           )}
 
@@ -225,13 +274,14 @@ export const AssignBillModal: React.FC = () => {
 
                       <button
                         type="button"
+                        disabled={selectedSessions.length === 0}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleExecuteAssign(pharm.id);
                         }}
-                        className="flex items-center space-x-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black px-3.5 py-2 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer"
+                        className="flex items-center space-x-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black px-3.5 py-2 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer"
                       >
-                        <span>Assign</span>
+                        <span>Assign{selectedSessions.length > 1 ? ` (${selectedSessions.length})` : ''}</span>
                         <ArrowRight className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -266,14 +316,19 @@ export const AssignBillModal: React.FC = () => {
           >
             Cancel
           </button>
-          {selectedTargetId && (
+          {selectedTargetId && selectedSessions.length > 0 && (
             <button
               type="button"
               onClick={() => handleExecuteAssign(selectedTargetId)}
               className="flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black px-5 py-2.5 rounded-xl shadow-md transition-all cursor-pointer active:scale-95"
             >
               <UserCheck className="w-4 h-4" />
-              <span>Confirm Transfer to Counter</span>
+              <span>
+                {selectedSessions.length > 1
+                  ? `Transfer ${selectedSessions.length} Bills to Counter`
+                  : 'Confirm Transfer to Counter'
+                }
+              </span>
             </button>
           )}
         </div>
