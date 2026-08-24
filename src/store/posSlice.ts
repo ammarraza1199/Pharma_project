@@ -225,18 +225,21 @@ const initialState: PosState = {
       orderNumber: 'ODR-2026-001',
       customerName: 'Ramesh Kumar',
       customerPhone: '9876543210',
+      deliveryMode: 'HOME_DELIVERY',
       deliveryAddress: 'Flat 12, Srinivas Residency, KPHB Colony, Hyderabad - 500085',
-      items: [{ productId: 'p1', productName: 'Metformin 500mg (Glycomet)', quantity: 2, unitPrice: 42.50, lineTotal: 85.00 }],
+      items: [{ productId: '64f1a2b3c4d5e6f7a8b9c001', productName: 'Metformin 500mg (Glycomet)', quantity: 2, unitPrice: 42.50, lineTotal: 85.00 }],
       totalAmount: 85.00,
       status: 'ON_TIME',
       deliveryType: 'STANDARD',
+      timeSlot: 'Today 5:00 PM – 6:00 PM',
       estimatedDeliveryTime: new Date(Date.now() + 45 * 60000).toISOString(),
       assignedRider: 'Ravi S.',
       riderPhone: '9876501234',
       prescriptionRequired: true,
       prescriptionVerified: true,
+      verificationDeadline: new Date(Date.now() + 20 * 3600000).toISOString(),
       notes: 'Ring the bell twice',
-      createdAt: new Date(Date.now() - 30 * 60000).toISOString(),
+      createdAt: new Date(Date.now() - 4 * 3600000).toISOString(),
       updatedAt: new Date(Date.now() - 5 * 60000).toISOString()
     },
     {
@@ -244,21 +247,24 @@ const initialState: PosState = {
       orderNumber: 'ODR-2026-002',
       customerName: 'Priya Sharma',
       customerPhone: '9876543211',
+      deliveryMode: 'HOME_DELIVERY',
       deliveryAddress: '14-B, Kavuri Hills Phase 2, Madhapur, Hyderabad - 500033',
       items: [
-        { productId: 'p2', productName: 'Amlodipine 5mg (Amlip)', quantity: 1, unitPrice: 55.00, lineTotal: 55.00 },
-        { productId: 'p3', productName: 'Atorvastatin 10mg (Atorva)', quantity: 1, unitPrice: 75.00, lineTotal: 75.00 }
+        { productId: '64f1a2b3c4d5e6f7a8b9c004', productName: 'Amlodipine 5mg (Amlip)', quantity: 1, unitPrice: 55.00, lineTotal: 55.00 },
+        { productId: '64f1a2b3c4d5e6f7a8b9c003', productName: 'Atorvastatin 10mg (Atorva)', quantity: 1, unitPrice: 75.00, lineTotal: 75.00 }
       ],
       totalAmount: 130.00,
       status: 'DELAYED',
       deliveryType: 'EXPRESS',
+      timeSlot: 'Express (Within 30 min)',
       estimatedDeliveryTime: new Date(Date.now() - 15 * 60000).toISOString(),
       assignedRider: 'Suresh P.',
       riderPhone: '9876502345',
       prescriptionRequired: true,
       prescriptionVerified: false,
+      verificationDeadline: new Date(Date.now() + 2 * 3600000).toISOString(), // Expiring in 2 hours!
       notes: 'Call before arriving',
-      createdAt: new Date(Date.now() - 90 * 60000).toISOString(),
+      createdAt: new Date(Date.now() - 22 * 3600000).toISOString(), // Created 22 hours ago (2h left in 24h SLA)
       updatedAt: new Date(Date.now() - 20 * 60000).toISOString()
     },
     {
@@ -266,17 +272,18 @@ const initialState: PosState = {
       orderNumber: 'ODR-2026-003',
       customerName: 'Mohammed Ali',
       customerPhone: '9876543213',
-      deliveryAddress: 'Plot 88, Gachibowli Township, Gachibowli, Hyderabad - 500032',
-      items: [{ productId: 'p4', productName: 'Pantoprazole 40mg (Pan-D)', quantity: 3, unitPrice: 28.00, lineTotal: 84.00 }],
+      deliveryMode: 'STORE_PICKUP',
+      pickupCounter: 'Pickup Counter #2 (Bin B-04)',
+      items: [{ productId: '64f1a2b3c4d5e6f7a8b9c001', productName: 'Pantoprazole 40mg (Pan-D)', quantity: 3, unitPrice: 28.00, lineTotal: 84.00 }],
       totalAmount: 84.00,
-      status: 'DISPATCHED',
+      status: 'ON_TIME',
       deliveryType: 'STANDARD',
+      timeSlot: 'Today 6:30 PM Pickup',
       estimatedDeliveryTime: new Date(Date.now() + 25 * 60000).toISOString(),
-      assignedRider: 'Kiran V.',
-      riderPhone: '9876503456',
       prescriptionRequired: false,
       prescriptionVerified: true,
-      createdAt: new Date(Date.now() - 20 * 60000).toISOString(),
+      verificationDeadline: new Date(Date.now() + 23 * 3600000).toISOString(),
+      createdAt: new Date(Date.now() - 60 * 60000).toISOString(),
       updatedAt: new Date(Date.now() - 2 * 60000).toISOString()
     },
     {
@@ -284,15 +291,18 @@ const initialState: PosState = {
       orderNumber: 'ODR-2026-004',
       customerName: 'Anjali Reddy',
       customerPhone: '9876543212',
+      deliveryMode: 'HOME_DELIVERY',
       deliveryAddress: 'H No 3-4-189, Barkatpura, Hyderabad - 500027',
-      items: [{ productId: 'p5', productName: 'Azithromycin 500mg (Azithral)', quantity: 1, unitPrice: 95.00, lineTotal: 95.00 }],
+      items: [{ productId: '64f1a2b3c4d5e6f7a8b9c003', productName: 'Azithromycin 500mg (Azithral)', quantity: 1, unitPrice: 95.00, lineTotal: 95.00 }],
       totalAmount: 95.00,
       status: 'PENDING',
       deliveryType: 'SCHEDULED',
-      estimatedDeliveryTime: new Date(Date.now() + 120 * 60000).toISOString(),
+      timeSlot: 'Tomorrow 10:00 AM – 11:30 AM',
+      estimatedDeliveryTime: new Date(Date.now() + 18 * 3600000).toISOString(),
       prescriptionRequired: true,
       prescriptionVerified: true,
-      createdAt: new Date(Date.now() - 5 * 60000).toISOString(),
+      verificationDeadline: new Date(Date.now() + 23.5 * 3600000).toISOString(),
+      createdAt: new Date(Date.now() - 30 * 60000).toISOString(),
       updatedAt: new Date(Date.now() - 5 * 60000).toISOString()
     }
   ],
@@ -1203,6 +1213,105 @@ export const posSlice = createSlice({
     },
     deleteDeliveryOrder: (state, action: PayloadAction<string>) => {
       state.deliveryOrders = state.deliveryOrders.filter(o => o.orderId !== action.payload);
+    },
+    toggleOrderPrescriptionVerification: (state, action: PayloadAction<string>) => {
+      const order = state.deliveryOrders.find(o => o.orderId === action.payload);
+      if (order) {
+        order.prescriptionVerified = !order.prescriptionVerified;
+        order.updatedAt = new Date().toISOString();
+      }
+    },
+    convertDeliveryOrderToInvoice: (state, action: PayloadAction<{ orderId: string; paymentMode?: string }>) => {
+      const order = state.deliveryOrders.find(o => o.orderId === action.payload.orderId);
+      if (!order) return;
+
+      const subtotal = order.totalAmount;
+      const totalCGST = Number((subtotal * 0.06).toFixed(2));
+      const totalSGST = Number((subtotal * 0.06).toFixed(2));
+      const grandTotal = Number((subtotal + totalCGST + totalSGST).toFixed(2));
+      const invoiceNumber = `INV-DLV-${Math.floor(100000 + Math.random() * 900000)}`;
+
+      // Create synthetic CartItems for stock deduction and billing session
+      const cartItems: CartItem[] = order.items.map((item, idx) => {
+        const prod = state.products.find(p => p._id === item.productId || p.name.toLowerCase() === item.productName.toLowerCase()) || state.products[0];
+        const batch = prod.batches[0] || { batchNumber: 'BT-DLV-01', expiryDate: '2027-12-31', stockQuantity: 50, location: 'Rack A-01', mrp: item.unitPrice };
+        return {
+          cartItemId: `cart-dlv-${Date.now()}-${idx}`,
+          productId: prod._id,
+          product: prod,
+          selectedBatch: batch,
+          quantity: item.quantity,
+          unitMode: 'PACK',
+          unitPrice: item.unitPrice,
+          discountPercent: 0,
+          taxableAmount: item.lineTotal,
+          cgstAmount: Number((item.lineTotal * 0.06).toFixed(2)),
+          sgstAmount: Number((item.lineTotal * 0.06).toFixed(2)),
+          totalGst: Number((item.lineTotal * 0.12).toFixed(2)),
+          lineTotal: Number((item.lineTotal * 1.12).toFixed(2))
+        };
+      });
+
+      // Deduct inventory stock for each item
+      cartItems.forEach(item => {
+        const prod = state.products.find(p => p._id === item.productId);
+        if (prod) {
+          const batch = prod.batches.find(b => b.batchNumber === item.selectedBatch.batchNumber) || prod.batches[0];
+          if (batch) {
+            batch.stockQuantity = Math.max(0, Number((batch.stockQuantity - item.quantity).toFixed(2)));
+          }
+          prod.totalStock = Math.max(0, Number(prod.batches.reduce((sum, b) => sum + b.stockQuantity, 0).toFixed(2)));
+          prod.stockStatus = prod.totalStock > 20 ? 'IN_STOCK' : prod.totalStock > 0 ? 'LOW_STOCK' : 'OUT_OF_STOCK';
+        }
+      });
+
+      const invoice: FinalizedInvoice = {
+        invoiceNumber,
+        invoiceDate: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+        billingSession: {
+          id: `sess-dlv-${order.orderId}`,
+          tabTitle: `Order ${order.orderNumber}`,
+          items: cartItems,
+          patientDetails: {
+            patientName: order.customerName,
+            phone: order.customerPhone,
+            gender: 'MALE'
+          },
+          doctorDetails: { doctorName: 'Online Order Rx', regNo: 'ONLINE' },
+          createdAt: order.createdAt
+        },
+        subtotal,
+        totalDiscount: 0,
+        totalCGST,
+        totalSGST,
+        grandTotal,
+        payment: {
+          mode: (action.payload.paymentMode || 'UPI') as any,
+          receivedAmount: grandTotal,
+          changeDue: 0,
+          digitalTransactionRef: order.orderNumber,
+          splitAmounts: { cash: 0, card: 0, upi: grandTotal }
+        },
+        pharmacistName: state.currentUser?.pharmacistName || 'Lead Pharmacist',
+        counterNumber: 1,
+        storeInfo: {
+          name: 'GENQUANTAA MEDPLUS PHARMACY',
+          dlNo: 'DL-2024/HYD/889201',
+          gstin: '36AAACG1234F1Z8',
+          address: 'Plot 42, Innovation Corridor, Tech City, Hyderabad - 500081',
+          phone: '+91 98765 43210'
+        }
+      };
+
+      state.invoices.unshift(invoice);
+      saveInvoicesToStorage(state.invoices);
+      state.latestFinalizedInvoice = invoice;
+
+      // Update delivery order status
+      order.invoiceNumber = invoiceNumber;
+      order.status = 'DELIVERED';
+      order.actualDeliveryTime = new Date().toISOString();
+      order.updatedAt = new Date().toISOString();
     }
   }
 });
@@ -1263,7 +1372,9 @@ export const {
   clearAllSavedInvoices,
   addDeliveryOrder,
   updateDeliveryOrderStatus,
-  deleteDeliveryOrder
+  deleteDeliveryOrder,
+  toggleOrderPrescriptionVerification,
+  convertDeliveryOrderToInvoice
 } = posSlice.actions;
 
 export default posSlice.reducer;

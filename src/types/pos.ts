@@ -277,6 +277,7 @@ export interface StoreSettings {
 
 export type DeliveryStatus = 'PENDING' | 'CONFIRMED' | 'DISPATCHED' | 'ON_TIME' | 'DELAYED' | 'DELIVERED' | 'CANCELLED';
 export type DeliveryType = 'STANDARD' | 'EXPRESS' | 'SCHEDULED';
+export type DeliveryMode = 'HOME_DELIVERY' | 'STORE_PICKUP';
 
 export interface DeliveryOrderItem {
   productId: string;
@@ -291,18 +292,25 @@ export interface DeliveryOrder {
   orderNumber: string;
   customerName: string;
   customerPhone: string;
-  deliveryAddress: string;
+  deliveryMode: DeliveryMode; // 🛵 Home Delivery vs 🏬 Store Pickup
+  deliveryAddress?: string;
+  pickupCounter?: string; // Counter number for Store Pickup
   items: DeliveryOrderItem[];
   totalAmount: number;
   status: DeliveryStatus;
   deliveryType: DeliveryType;
+  timeSlot?: string; // e.g. "Today 4:00 PM - 5:00 PM", "Within 30 min"
   estimatedDeliveryTime: string;
   actualDeliveryTime?: string;
   assignedRider?: string;
   riderPhone?: string;
   prescriptionRequired: boolean;
   prescriptionVerified: boolean;
+  verificationDeadline?: string; // 24 Hours SLA countdown window
+  pharmacistName?: string;
+  invoiceNumber?: string; // Generated tax invoice number
   notes?: string;
   createdAt: string;
   updatedAt: string;
 }
+

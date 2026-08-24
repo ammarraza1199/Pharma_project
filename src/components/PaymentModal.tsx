@@ -4,9 +4,10 @@ import type { RootState } from '../store';
 import {
   setPaymentModalOpen,
   startSubmittingBill,
-  finalizeBillSuccess
+  finalizeBillSuccess,
+  addDeliveryOrder
 } from '../store/posSlice';
-import type { PaymentDetails, PaymentMethodType } from '../types/pos';
+import type { PaymentDetails, PaymentMethodType, DeliveryMode, DeliveryType } from '../types/pos';
 import {
   QrCode,
   CreditCard,
@@ -20,7 +21,11 @@ import {
   ShieldCheck,
   Smartphone,
   Check,
-  Sparkles
+  Sparkles,
+  Bike,
+  Store,
+  Clock,
+  MapPin
 } from 'lucide-react';
 
 export const PaymentModal: React.FC = () => {
@@ -64,6 +69,13 @@ export const PaymentModal: React.FC = () => {
   // Razorpay UPI QR Simulation State
   const [upiPollTimer, setUpiPollTimer] = useState<number>(45);
   const [isUpiVerified, setIsUpiVerified] = useState<boolean>(false);
+
+  // Fulfillment Mode (Walk-in Counter vs Home Delivery vs Store Pickup)
+  const [fulfillmentMode, setFulfillmentMode] = useState<'WALK_IN' | 'HOME_DELIVERY' | 'STORE_PICKUP'>('WALK_IN');
+  const [deliveryAddress, setDeliveryAddress] = useState<string>('');
+  const [deliveryTimeSlot, setDeliveryTimeSlot] = useState<string>('Instant (Within 30 min)');
+  const [deliverySpeed, setDeliverySpeed] = useState<DeliveryType>('STANDARD');
+  const [pickupCounter, setPickupCounter] = useState<string>('Counter #1 (Bin A-01)');
 
   useEffect(() => {
     if (paymentMethod === 'UPI' && modal.isOpen) {
@@ -197,6 +209,38 @@ export const PaymentModal: React.FC = () => {
         paymentStatus: 'SUCCESS'
       };
 
+      // If Home Delivery or Store Pickup is selected, create delivery order for dashboard tracking
+      if (fulfillmentMode === 'HOME_DELIVERY' || fulfillmentMode === 'STORE_PICKUP') {
+        const orderItems = items.map(it => ({
+          productId: it.productId,
+          productName: it.product.name,
+          quantity: it.quantity,
+          unitPrice: it.unitPrice,
+          lineTotal: it.lineTotal
+        }));
+
+        const isPrescriptionRequired = items.some(it => it.product.scheduleCategory !== 'REGULAR');
+        const deadline = new Date(Date.now() + 24 * 3600000).toISOString();
+
+        dispatch(addDeliveryOrder({
+          customerName: currentSession?.patientDetails?.patientName || 'Counter Customer',
+          customerPhone: currentSession?.patientDetails?.phone || '9876543210',
+          deliveryMode: fulfillmentMode,
+          deliveryAddress: fulfillmentMode === 'HOME_DELIVERY' ? (deliveryAddress || 'Customer Address Provided at Counter') : undefined,
+          pickupCounter: fulfillmentMode === 'STORE_PICKUP' ? (pickupCounter || 'Counter #1') : undefined,
+          items: orderItems,
+          totalAmount: grandTotal,
+          status: 'ON_TIME',
+          deliveryType: deliverySpeed,
+          timeSlot: deliveryTimeSlot,
+          estimatedDeliveryTime: new Date(Date.now() + (deliverySpeed === 'EXPRESS' ? 30 : 90) * 60000).toISOString(),
+          prescriptionRequired: isPrescriptionRequired,
+          prescriptionVerified: true, // Already verified by dispensing pharmacist at POS counter
+          verificationDeadline: deadline,
+          notes: `Billed at POS (${paymentMethod})`
+        }));
+      }
+
       dispatch(finalizeBillSuccess(payment));
     }, 1000); // Simulated latency
   };
@@ -239,6 +283,140 @@ export const PaymentModal: React.FC = () => {
                 Patient: <span className="font-bold text-white">{currentSession?.patientDetails?.patientName || 'Walk-in Customer'}</span>
               </div>
             </div>
+          </div>
+
+          {/* Order Fulfillment Mode (Walk-in vs Home Delivery vs Store Pickup) */}
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 flex items-center space-x-1">
+                <span>Order Fulfillment Mode</span>
+              </span>
+              <span className="text-[10px] text-slate-400 font-medium">
+                Choose Walk-in, Delivery, or Pickup
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-3 gap-2">
+              {/* Walk-in Counter */}
+              <button
+                type="button"
+                onClick={() => setFulfillmentMode('WALK_IN')}
+                className={`py-2 px-2 rounded-xl border flex items-center justify-center space-x-1.5 text-xs font-bold cursor-pointer transition-all ${
+                  fulfillmentMode === 'WALK_IN'
+                    ? 'bg-slate-800 border-slate-800 text-white shadow-xs'
+                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <Store className="w-3.5 h-3.5" />
+                <span>Walk-in Counter</span>
+              </button>
+
+              {/* Home Delivery */}
+              <button
+                type="button"
+                onClick={() => setFulfillmentMode('HOME_DELIVERY')}
+                className={`py-2 px-2 rounded-xl border flex items-center justify-center space-x-1.5 text-xs font-bold cursor-pointer transition-all ${
+                  fulfillmentMode === 'HOME_DELIVERY'
+                    ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs'
+                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <Bike className="w-3.5 h-3.5" />
+                <span>Home Delivery 🛵</span>
+              </button>
+
+              {/* Store Pickup */}
+              <button
+                type="button"
+                onClick={() => setFulfillmentMode('STORE_PICKUP')}
+                className={`py-2 px-2 rounded-xl border flex items-center justify-center space-x-1.5 text-xs font-bold cursor-pointer transition-all ${
+                  fulfillmentMode === 'STORE_PICKUP'
+                    ? 'bg-blue-600 border-blue-600 text-white shadow-xs'
+                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <Store className="w-3.5 h-3.5" />
+                <span>Store Pickup 🏬</span>
+              </button>
+            </div>
+
+            {/* Home Delivery Details */}
+            {fulfillmentMode === 'HOME_DELIVERY' && (
+              <div className="bg-emerald-50/70 p-3 rounded-lg border border-emerald-200 space-y-2 pt-2 text-xs animate-fadeIn">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-0.5">Preferred Delivery Slot</label>
+                    <select
+                      value={deliveryTimeSlot}
+                      onChange={e => setDeliveryTimeSlot(e.target.value)}
+                      className="w-full p-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400 font-medium cursor-pointer"
+                    >
+                      <option value="Instant (Within 30 min)">Instant Express (Within 30 min)</option>
+                      <option value="Today 4:00 PM – 5:30 PM">Today 4:00 PM – 5:30 PM</option>
+                      <option value="Today 6:00 PM – 7:30 PM">Today 6:00 PM – 7:30 PM</option>
+                      <option value="Tomorrow 9:00 AM – 11:00 AM">Tomorrow 9:00 AM – 11:00 AM</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-0.5">Delivery Priority</label>
+                    <select
+                      value={deliverySpeed}
+                      onChange={e => setDeliverySpeed(e.target.value as DeliveryType)}
+                      className="w-full p-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400 font-medium cursor-pointer"
+                    >
+                      <option value="STANDARD">Standard Delivery</option>
+                      <option value="EXPRESS">Express Delivery ⚡</option>
+                      <option value="SCHEDULED">Scheduled Delivery 🗓</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 mb-0.5">Customer Delivery Address *</label>
+                  <input
+                    value={deliveryAddress}
+                    onChange={e => setDeliveryAddress(e.target.value)}
+                    placeholder="Enter full customer delivery address..."
+                    className="w-full p-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                  />
+                </div>
+                <p className="text-[10px] text-emerald-800 font-medium flex items-center space-x-1">
+                  <span>✓ Will be automatically tracked in the 2nd Online Delivery Dashboard.</span>
+                </p>
+              </div>
+            )}
+
+            {/* Store Pickup Details */}
+            {fulfillmentMode === 'STORE_PICKUP' && (
+              <div className="bg-blue-50/70 p-3 rounded-lg border border-blue-200 space-y-2 pt-2 text-xs animate-fadeIn">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-0.5">Pickup Time Slot</label>
+                    <select
+                      value={deliveryTimeSlot}
+                      onChange={e => setDeliveryTimeSlot(e.target.value)}
+                      className="w-full p-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-400 font-medium cursor-pointer"
+                    >
+                      <option value="Immediate Counter Pickup">Immediate Counter Pickup</option>
+                      <option value="Today 4:00 PM – 5:30 PM">Today 4:00 PM – 5:30 PM</option>
+                      <option value="Today 6:00 PM – 7:30 PM">Today 6:00 PM – 7:30 PM</option>
+                      <option value="Tomorrow 9:00 AM – 11:00 AM">Tomorrow 9:00 AM – 11:00 AM</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-0.5">Counter / Rack Bin</label>
+                    <input
+                      value={pickupCounter}
+                      onChange={e => setPickupCounter(e.target.value)}
+                      placeholder="e.g. Counter #1 (Bin A-02)"
+                      className="w-full p-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-blue-800 font-medium flex items-center space-x-1">
+                  <span>✓ Staged in the Pickup Queue for customer collection.</span>
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Payment Method Selector Grid */}
@@ -754,7 +932,15 @@ export const PaymentModal: React.FC = () => {
             ) : (
               <>
                 <CheckCircle2 className="w-4 h-4" />
-                <span>Confirm {paymentMethod.replace('_', ' ')} &amp; Generate Invoice</span>
+                <span>
+                  Confirm {paymentMethod.replace('_', ' ')} &amp; {
+                    fulfillmentMode === 'HOME_DELIVERY'
+                      ? 'Dispatch Delivery 🛵'
+                      : fulfillmentMode === 'STORE_PICKUP'
+                      ? 'Stage for Pickup 🏬'
+                      : 'Generate Invoice'
+                  }
+                </span>
               </>
             )}
           </button>
