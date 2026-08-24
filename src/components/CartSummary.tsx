@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import { setPaymentModalOpen, openScheduleHDetailsPrompt } from '../store/posSlice';
 import { getMedicineDetails } from '../utils/medicineDetails';
-import { CreditCard, ShieldAlert, Loader2, ArrowRight } from 'lucide-react';
+import { CreditCard, ShieldAlert, Loader2, ArrowRight, Sparkles, Tag } from 'lucide-react';
 
 export const CartSummary: React.FC = () => {
   const dispatch = useDispatch();
@@ -21,6 +21,13 @@ export const CartSummary: React.FC = () => {
   const totalCGST = items.reduce((sum, item) => sum + item.cgstAmount, 0);
   const totalSGST = items.reduce((sum, item) => sum + item.sgstAmount, 0);
   const grandTotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
+
+  // Substitute savings calculation
+  const substituteItems = items.filter(item => item.isSubstitute && item.discountPercent > 0);
+  const totalSubstituteSavings = substituteItems.reduce((sum, item) => {
+    return sum + ((item.unitPrice * item.quantity * item.discountPercent) / 100);
+  }, 0);
+  const hasSubstituteSavings = totalSubstituteSavings > 0;
   
   const totalPacksCount = items
     .filter(item => (item.unitMode || 'PACK') === 'PACK')
@@ -64,6 +71,43 @@ export const CartSummary: React.FC = () => {
           </span>
         </h2>
 
+        {/* 🎉 Substitute Savings Banner */}
+        {hasSubstituteSavings && (
+          <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl p-3 mb-3 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className="p-1.5 bg-white/20 rounded-lg">
+                  <Sparkles className="w-4 h-4 text-amber-300" />
+                </div>
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-wider text-emerald-100">Substitute Savings</div>
+                  <div className="text-sm font-black leading-tight">
+                    🎉 You saved <span className="text-amber-300">₹{totalSubstituteSavings.toFixed(2)}</span>!
+                  </div>
+                </div>
+              </div>
+              <span className="bg-amber-400 text-slate-900 text-[10px] font-black px-2 py-0.5 rounded-full">
+                {substituteItems.length} Substitute{substituteItems.length > 1 ? 's' : ''}
+              </span>
+            </div>
+            <div className="mt-1.5 space-y-0.5">
+              {substituteItems.map(item => {
+                const itemSaving = (item.unitPrice * item.quantity * item.discountPercent) / 100;
+                return (
+                  <div key={item.cartItemId} className="flex items-center justify-between text-[10px] text-emerald-100">
+                    <span className="flex items-center space-x-1">
+                      <Tag className="w-2.5 h-2.5 text-amber-300" />
+                      <span>{item.product.name.split(' ').slice(0, 3).join(' ')}</span>
+                      <span className="text-emerald-300">({item.discountPercent}% OFF)</span>
+                    </span>
+                    <span className="font-bold text-amber-200">-₹{itemSaving.toFixed(2)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="space-y-2 text-xs font-medium text-slate-600">
           <div className="flex justify-between text-slate-700 bg-slate-50 p-2 rounded-lg border border-slate-200 text-[11.5px]">
             <span>Selected Quantity</span>
@@ -80,7 +124,10 @@ export const CartSummary: React.FC = () => {
           </div>
 
           <div className="flex justify-between text-emerald-700">
-            <span>Special Discount</span>
+            <span className="flex items-center space-x-1">
+              {hasSubstituteSavings && <Tag className="w-3 h-3 text-emerald-600" />}
+              <span>{hasSubstituteSavings ? 'Discount (incl. Substitute)' : 'Special Discount'}</span>
+            </span>
             <span className="font-bold">-₹{totalDiscount.toFixed(2)}</span>
           </div>
 

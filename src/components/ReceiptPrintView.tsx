@@ -36,6 +36,13 @@ export const ReceiptPrintView: React.FC = () => {
     return sum + (mrp * item.quantity);
   }, 0);
 
+  // Substitute savings
+  const substituteItems = items.filter(i => i.isSubstitute && i.discountPercent > 0);
+  const totalSubstituteSavings = substituteItems.reduce((sum, i) => {
+    return sum + ((i.unitPrice * i.quantity * i.discountPercent) / 100);
+  }, 0);
+  const hasSubstituteSavings = totalSubstituteSavings > 0;
+
   const shippingCharges = 0;
   const billAmount = invoice.subtotal + invoice.totalCGST + invoice.totalSGST;
   const roundedPayable = Math.round(invoice.grandTotal);
@@ -208,6 +215,11 @@ export const ReceiptPrintView: React.FC = () => {
                   <div>CGST: ₹{invoice.totalCGST.toFixed(2)}</div>
                   <div>SGST: ₹{invoice.totalSGST.toFixed(2)}</div>
                   <div className="text-xs font-black pt-1">Grand Total: ₹{invoice.grandTotal.toFixed(2)}</div>
+                  {hasSubstituteSavings && (
+                    <div className="mt-1 pt-1 border-t border-dashed border-emerald-400 text-emerald-700 font-black text-[10px]">
+                      🎉 You saved ₹{totalSubstituteSavings.toFixed(2)} on substitute medicines!
+                    </div>
+                  )}
                 </div>
 
                 <div className="pt-2 text-center text-[9px] text-slate-500 space-y-0.5">
@@ -476,6 +488,12 @@ export const ReceiptPrintView: React.FC = () => {
                       <span>PAYMENT MODE:</span>
                       <span className="uppercase font-extrabold">{getPaymentLabel()}</span>
                     </div>
+                    {hasSubstituteSavings && (
+                      <div className="flex justify-between p-0.5 px-1 text-[8.5px] font-black bg-emerald-50 border-t border-emerald-300 text-emerald-800">
+                        <span>🎉 SUBSTITUTE SAVINGS:</span>
+                        <span>₹{totalSubstituteSavings.toFixed(2)}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

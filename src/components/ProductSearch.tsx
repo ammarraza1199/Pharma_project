@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import { addItemToCart } from '../store/posSlice';
 import { getMedicineDetails } from '../utils/medicineDetails';
+import { getSortedBatchesFEFO, getEarliestExpiringBatch } from '../utils/fefoHelper';
 import type { Product, BatchInfo, ScheduleCategory, SellingUnitMode } from '../types/pos';
 import {
   Search, ScanBarcode, AlertCircle, Plus, Zap,
@@ -138,7 +139,8 @@ export const ProductSearch: React.FC = () => {
   const flashAndAdd = useCallback((product: Product) => {
     setBarcodeFlash(product._id);
     setTimeout(() => setBarcodeFlash(null), 600);
-    const batch = selectedBatchMap[product._id] || product.batches[0];
+    const defaultBatch = getEarliestExpiringBatch(product.batches) || product.batches[0];
+    const batch = selectedBatchMap[product._id] || defaultBatch;
     const qty   = qtyMap[product._id] || 1;
     const unitMode = unitModeMap[product._id] || 'PACK';
     dispatch(addItemToCart({ product, selectedBatch: batch, quantity: qty, unitMode }));
@@ -291,7 +293,9 @@ export const ProductSearch: React.FC = () => {
               return exp < thirtyDays && exp > new Date();
             });
             const badge      = SCHEDULE_BADGE[product.scheduleCategory];
-            const selBatch   = selectedBatchMap[product._id] || product.batches[0];
+            const sortedBatches = getSortedBatchesFEFO(product.batches);
+            const fefoBatch  = getEarliestExpiringBatch(product.batches) || sortedBatches[0];
+            const selBatch   = selectedBatchMap[product._id] || fefoBatch;
             const qty        = qtyMap[product._id] || 1;
             const isFlashing = barcodeFlash === product._id;
 
@@ -411,21 +415,22 @@ export const ProductSearch: React.FC = () => {
                       );
                     })()}
 
-                    {/* Batch selector */}
-                    {!isOut && product.batches.length > 0 && (
+                    {/* Batch selector (FEFO Sorted) */}
+                    {!isOut && sortedBatches.length > 0 && (
                       <div className="mt-2 flex items-center space-x-2 flex-wrap gap-y-1">
                         <span className="text-[10px] text-slate-500 font-medium">Batch:</span>
                         <select
                           value={selBatch?.batchNumber || ''}
                           onChange={e => handleBatchChange(product._id, e.target.value, product)}
-                          className="text-[11px] bg-slate-50 border border-slate-300 rounded-lg px-2 py-0.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-400 cursor-pointer"
+                          className="text-[11px] bg-slate-50 border border-slate-300 rounded-lg px-2 py-0.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-400 cursor-pointer font-medium"
                         >
-                          {product.batches.map(b => {
+                          {sortedBatches.map((b, idx) => {
                             const near = new Date(b.expiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
                             const exp  = new Date(b.expiryDate) <= new Date();
+                            const isFefo = b.batchNumber === fefoBatch?.batchNumber && sortedBatches.length > 1;
                             return (
                               <option key={b.batchNumber} value={b.batchNumber} disabled={exp}>
-                                {b.batchNumber} · Exp: {b.expiryDate}{exp ? ' [EXPIRED]' : near ? ' ⚠' : ''} · Qty: {b.stockQuantity}
+                                {b.batchNumber} · Exp: {b.expiryDate}{isFefo ? ' ⚡[Expiring First]' : ''}{exp ? ' [EXPIRED]' : near ? ' ⚠' : ''} · Qty: {b.stockQuantity}
                               </option>
                             );
                           })}

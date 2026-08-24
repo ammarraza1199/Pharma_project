@@ -8,7 +8,7 @@ import {
   Calendar, Layers, X, PackageX
 } from 'lucide-react';
 
-type ExpiryFilterTab = 'EXPIRED' | 'NEAR_30' | 'NEAR_60' | 'NEAR_90';
+type ExpiryFilterTab = 'EXPIRED' | 'NEAR_3' | 'NEAR_7' | 'NEAR_20' | 'NEAR_30' | 'NEAR_60';
 
 interface BatchRow {
   product: Product;
@@ -50,15 +50,19 @@ export const ExpiryManagementPage: React.FC = () => {
 
   // Filter batch rows
   const expiredBatches = allBatchRows.filter(r => r.isExpired);
+  const near3Batches   = allBatchRows.filter(r => r.daysLeft > 0 && r.daysLeft <= 3);
+  const near7Batches   = allBatchRows.filter(r => r.daysLeft > 3 && r.daysLeft <= 7);
+  const near20Batches  = allBatchRows.filter(r => r.daysLeft > 7 && r.daysLeft <= 20);
   const near30Batches  = allBatchRows.filter(r => r.daysLeft > 0 && r.daysLeft <= 30);
   const near60Batches  = allBatchRows.filter(r => r.daysLeft > 30 && r.daysLeft <= 60);
-  const near90Batches  = allBatchRows.filter(r => r.daysLeft > 60 && r.daysLeft <= 90);
 
   const displayedRows =
-    activeTab === 'EXPIRED' ? expiredBatches :
-    activeTab === 'NEAR_30' ? near30Batches :
-    activeTab === 'NEAR_60' ? near60Batches :
-    near90Batches;
+    activeTab === 'EXPIRED'  ? expiredBatches :
+    activeTab === 'NEAR_3'   ? near3Batches :
+    activeTab === 'NEAR_7'   ? near7Batches :
+    activeTab === 'NEAR_20'  ? near20Batches :
+    activeTab === 'NEAR_30'  ? near30Batches :
+    near60Batches;
 
   // Total loss calculation
   const totalExpiredLoss = expiredBatches.reduce((sum, r) => sum + (r.batch.stockQuantity * r.product.sellingPrice), 0);
@@ -148,7 +152,7 @@ export const ExpiryManagementPage: React.FC = () => {
 
         {/* Expiring (< 60 Days) */}
         <div className="bg-white rounded-2xl border border-slate-200 p-3.5 shadow-xs flex items-center space-x-3">
-          <div className="bg-blue-100 p-2.5 rounded-xl text-blue-700">
+          <div className="bg-emerald-100 p-2.5 rounded-xl text-emerald-700">
             <Calendar className="w-5 h-5" />
           </div>
           <div>
@@ -169,51 +173,129 @@ export const ExpiryManagementPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ── TIMEFRAME TAB SELECTOR ───────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-2 shadow-xs flex items-center space-x-1 overflow-x-auto text-xs">
-        <button
-          onClick={() => setActiveTab('EXPIRED')}
-          className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-bold transition-all cursor-pointer ${
-            activeTab === 'EXPIRED'
-              ? 'bg-rose-600 text-white shadow-md'
-              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-          }`}
-        >
-          <span>Expired Batches ({expiredBatches.length})</span>
-        </button>
+      {/* ── FILTER TABS (SINGLE ROW) ─────────────────────────────────── */}
+      <div className="bg-white rounded-xl border border-slate-200 p-2 shadow-2xs">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+          {/* 1. Expired */}
+          <button
+            onClick={() => setActiveTab('EXPIRED')}
+            className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+              activeTab === 'EXPIRED'
+                ? 'bg-rose-600 border-rose-600 text-white shadow-xs'
+                : 'bg-rose-50/70 border-rose-200 text-rose-700 hover:bg-rose-100'
+            }`}
+          >
+            <span className="flex items-center gap-1.5 text-[11px]">
+              <span className="text-xs leading-none">🚨</span>
+              <span>Expired</span>
+            </span>
+            <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
+              activeTab === 'EXPIRED' ? 'bg-white/25 text-white' : 'bg-rose-600 text-white'
+            }`}>
+              {expiredBatches.length}
+            </span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('NEAR_30')}
-          className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-bold transition-all cursor-pointer ${
-            activeTab === 'NEAR_30'
-              ? 'bg-amber-500 text-white shadow-md'
-              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-          }`}
-        >
-          <span>Near Expiry &lt; 30 Days ({near30Batches.length})</span>
-        </button>
+          {/* 2. < 3 Days */}
+          <button
+            onClick={() => setActiveTab('NEAR_3')}
+            className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+              activeTab === 'NEAR_3'
+                ? 'bg-red-600 border-red-600 text-white shadow-xs'
+                : 'bg-red-50/70 border-red-200 text-red-700 hover:bg-red-100'
+            }`}
+          >
+            <span className="flex items-center gap-1.5 text-[11px]">
+              <span className="w-2 h-2 rounded-full bg-red-500 inline-block"></span>
+              <span>&lt; 3 Days</span>
+            </span>
+            <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
+              activeTab === 'NEAR_3' ? 'bg-white/25 text-white' : near3Batches.length > 0 ? 'bg-red-600 text-white' : 'bg-slate-200 text-slate-500'
+            }`}>
+              {near3Batches.length}
+            </span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('NEAR_60')}
-          className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-bold transition-all cursor-pointer ${
-            activeTab === 'NEAR_60'
-              ? 'bg-blue-600 text-white shadow-md'
-              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-          }`}
-        >
-          <span>Expiring &lt; 60 Days ({near60Batches.length})</span>
-        </button>
+          {/* 3. < 7 Days */}
+          <button
+            onClick={() => setActiveTab('NEAR_7')}
+            className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+              activeTab === 'NEAR_7'
+                ? 'bg-orange-500 border-orange-500 text-white shadow-xs'
+                : 'bg-orange-50/70 border-orange-200 text-orange-700 hover:bg-orange-100'
+            }`}
+          >
+            <span className="flex items-center gap-1.5 text-[11px]">
+              <span className="w-2 h-2 rounded-full bg-orange-500 inline-block"></span>
+              <span>&lt; 7 Days</span>
+            </span>
+            <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
+              activeTab === 'NEAR_7' ? 'bg-white/25 text-white' : near7Batches.length > 0 ? 'bg-orange-500 text-white' : 'bg-slate-200 text-slate-500'
+            }`}>
+              {near7Batches.length}
+            </span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('NEAR_90')}
-          className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-bold transition-all cursor-pointer ${
-            activeTab === 'NEAR_90'
-              ? 'bg-slate-800 text-white shadow-md'
-              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-          }`}
-        >
-          <span>Expiring &lt; 90 Days ({near90Batches.length})</span>
-        </button>
+          {/* 4. < 20 Days */}
+          <button
+            onClick={() => setActiveTab('NEAR_20')}
+            className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+              activeTab === 'NEAR_20'
+                ? 'bg-amber-500 border-amber-500 text-white shadow-xs'
+                : 'bg-amber-50/70 border-amber-200 text-amber-700 hover:bg-amber-100'
+            }`}
+          >
+            <span className="flex items-center gap-1.5 text-[11px]">
+              <span className="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
+              <span>&lt; 20 Days</span>
+            </span>
+            <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
+              activeTab === 'NEAR_20' ? 'bg-white/25 text-white' : near20Batches.length > 0 ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-500'
+            }`}>
+              {near20Batches.length}
+            </span>
+          </button>
+
+          {/* 5. < 30 Days */}
+          <button
+            onClick={() => setActiveTab('NEAR_30')}
+            className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+              activeTab === 'NEAR_30'
+                ? 'bg-yellow-500 border-yellow-500 text-white shadow-xs'
+                : 'bg-yellow-50/70 border-yellow-200 text-yellow-700 hover:bg-yellow-100'
+            }`}
+          >
+            <span className="flex items-center gap-1.5 text-[11px]">
+              <span className="w-2 h-2 rounded-full bg-yellow-400 inline-block"></span>
+              <span>&lt; 30 Days</span>
+            </span>
+            <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
+              activeTab === 'NEAR_30' ? 'bg-white/25 text-white' : near3Batches.length > 0 ? 'bg-yellow-600 text-white' : 'bg-slate-200 text-slate-500'
+            }`}>
+              {near3Batches.length}
+            </span>
+          </button>
+
+          {/* 6. < 60 Days (Green / Emerald) */}
+          <button
+            onClick={() => setActiveTab('NEAR_60')}
+            className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+              activeTab === 'NEAR_60'
+                ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs'
+                : 'bg-emerald-50/70 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+            }`}
+          >
+            <span className="flex items-center gap-1.5 text-[11px]">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+              <span>&lt; 60 Days</span>
+            </span>
+            <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
+              activeTab === 'NEAR_60' ? 'bg-white/25 text-white' : near60Batches.length > 0 ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-500'
+            }`}>
+              {near60Batches.length}
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* ── BATCH EXPIRY TIMELINE TABLE ───────────────────────────────── */}

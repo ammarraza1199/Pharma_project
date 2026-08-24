@@ -28,6 +28,7 @@ import { SettingsPage } from './components/SettingsPage';
 import { EmergencyDeliveryPage } from './components/EmergencyDeliveryPage';
 import { InvoicesPage } from './components/InvoicesPage';
 import { AssignBillModal } from './components/AssignBillModal';
+import { OnlineDeliveryPage } from './components/OnlineDeliveryPage';
 
 export const App: React.FC = () => {
   const currentView = useSelector((state: RootState) => state.pos.currentView);
@@ -94,6 +95,11 @@ export const App: React.FC = () => {
       {/* ── INVOICES & SALES JOURNAL VIEW ── */}
       {currentView === 'INVOICES' && (
         <InvoicesPage />
+      )}
+
+      {/* ── ONLINE DELIVERY DASHBOARD VIEW ── */}
+      {currentView === 'ONLINE_DELIVERY' && (
+        <OnlineDeliveryPage />
       )}
 
       {/* ── POS TERMINAL VIEW ── */}

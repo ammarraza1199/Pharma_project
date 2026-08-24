@@ -21,11 +21,13 @@ import type {
   SupplierRecord,
   StoreSettings,
   PharmacistCounter,
-  SellingUnitMode
+  SellingUnitMode,
+  DeliveryOrder
 } from '../types/pos';
 import { MOCK_PRODUCTS } from '../mock/products';
 import { calculateItemGST } from '../utils/gstCalculator';
 import { getMedicineDetails } from '../utils/medicineDetails';
+import { getEarliestExpiringBatch } from '../utils/fefoHelper';
 import { analyzeDrugInteractions } from '../utils/drugInteractionEngine';
 
 export const DEFAULT_PHARMACISTS: PharmacistCounter[] = [
@@ -51,6 +53,7 @@ interface PosState {
   activeSessionId: string;
   heldBills: HeldBill[];
   isManagerAuthenticated: boolean;
+  deliveryOrders: DeliveryOrder[];
 
   // Modals & Overlays
   assignBillModal: {
@@ -216,6 +219,83 @@ const initialState: PosState = {
   grnEntries: [],
   returnNotes: [],
   disposalRecords: [],
+  deliveryOrders: [
+    {
+      orderId: 'del-001',
+      orderNumber: 'ODR-2026-001',
+      customerName: 'Ramesh Kumar',
+      customerPhone: '9876543210',
+      deliveryAddress: 'Flat 12, Srinivas Residency, KPHB Colony, Hyderabad - 500085',
+      items: [{ productId: 'p1', productName: 'Metformin 500mg (Glycomet)', quantity: 2, unitPrice: 42.50, lineTotal: 85.00 }],
+      totalAmount: 85.00,
+      status: 'ON_TIME',
+      deliveryType: 'STANDARD',
+      estimatedDeliveryTime: new Date(Date.now() + 45 * 60000).toISOString(),
+      assignedRider: 'Ravi S.',
+      riderPhone: '9876501234',
+      prescriptionRequired: true,
+      prescriptionVerified: true,
+      notes: 'Ring the bell twice',
+      createdAt: new Date(Date.now() - 30 * 60000).toISOString(),
+      updatedAt: new Date(Date.now() - 5 * 60000).toISOString()
+    },
+    {
+      orderId: 'del-002',
+      orderNumber: 'ODR-2026-002',
+      customerName: 'Priya Sharma',
+      customerPhone: '9876543211',
+      deliveryAddress: '14-B, Kavuri Hills Phase 2, Madhapur, Hyderabad - 500033',
+      items: [
+        { productId: 'p2', productName: 'Amlodipine 5mg (Amlip)', quantity: 1, unitPrice: 55.00, lineTotal: 55.00 },
+        { productId: 'p3', productName: 'Atorvastatin 10mg (Atorva)', quantity: 1, unitPrice: 75.00, lineTotal: 75.00 }
+      ],
+      totalAmount: 130.00,
+      status: 'DELAYED',
+      deliveryType: 'EXPRESS',
+      estimatedDeliveryTime: new Date(Date.now() - 15 * 60000).toISOString(),
+      assignedRider: 'Suresh P.',
+      riderPhone: '9876502345',
+      prescriptionRequired: true,
+      prescriptionVerified: false,
+      notes: 'Call before arriving',
+      createdAt: new Date(Date.now() - 90 * 60000).toISOString(),
+      updatedAt: new Date(Date.now() - 20 * 60000).toISOString()
+    },
+    {
+      orderId: 'del-003',
+      orderNumber: 'ODR-2026-003',
+      customerName: 'Mohammed Ali',
+      customerPhone: '9876543213',
+      deliveryAddress: 'Plot 88, Gachibowli Township, Gachibowli, Hyderabad - 500032',
+      items: [{ productId: 'p4', productName: 'Pantoprazole 40mg (Pan-D)', quantity: 3, unitPrice: 28.00, lineTotal: 84.00 }],
+      totalAmount: 84.00,
+      status: 'DISPATCHED',
+      deliveryType: 'STANDARD',
+      estimatedDeliveryTime: new Date(Date.now() + 25 * 60000).toISOString(),
+      assignedRider: 'Kiran V.',
+      riderPhone: '9876503456',
+      prescriptionRequired: false,
+      prescriptionVerified: true,
+      createdAt: new Date(Date.now() - 20 * 60000).toISOString(),
+      updatedAt: new Date(Date.now() - 2 * 60000).toISOString()
+    },
+    {
+      orderId: 'del-004',
+      orderNumber: 'ODR-2026-004',
+      customerName: 'Anjali Reddy',
+      customerPhone: '9876543212',
+      deliveryAddress: 'H No 3-4-189, Barkatpura, Hyderabad - 500027',
+      items: [{ productId: 'p5', productName: 'Azithromycin 500mg (Azithral)', quantity: 1, unitPrice: 95.00, lineTotal: 95.00 }],
+      totalAmount: 95.00,
+      status: 'PENDING',
+      deliveryType: 'SCHEDULED',
+      estimatedDeliveryTime: new Date(Date.now() + 120 * 60000).toISOString(),
+      prescriptionRequired: true,
+      prescriptionVerified: true,
+      createdAt: new Date(Date.now() - 5 * 60000).toISOString(),
+      updatedAt: new Date(Date.now() - 5 * 60000).toISOString()
+    }
+  ],
   patients: [
     { patientId: 'pat-001', name: 'Ramesh Kumar', phone: '9876543210', age: '42', gender: 'MALE', totalBills: 14, totalSpent: 5420, lastVisit: '2026-08-14', chronicConditions: ['Hypertension'] },
     { patientId: 'pat-002', name: 'Priya Sharma', phone: '9876543211', age: '35', gender: 'FEMALE', totalBills: 8, totalSpent: 2850, lastVisit: '2026-08-12', chronicConditions: ['Asthma'] },
@@ -299,10 +379,7 @@ const addProductToCartInternal = (
   const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
   if (!currentSession) return;
 
-  const batchToUse = selectedBatch || product.batches.find(b => {
-    const expDate = new Date(b.expiryDate);
-    return expDate > new Date() && b.stockQuantity > 0;
-  }) || product.batches[0];
+  const batchToUse = selectedBatch || getEarliestExpiringBatch(product.batches) || product.batches[0];
 
   if (batchToUse) {
     const expDate = new Date(batchToUse.expiryDate);
@@ -1028,6 +1105,28 @@ export const posSlice = createSlice({
       state.invoices.unshift(invoice);
       saveInvoicesToStorage(state.invoices);
 
+      // Deduct inventory stock for all sold items (full strips & loose tablets)
+      currentSession.items.forEach(item => {
+        const prod = state.products.find(p => p._id === item.productId || p._id === item.product?._id);
+        if (prod) {
+          const batch = prod.batches.find(b => b.batchNumber === item.selectedBatch?.batchNumber) || prod.batches[0];
+          const medDetails = getMedicineDetails(prod);
+          const unitsPerPack = medDetails.unitsPerPack || prod.unitsPerPack || 10;
+          const isLoose = (item.unitMode || 'PACK') === 'LOOSE';
+          
+          // Calculate reduction in pack units (e.g. 5 loose tabs from 10-tab strip = 0.5 pack)
+          const packDeduction = isLoose ? item.quantity / unitsPerPack : item.quantity;
+          
+          if (batch) {
+            batch.stockQuantity = Math.max(0, Number((batch.stockQuantity - packDeduction).toFixed(2)));
+          }
+          
+          // Recalculate total product stock & stock status
+          prod.totalStock = Math.max(0, Number(prod.batches.reduce((sum, b) => sum + b.stockQuantity, 0).toFixed(2)));
+          prod.stockStatus = prod.totalStock > 20 ? 'IN_STOCK' : prod.totalStock > 0 ? 'LOW_STOCK' : 'OUT_OF_STOCK';
+        }
+      });
+
       state.latestFinalizedInvoice = invoice;
       state.isSubmittingBill = false;
       state.paymentModal.isOpen = false;
@@ -1038,9 +1137,27 @@ export const posSlice = createSlice({
       currentSession.patientDetails = { patientName: '', phone: '', age: '', gender: 'MALE' };
     },
     finalizeEmergencyInvoice: (state, action: PayloadAction<FinalizedInvoice>) => {
-      state.invoices.unshift(action.payload);
+      const invoice = action.payload;
+      if (invoice.billingSession?.items) {
+        invoice.billingSession.items.forEach(item => {
+          const prod = state.products.find(p => p._id === item.productId || p._id === item.product?._id);
+          if (prod) {
+            const batch = prod.batches.find(b => b.batchNumber === item.selectedBatch?.batchNumber) || prod.batches[0];
+            const medDetails = getMedicineDetails(prod);
+            const unitsPerPack = medDetails.unitsPerPack || prod.unitsPerPack || 10;
+            const isLoose = (item.unitMode || 'PACK') === 'LOOSE';
+            const packDeduction = isLoose ? item.quantity / unitsPerPack : item.quantity;
+            if (batch) {
+              batch.stockQuantity = Math.max(0, Number((batch.stockQuantity - packDeduction).toFixed(2)));
+            }
+            prod.totalStock = Math.max(0, Number(prod.batches.reduce((sum, b) => sum + b.stockQuantity, 0).toFixed(2)));
+            prod.stockStatus = prod.totalStock > 20 ? 'IN_STOCK' : prod.totalStock > 0 ? 'LOW_STOCK' : 'OUT_OF_STOCK';
+          }
+        });
+      }
+      state.invoices.unshift(invoice);
       saveInvoicesToStorage(state.invoices);
-      state.latestFinalizedInvoice = action.payload;
+      state.latestFinalizedInvoice = invoice;
     },
     clearFinalizedInvoice: (state) => {
       state.latestFinalizedInvoice = null;
@@ -1061,6 +1178,31 @@ export const posSlice = createSlice({
     clearAllSavedInvoices: (state) => {
       state.invoices = [];
       saveInvoicesToStorage([]);
+    },
+
+    // Delivery Order Management
+    addDeliveryOrder: (state, action: PayloadAction<Omit<DeliveryOrder, 'orderId' | 'orderNumber' | 'createdAt' | 'updatedAt'>>) => {
+      const newOrder: DeliveryOrder = {
+        ...action.payload,
+        orderId: `del-${Date.now()}`,
+        orderNumber: `ODR-2026-${String(state.deliveryOrders.length + 1).padStart(3, '0')}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      state.deliveryOrders.unshift(newOrder);
+    },
+    updateDeliveryOrderStatus: (state, action: PayloadAction<{ orderId: string; status: DeliveryOrder['status']; actualDeliveryTime?: string }>) => {
+      const order = state.deliveryOrders.find(o => o.orderId === action.payload.orderId);
+      if (order) {
+        order.status = action.payload.status;
+        order.updatedAt = new Date().toISOString();
+        if (action.payload.actualDeliveryTime) {
+          order.actualDeliveryTime = action.payload.actualDeliveryTime;
+        }
+      }
+    },
+    deleteDeliveryOrder: (state, action: PayloadAction<string>) => {
+      state.deliveryOrders = state.deliveryOrders.filter(o => o.orderId !== action.payload);
     }
   }
 });
@@ -1118,7 +1260,10 @@ export const {
   setInvoiceHistoryModalOpen,
   reprintInvoice,
   deleteSavedInvoice,
-  clearAllSavedInvoices
+  clearAllSavedInvoices,
+  addDeliveryOrder,
+  updateDeliveryOrderStatus,
+  deleteDeliveryOrder
 } = posSlice.actions;
 
 export default posSlice.reducer;

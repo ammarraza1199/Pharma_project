@@ -1,4 +1,4 @@
-export type AppView = 'LANDING' | 'AUTH' | 'POS_TERMINAL' | 'DASHBOARD' | 'INVENTORY' | 'PURCHASE_GRN' | 'REPORTS' | 'RETURNS' | 'EXPIRY_MANAGEMENT' | 'PATIENTS' | 'SUPPLIERS' | 'SETTINGS' | 'EMERGENCY_DELIVERY' | 'INVOICES';
+export type AppView = 'LANDING' | 'AUTH' | 'POS_TERMINAL' | 'DASHBOARD' | 'INVENTORY' | 'PURCHASE_GRN' | 'REPORTS' | 'RETURNS' | 'EXPIRY_MANAGEMENT' | 'PATIENTS' | 'SUPPLIERS' | 'SETTINGS' | 'EMERGENCY_DELIVERY' | 'INVOICES' | 'ONLINE_DELIVERY';
 export type AuthMode = 'SIGN_IN' | 'SIGN_UP';
 
 export interface UserAccount {
@@ -275,3 +275,34 @@ export interface StoreSettings {
   ownerPin?: string;
 }
 
+export type DeliveryStatus = 'PENDING' | 'CONFIRMED' | 'DISPATCHED' | 'ON_TIME' | 'DELAYED' | 'DELIVERED' | 'CANCELLED';
+export type DeliveryType = 'STANDARD' | 'EXPRESS' | 'SCHEDULED';
+
+export interface DeliveryOrderItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+}
+
+export interface DeliveryOrder {
+  orderId: string;
+  orderNumber: string;
+  customerName: string;
+  customerPhone: string;
+  deliveryAddress: string;
+  items: DeliveryOrderItem[];
+  totalAmount: number;
+  status: DeliveryStatus;
+  deliveryType: DeliveryType;
+  estimatedDeliveryTime: string;
+  actualDeliveryTime?: string;
+  assignedRider?: string;
+  riderPhone?: string;
+  prescriptionRequired: boolean;
+  prescriptionVerified: boolean;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}

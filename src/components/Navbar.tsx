@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import { navigateTo, logoutUser, setInvoiceHistoryModalOpen, switchActivePharmacist } from '../store/posSlice';
-import { Wifi, Clock, Store, LogOut, LayoutDashboard, ShoppingCart, Package, Truck, BarChart3, RotateCcw, Users, Building, Settings, History, FileText, Siren, ChevronDown, Check } from 'lucide-react';
+import { Wifi, Clock, Store, LogOut, LayoutDashboard, ShoppingCart, Package, Truck, BarChart3, RotateCcw, Users, Building, Settings, History, FileText, Siren, ChevronDown, Check, Bike } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const dispatch = useDispatch();
@@ -218,6 +218,19 @@ export const Navbar: React.FC = () => {
         >
           <Siren className="w-3.5 h-3.5 text-red-600 animate-pulse" />
           <span className="font-heading tracking-tight">🚨 Emergency</span>
+        </button>
+
+        {/* Online Delivery Dashboard Nav */}
+        <button
+          onClick={() => dispatch(navigateTo('ONLINE_DELIVERY'))}
+          className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer shadow-xs ${currentView === 'ONLINE_DELIVERY'
+              ? 'bg-emerald-600 text-white ring-2 ring-emerald-300 shadow-sm'
+              : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+            }`}
+          title="Online Home Delivery Dashboard"
+        >
+          <Bike className="w-3.5 h-3.5" />
+          <span className="font-heading tracking-tight">🚴 Delivery</span>
         </button>
 
         {/* 🏪 Active Shift Counter Badge — or Emergency Desk Badge */}
