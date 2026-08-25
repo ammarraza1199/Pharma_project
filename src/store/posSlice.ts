@@ -22,7 +22,9 @@ import type {
   StoreSettings,
   PharmacistCounter,
   SellingUnitMode,
-  DeliveryOrder
+  DeliveryOrder,
+  SupplierBill,
+  SupplierPaymentLog
 } from '../types/pos';
 import { MOCK_PRODUCTS } from '../mock/products';
 import { calculateItemGST } from '../utils/gstCalculator';
@@ -47,6 +49,8 @@ interface PosState {
   disposalRecords: DisposalRecord[];
   patients: PatientRecord[];
   suppliers: SupplierRecord[];
+  supplierBills: SupplierBill[];
+  supplierPaymentLogs: SupplierPaymentLog[];
   pharmacists: PharmacistCounter[];
   activePharmacistId: string;
   sessions: BillingSession[];
@@ -92,6 +96,13 @@ interface PosState {
   };
   invoiceHistoryModal: {
     isOpen: boolean;
+  };
+  prescriptionUploadModal: {
+    isOpen: boolean;
+  };
+  chronicRefillModal: {
+    isOpen: boolean;
+    patientId?: string;
   };
 
   // Printing & Finalization
@@ -307,15 +318,298 @@ const initialState: PosState = {
     }
   ],
   patients: [
-    { patientId: 'pat-001', name: 'Ramesh Kumar', phone: '9876543210', age: '42', gender: 'MALE', totalBills: 14, totalSpent: 5420, lastVisit: '2026-08-14', chronicConditions: ['Hypertension'] },
-    { patientId: 'pat-002', name: 'Priya Sharma', phone: '9876543211', age: '35', gender: 'FEMALE', totalBills: 8, totalSpent: 2850, lastVisit: '2026-08-12', chronicConditions: ['Asthma'] },
-    { patientId: 'pat-003', name: 'Anjali Reddy', phone: '9876543212', age: '29', gender: 'FEMALE', totalBills: 5, totalSpent: 1920, lastVisit: '2026-08-10' },
-    { patientId: 'pat-004', name: 'Mohammed Ali', phone: '9876543213', age: '56', gender: 'MALE', totalBills: 22, totalSpent: 12400, lastVisit: '2026-08-08', chronicConditions: ['Type 2 Diabetes', 'Hypertension'] }
+    {
+      patientId: 'pat-001',
+      name: 'Ramesh Kumar',
+      phone: '9876543210',
+      age: '42',
+      gender: 'MALE',
+      totalBills: 14,
+      totalSpent: 5420,
+      lastVisit: '2026-08-14',
+      chronicConditions: ['Hypertension (BP)', 'Type-2 Diabetes'],
+      chronicMedications: [
+        {
+          productId: '64f1a2b3c4d5e6f7a8b9c004',
+          productName: 'Calpol 650mg Tablet',
+          dosage: '1-0-1 Daily After Meals',
+          frequencyDays: 30,
+          quantity: 30,
+          conditionCategory: 'HYPERTENSION',
+          lastRefilledDate: '2026-07-28',
+          doctorName: 'Dr. V. Sharma (Cardiologist)'
+        },
+        {
+          productId: '64f1a2b3c4d5e6f7a8b9c003',
+          productName: 'Dolo 650 Tablet',
+          dosage: '1-0-0 Daily Morning',
+          frequencyDays: 30,
+          quantity: 30,
+          conditionCategory: 'DIABETES',
+          lastRefilledDate: '2026-07-28',
+          doctorName: 'Dr. K. Srinivas (Endocrinologist)'
+        },
+        {
+          productId: '64f1a2b3c4d5e6f7a8b9c005',
+          productName: 'Paracip 650 Tablet',
+          dosage: '0-0-1 Bedtime',
+          frequencyDays: 30,
+          quantity: 30,
+          conditionCategory: 'GENERAL',
+          lastRefilledDate: '2026-07-28',
+          doctorName: 'Dr. V. Sharma'
+        }
+      ]
+    },
+    {
+      patientId: 'pat-002',
+      name: 'Priya Sharma',
+      phone: '9876543211',
+      age: '35',
+      gender: 'FEMALE',
+      totalBills: 8,
+      totalSpent: 2850,
+      lastVisit: '2026-08-12',
+      chronicConditions: ['Asthma', 'Allergic Rhinitis'],
+      chronicMedications: [
+        {
+          productId: '64f1a2b3c4d5e6f7a8b9c001',
+          productName: 'Augmentin 625 Duo Tablet',
+          dosage: '1-0-1 For 7 Days',
+          frequencyDays: 14,
+          quantity: 14,
+          conditionCategory: 'GENERAL',
+          lastRefilledDate: '2026-08-01',
+          doctorName: 'Dr. P. Deshmukh'
+        }
+      ]
+    },
+    {
+      patientId: 'pat-003',
+      name: 'Anjali Reddy',
+      phone: '9876543212',
+      age: '29',
+      gender: 'FEMALE',
+      totalBills: 5,
+      totalSpent: 1920,
+      lastVisit: '2026-08-10'
+    },
+    {
+      patientId: 'pat-004',
+      name: 'Mohammed Ali',
+      phone: '9876543213',
+      age: '56',
+      gender: 'MALE',
+      totalBills: 22,
+      totalSpent: 12400,
+      lastVisit: '2026-08-08',
+      chronicConditions: ['Type 2 Diabetes (Sugar)', 'Hypertension (BP)', 'Cardiac Care'],
+      chronicMedications: [
+        {
+          productId: '64f1a2b3c4d5e6f7a8b9c003',
+          productName: 'Dolo 650 Tablet',
+          dosage: '1-0-1 Before Food (Sugar Care)',
+          frequencyDays: 30,
+          quantity: 30,
+          conditionCategory: 'DIABETES',
+          lastRefilledDate: '2026-07-25',
+          doctorName: 'Dr. R. K. Patel (Diabetologist)'
+        },
+        {
+          productId: '64f1a2b3c4d5e6f7a8b9c004',
+          productName: 'Calpol 650mg Tablet',
+          dosage: '1-0-0 Morning (BP Care)',
+          frequencyDays: 30,
+          quantity: 30,
+          conditionCategory: 'HYPERTENSION',
+          lastRefilledDate: '2026-07-25',
+          doctorName: 'Dr. A. Verma (Cardiologist)'
+        }
+      ]
+    }
   ],
   suppliers: [
-    { supplierId: 'sup-001', name: 'MedLife Distributors Pvt Ltd', contactPerson: 'Rajesh Verma', phone: '+91 98490 12345', email: 'rajesh@medlifedist.com', gstin: '36AAACM8890A1Z2', dlNumber: 'DL-1002/HYD', address: 'Plot 12, Pharma City, Hyderabad', pendingBalance: 14500 },
-    { supplierId: 'sup-002', name: 'Sun Pharma Wholesale', contactPerson: 'Suresh Nair', phone: '+91 98490 12346', email: 'suresh@sunpharma.com', gstin: '36AAACS5512B1Z5', dlNumber: 'DL-1003/HYD', address: 'Block B, Industrial Area, Hyderabad', pendingBalance: 0 },
-    { supplierId: 'sup-003', name: 'Cipla Regional Depot', contactPerson: 'Venkat Rao', phone: '+91 98490 12347', email: 'venkat@cipladepot.com', gstin: '36AAACC4488C1Z9', dlNumber: 'DL-1004/HYD', address: 'Sector 4, Logistics Park, Hyderabad', pendingBalance: 8200 }
+    {
+      supplierId: 'sup-002',
+      name: 'Sun Pharma Wholesale Depot',
+      contactPerson: 'Suresh Nair',
+      phone: '+91 98490 12346',
+      email: 'suresh@sunpharma.com',
+      gstin: '36AAACS5512B1Z5',
+      dlNumber: 'DL-1003/HYD',
+      address: 'Block B, Industrial Area, Hyderabad',
+      pendingBalance: 0,
+      tradeDiscountPercent: 24.0,
+      rebatePercent: 3.5,
+      liquidMarginPercent: 27.5,
+      creditPeriodDays: 30,
+      deliveryLeadTimeHours: 12,
+      topBrandsSupplied: ['Sun Pharma', 'Ranbaxy', 'Volini', 'Rosuvas', 'Pantocid'],
+      recommendationTag: 'BEST_MARGIN',
+      performanceScore: 98,
+      returnAcceptanceRate: 100
+    },
+    {
+      supplierId: 'sup-003',
+      name: 'Cipla Regional Depot',
+      contactPerson: 'Venkat Rao',
+      phone: '+91 98490 12347',
+      email: 'venkat@cipladepot.com',
+      gstin: '36AAACC4488C1Z9',
+      dlNumber: 'DL-1004/HYD',
+      address: 'Sector 4, Logistics Park, Hyderabad',
+      pendingBalance: 8200,
+      tradeDiscountPercent: 22.0,
+      rebatePercent: 4.0,
+      liquidMarginPercent: 26.0,
+      creditPeriodDays: 15,
+      deliveryLeadTimeHours: 4,
+      topBrandsSupplied: ['Cipla', 'Foracort', 'Asthalin', 'Montair', 'Budecort'],
+      recommendationTag: 'TOP_REBATE',
+      performanceScore: 96,
+      returnAcceptanceRate: 98
+    },
+    {
+      supplierId: 'sup-004',
+      name: "Dr. Reddy's Direct Supply Logistics",
+      contactPerson: 'Arun Mehra',
+      phone: '+91 98490 12348',
+      email: 'arun.mehra@drreddys.com',
+      gstin: '36AAACD1122D1Z4',
+      dlNumber: 'DL-1006/HYD',
+      address: 'Pharma Valley, Bollaram, Hyderabad',
+      pendingBalance: 3400,
+      tradeDiscountPercent: 23.0,
+      rebatePercent: 3.0,
+      liquidMarginPercent: 26.0,
+      creditPeriodDays: 28,
+      deliveryLeadTimeHours: 8,
+      topBrandsSupplied: ['Dr. Reddy', 'Omez', 'Nise', 'Stamlo', 'Razo'],
+      recommendationTag: 'OVERALL_VALUE',
+      performanceScore: 97,
+      returnAcceptanceRate: 100
+    },
+    {
+      supplierId: 'sup-001',
+      name: 'MedLife Distributors Pvt Ltd',
+      contactPerson: 'Rajesh Verma',
+      phone: '+91 98490 12345',
+      email: 'rajesh@medlifedist.com',
+      gstin: '36AAACM8890A1Z2',
+      dlNumber: 'DL-1002/HYD',
+      address: 'Plot 12, Pharma City, Hyderabad',
+      pendingBalance: 14500,
+      tradeDiscountPercent: 20.0,
+      rebatePercent: 2.5,
+      liquidMarginPercent: 22.5,
+      creditPeriodDays: 21,
+      deliveryLeadTimeHours: 3,
+      topBrandsSupplied: ['Abbott', 'GSK', 'Alkem', 'Mankind', 'Zydus'],
+      recommendationTag: 'FAST_FULFILLMENT',
+      performanceScore: 94,
+      returnAcceptanceRate: 100
+    }
+  ],
+  supplierBills: [
+    {
+      billId: 'sb-001',
+      supplierId: 'sup-001',
+      supplierName: 'MedLife Distributors Pvt Ltd',
+      invoiceNumber: 'MED-INV-8891',
+      billDate: '2026-08-15',
+      billType: 'CREDIT',
+      totalAmount: 14500,
+      paidAmount: 0,
+      pendingAmount: 14500,
+      creditDays: 15,
+      dueDate: '2026-08-30',
+      status: 'PENDING',
+      notes: 'General Antibiotics & Chronic Care shipment'
+    },
+    {
+      billId: 'sb-002',
+      supplierId: 'sup-003',
+      supplierName: 'Cipla Regional Depot',
+      invoiceNumber: 'CIP-INV-1104',
+      billDate: '2026-08-20',
+      billType: 'CREDIT',
+      totalAmount: 8200,
+      paidAmount: 0,
+      pendingAmount: 8200,
+      creditDays: 10,
+      dueDate: '2026-08-30',
+      status: 'PENDING',
+      notes: 'Asthalin & Foracort Inhaler supplies'
+    },
+    {
+      billId: 'sb-003',
+      supplierId: 'sup-004',
+      supplierName: "Dr. Reddy's Direct Supply Logistics",
+      invoiceNumber: 'DR-INV-9902',
+      billDate: '2026-08-22',
+      billType: 'CREDIT',
+      totalAmount: 3400,
+      paidAmount: 0,
+      pendingAmount: 3400,
+      creditDays: 15,
+      dueDate: '2026-09-06',
+      status: 'PENDING',
+      notes: 'Omez 20mg & Nise tablet restock'
+    },
+    {
+      billId: 'sb-004',
+      supplierId: 'sup-002',
+      supplierName: 'Sun Pharma Wholesale Depot',
+      invoiceNumber: 'SUN-INV-4421',
+      billDate: '2026-08-18',
+      billType: 'CASH',
+      totalAmount: 28400,
+      paidAmount: 28400,
+      pendingAmount: 0,
+      creditDays: 0,
+      dueDate: '2026-08-18',
+      status: 'PAID',
+      notes: 'Volini & Rosuvas bulk order - Settled via UPI'
+    },
+    {
+      billId: 'sb-005',
+      supplierId: 'sup-001',
+      supplierName: 'MedLife Distributors Pvt Ltd',
+      invoiceNumber: 'MED-INV-8710',
+      billDate: '2026-08-01',
+      billType: 'CREDIT',
+      totalAmount: 10000,
+      paidAmount: 10000,
+      pendingAmount: 0,
+      creditDays: 15,
+      dueDate: '2026-08-16',
+      status: 'PAID',
+      notes: 'Settled via NEFT on 14th Aug'
+    }
+  ],
+  supplierPaymentLogs: [
+    {
+      paymentId: 'pay-001',
+      supplierId: 'sup-001',
+      supplierName: 'MedLife Distributors Pvt Ltd',
+      amount: 10000,
+      paymentDate: '2026-08-14 11:30 AM',
+      paymentMode: 'NEFT_RTGS',
+      referenceNo: 'NEFT2608149811',
+      billInvoiceNo: 'MED-INV-8710',
+      notes: 'Payment for 15-day credit invoice cleared'
+    },
+    {
+      paymentId: 'pay-002',
+      supplierId: 'sup-002',
+      supplierName: 'Sun Pharma Wholesale Depot',
+      amount: 28400,
+      paymentDate: '2026-08-18 03:45 PM',
+      paymentMode: 'UPI',
+      referenceNo: 'UPI/2026/883921',
+      billInvoiceNo: 'SUN-INV-4421',
+      notes: 'Spot delivery cash bill settlement'
+    }
   ],
   pharmacists: DEFAULT_PHARMACISTS,
   activePharmacistId: 'pharm-1',
@@ -351,6 +645,13 @@ const initialState: PosState = {
   },
   invoiceHistoryModal: {
     isOpen: false
+  },
+  prescriptionUploadModal: {
+    isOpen: false
+  },
+  chronicRefillModal: {
+    isOpen: false,
+    patientId: undefined
   },
 
   invoices: getInitialInvoices(),
@@ -579,6 +880,31 @@ export const posSlice = createSlice({
       }
     },
 
+    applyDumpClearanceDiscount: (state, action: PayloadAction<{ productId: string; batchNumber: string; discountPercent: number }>) => {
+      const prod = state.products.find(p => p._id === action.payload.productId);
+      if (prod) {
+        const batch = prod.batches.find(b => b.batchNumber === action.payload.batchNumber);
+        if (batch) {
+          batch.clearanceDiscountPercent = action.payload.discountPercent;
+          batch.isDumpStock = true;
+        }
+      }
+    },
+
+    applyBulk30DayDumpClearance: (state, action: PayloadAction<{ discountPercent: number }>) => {
+      const now = new Date();
+      const thirtyDaysAhead = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      state.products.forEach(prod => {
+        prod.batches.forEach(b => {
+          const exp = new Date(b.expiryDate);
+          if (exp > now && exp <= thirtyDaysAhead) {
+            b.clearanceDiscountPercent = action.payload.discountPercent;
+            b.isDumpStock = true;
+          }
+        });
+      });
+    },
+
     addPatient: (state, action: PayloadAction<Omit<PatientRecord, 'patientId'> & { patientId?: string }>) => {
       const newPatient: PatientRecord = {
         ...action.payload,
@@ -593,6 +919,143 @@ export const posSlice = createSlice({
         supplierId: action.payload.supplierId || `sup-${Date.now()}`
       };
       state.suppliers.unshift(newSupplier);
+    },
+
+    recordSupplierPayment: (state, action: PayloadAction<{
+      supplierId: string;
+      amount: number;
+      paymentMode: 'UPI' | 'NEFT_RTGS' | 'CASH' | 'CHEQUE';
+      referenceNo: string;
+      billInvoiceNo?: string;
+      notes?: string;
+    }>) => {
+      const { supplierId, amount, paymentMode, referenceNo, billInvoiceNo, notes } = action.payload;
+      const supplier = state.suppliers.find(s => s.supplierId === supplierId);
+      if (supplier) {
+        supplier.pendingBalance = Math.max(0, supplier.pendingBalance - amount);
+      }
+
+      // If tied to a specific bill, reduce bill pending amount
+      if (billInvoiceNo) {
+        const bill = state.supplierBills.find(b => b.invoiceNumber === billInvoiceNo || b.billId === billInvoiceNo);
+        if (bill) {
+          bill.paidAmount += amount;
+          bill.pendingAmount = Math.max(0, bill.totalAmount - bill.paidAmount);
+          bill.status = bill.pendingAmount === 0 ? 'PAID' : 'PARTIAL';
+        }
+      }
+
+      const newLog: SupplierPaymentLog = {
+        paymentId: `pay-${Date.now()}`,
+        supplierId,
+        supplierName: supplier?.name || 'Distributor',
+        amount,
+        paymentDate: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+        paymentMode,
+        referenceNo,
+        billInvoiceNo,
+        notes
+      };
+
+      state.supplierPaymentLogs.unshift(newLog);
+    },
+
+    addSupplierBill: (state, action: PayloadAction<Omit<SupplierBill, 'billId'> & { billId?: string }>) => {
+      const newBill: SupplierBill = {
+        ...action.payload,
+        billId: action.payload.billId || `sb-${Date.now()}`
+      };
+      state.supplierBills.unshift(newBill);
+
+      // If credit bill with pending amount, add to supplier pending balance
+      if (newBill.billType === 'CREDIT' && newBill.pendingAmount > 0) {
+        const supplier = state.suppliers.find(s => s.supplierId === newBill.supplierId);
+        if (supplier) {
+          supplier.pendingBalance += newBill.pendingAmount;
+        }
+      }
+    },
+
+    addNewBatchToProduct: (state, action: PayloadAction<{
+      productId: string;
+      batchNumber: string;
+      expiryDate: string;
+      stockQuantity: number;
+      location: string;
+      mrp: number;
+      purchaseRate?: number;
+      sellingPrice?: number;
+    }>) => {
+      const prod = state.products.find(p => p._id === action.payload.productId);
+      if (prod) {
+        const existingBatch = prod.batches.find(b => b.batchNumber.toLowerCase() === action.payload.batchNumber.toLowerCase());
+        if (existingBatch) {
+          existingBatch.stockQuantity += action.payload.stockQuantity;
+          existingBatch.expiryDate = action.payload.expiryDate;
+          existingBatch.location = action.payload.location || existingBatch.location;
+          existingBatch.mrp = action.payload.mrp || existingBatch.mrp;
+          if (action.payload.purchaseRate) existingBatch.purchaseRate = action.payload.purchaseRate;
+        } else {
+          prod.batches.push({
+            batchNumber: action.payload.batchNumber,
+            expiryDate: action.payload.expiryDate,
+            stockQuantity: action.payload.stockQuantity,
+            location: action.payload.location,
+            mrp: action.payload.mrp,
+            purchaseRate: action.payload.purchaseRate
+          });
+        }
+        prod.totalStock = prod.batches.reduce((sum, b) => sum + b.stockQuantity, 0);
+        prod.stockStatus = prod.totalStock > 20 ? 'IN_STOCK' : prod.totalStock > 0 ? 'LOW_STOCK' : 'OUT_OF_STOCK';
+        if (action.payload.sellingPrice) {
+          prod.sellingPrice = action.payload.sellingPrice;
+        }
+      }
+    },
+
+    updateBatchDetails: (state, action: PayloadAction<{
+      productId: string;
+      batchNumber: string;
+      expiryDate?: string;
+      stockQuantity?: number;
+      location?: string;
+      mrp?: number;
+      sellingPrice?: number;
+      purchaseRate?: number;
+    }>) => {
+      const prod = state.products.find(p => p._id === action.payload.productId);
+      if (prod) {
+        const batch = prod.batches.find(b => b.batchNumber === action.payload.batchNumber);
+        if (batch) {
+          if (action.payload.expiryDate) batch.expiryDate = action.payload.expiryDate;
+          if (action.payload.stockQuantity !== undefined) batch.stockQuantity = action.payload.stockQuantity;
+          if (action.payload.location) batch.location = action.payload.location;
+          if (action.payload.mrp) batch.mrp = action.payload.mrp;
+          if (action.payload.purchaseRate) batch.purchaseRate = action.payload.purchaseRate;
+        }
+        if (action.payload.sellingPrice) prod.sellingPrice = action.payload.sellingPrice;
+        prod.totalStock = prod.batches.reduce((sum, b) => sum + b.stockQuantity, 0);
+        prod.stockStatus = prod.totalStock > 20 ? 'IN_STOCK' : prod.totalStock > 0 ? 'LOW_STOCK' : 'OUT_OF_STOCK';
+      }
+    },
+
+    quickUpdateProductPriceAndShelf: (state, action: PayloadAction<{
+      productId: string;
+      batchNumber: string;
+      sellingPrice: number;
+      location: string;
+      mrp?: number;
+    }>) => {
+      const prod = state.products.find(p => p._id === action.payload.productId);
+      if (prod) {
+        prod.sellingPrice = action.payload.sellingPrice;
+        if (action.payload.mrp) prod.unitMRP = action.payload.mrp;
+        const batch = prod.batches.find(b => b.batchNumber === action.payload.batchNumber);
+        if (batch) {
+          batch.location = action.payload.location;
+          if (action.payload.mrp) batch.mrp = action.payload.mrp;
+        }
+      }
     },
 
     updateStoreSettings: (state, action: PayloadAction<Partial<StoreSettings>>) => {
@@ -1069,6 +1532,49 @@ export const posSlice = createSlice({
     setCustomerDisplayModalOpen: (state, action: PayloadAction<boolean>) => {
       state.customerDisplayModal.isOpen = action.payload;
     },
+    setPrescriptionUploadModalOpen: (state, action: PayloadAction<boolean>) => {
+      state.prescriptionUploadModal.isOpen = action.payload;
+    },
+
+    setChronicRefillModalOpen: (state, action: PayloadAction<{ isOpen: boolean; patientId?: string }>) => {
+      state.chronicRefillModal.isOpen = action.payload.isOpen;
+      state.chronicRefillModal.patientId = action.payload.patientId;
+    },
+
+    attachPrescriptionToSession: (state, action: PayloadAction<{ sessionId?: string; prescriptionUrl: string; prescriptionName?: string }>) => {
+      const sessId = action.payload.sessionId || state.activeSessionId;
+      const sess = state.sessions.find(s => s.id === sessId);
+      if (sess) {
+        sess.uploadedPrescriptionUrl = action.payload.prescriptionUrl;
+        sess.uploadedPrescriptionName = action.payload.prescriptionName || 'Doctor_Prescription_Rx.jpg';
+      }
+    },
+
+    removePrescriptionFromSession: (state, action: PayloadAction<{ sessionId?: string }>) => {
+      const sessId = action.payload.sessionId || state.activeSessionId;
+      const sess = state.sessions.find(s => s.id === sessId);
+      if (sess) {
+        sess.uploadedPrescriptionUrl = undefined;
+        sess.uploadedPrescriptionName = undefined;
+      }
+    },
+
+    refillChronicMedicationsToCart: (state, action: PayloadAction<{
+      sessionId?: string;
+      items: { productId: string; quantity: number }[];
+    }>) => {
+      action.payload.items.forEach(item => {
+        const product = state.products.find(p => p._id === item.productId);
+        if (product) {
+          const sortedBatches = getSortedBatchesFEFO(product.batches || []);
+          const availableBatch = sortedBatches.find(b => b.stockQuantity > 0) || sortedBatches[0];
+          if (availableBatch) {
+            addProductToCartInternal(state, product, availableBatch, item.quantity, 0, false, undefined, 'PACK');
+          }
+        }
+      });
+    },
+
     openScheduleHDetailsPrompt: (state) => {
       state.complianceModal = {
         isOpen: true,
@@ -1361,6 +1867,11 @@ export const {
   setPaymentModalOpen,
   setHeldBillsModalOpen,
   setCustomerDisplayModalOpen,
+  setPrescriptionUploadModalOpen,
+  setChronicRefillModalOpen,
+  attachPrescriptionToSession,
+  removePrescriptionFromSession,
+  refillChronicMedicationsToCart,
   openScheduleHDetailsPrompt,
   startSubmittingBill,
   finalizeBillSuccess,
@@ -1374,7 +1885,14 @@ export const {
   updateDeliveryOrderStatus,
   deleteDeliveryOrder,
   toggleOrderPrescriptionVerification,
-  convertDeliveryOrderToInvoice
+  convertDeliveryOrderToInvoice,
+  applyDumpClearanceDiscount,
+  applyBulk30DayDumpClearance,
+  recordSupplierPayment,
+  addSupplierBill,
+  addNewBatchToProduct,
+  updateBatchDetails,
+  quickUpdateProductPriceAndShelf
 } = posSlice.actions;
 
 export default posSlice.reducer;

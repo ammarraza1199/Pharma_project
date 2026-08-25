@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import { navigateTo, logoutUser, setInvoiceHistoryModalOpen, switchActivePharmacist } from '../store/posSlice';
-import { Wifi, Clock, Store, LogOut, LayoutDashboard, ShoppingCart, Package, Truck, BarChart3, RotateCcw, Users, Building, Settings, History, FileText, Siren, ChevronDown, Check, Bike } from 'lucide-react';
+import { Wifi, Clock, Store, LogOut, LayoutDashboard, ShoppingCart, Package, Truck, BarChart3, RotateCcw, Users, Building, Settings, History, FileText, Siren, ChevronDown, Check, Bike, AlertTriangle } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const dispatch = useDispatch();
@@ -52,23 +52,23 @@ export const Navbar: React.FC = () => {
         </div>
       </div>
 
-      {/* Center Status Indicators */}
-      <div className="hidden md:flex items-center space-x-4 bg-slate-50 border border-slate-200 px-3.5 py-1 rounded-xl">
+      {/* Center Status Indicators (Compact) */}
+      <div className="hidden md:flex items-center space-x-2 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
         {/* Offline Reliability Status */}
-        <div className="flex items-center space-x-1.5 text-xs font-semibold text-emerald-700">
-          <span className="relative flex h-2 w-2">
+        <div className="flex items-center space-x-1 text-[11px] font-semibold text-emerald-700">
+          <span className="relative flex h-1.5 w-1.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
           </span>
-          <Wifi className="w-3.5 h-3.5 text-emerald-600" />
+          <Wifi className="w-3 h-3 text-emerald-600" />
           <span>72h Offline Ready</span>
         </div>
 
-        <div className="h-4 w-[1px] bg-slate-300"></div>
+        <div className="h-3 w-[1px] bg-slate-300"></div>
 
         {/* Live Clock */}
-        <div className="flex items-center space-x-1 text-xs font-semibold text-slate-700">
-          <Clock className="w-3.5 h-3.5 text-slate-500" />
+        <div className="flex items-center space-x-1 text-[11px] font-semibold text-slate-600">
+          <Clock className="w-3 h-3 text-slate-400" />
           <span>{timeStr || '12:00:00 PM'}</span>
         </div>
       </div>
@@ -121,6 +121,18 @@ export const Navbar: React.FC = () => {
           title="Inventory Catalog"
         >
           <Package className="w-4 h-4" />
+        </button>
+
+        {/* Inventory Shelf & Price Dashboard Nav */}
+        <button
+          onClick={() => dispatch(navigateTo('INVENTORY_DASHBOARD'))}
+          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'INVENTORY_DASHBOARD'
+              ? 'bg-teal-100 text-teal-800 font-bold shadow-2xs'
+              : 'text-slate-500 hover:text-teal-700 hover:bg-teal-50'
+            }`}
+          title="Inventory Shelf, Expiry & Pricing Dashboard"
+        >
+          <BarChart3 className="w-4 h-4 text-teal-600" />
         </button>
 
         {/* Stock Purchase GRN Nav */}

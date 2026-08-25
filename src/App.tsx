@@ -18,6 +18,7 @@ import { ReceiptPrintView } from './components/ReceiptPrintView';
 import { InvoiceHistoryModal } from './components/InvoiceHistoryModal';
 import { Dashboard } from './components/Dashboard';
 import { InventoryPage } from './components/InventoryPage';
+import { InventoryDashboardPage } from './components/InventoryDashboardPage';
 import { PurchaseGRNPage } from './components/PurchaseGRNPage';
 import { ReportsPage } from './components/ReportsPage';
 import { ReturnsPage } from './components/ReturnsPage';
@@ -29,6 +30,8 @@ import { EmergencyDeliveryPage } from './components/EmergencyDeliveryPage';
 import { InvoicesPage } from './components/InvoicesPage';
 import { AssignBillModal } from './components/AssignBillModal';
 import { OnlineDeliveryPage } from './components/OnlineDeliveryPage';
+import { PrescriptionUploadModal } from './components/PrescriptionUploadModal';
+import { ChronicRefillModal } from './components/ChronicRefillModal';
 
 export const App: React.FC = () => {
   const currentView = useSelector((state: RootState) => state.pos.currentView);
@@ -50,6 +53,11 @@ export const App: React.FC = () => {
       {/* ── INVENTORY MANAGEMENT VIEW ── */}
       {currentView === 'INVENTORY' && (
         <InventoryPage />
+      )}
+
+      {/* ── DEDICATED INVENTORY & SHELF-LIFE DASHBOARD VIEW ── */}
+      {currentView === 'INVENTORY_DASHBOARD' && (
+        <InventoryDashboardPage />
       )}
 
       {/* ── STOCK PURCHASE (GRN) VIEW ── */}
@@ -134,6 +142,8 @@ export const App: React.FC = () => {
           <HeldBillsModal />
           <CustomerDisplayModal />
           <AssignBillModal />
+          <PrescriptionUploadModal />
+          <ChronicRefillModal />
         </>
       )}
 

@@ -1,4 +1,4 @@
-export type AppView = 'LANDING' | 'AUTH' | 'POS_TERMINAL' | 'DASHBOARD' | 'INVENTORY' | 'PURCHASE_GRN' | 'REPORTS' | 'RETURNS' | 'EXPIRY_MANAGEMENT' | 'PATIENTS' | 'SUPPLIERS' | 'SETTINGS' | 'EMERGENCY_DELIVERY' | 'INVOICES' | 'ONLINE_DELIVERY';
+export type AppView = 'LANDING' | 'AUTH' | 'POS_TERMINAL' | 'DASHBOARD' | 'INVENTORY' | 'INVENTORY_DASHBOARD' | 'PURCHASE_GRN' | 'REPORTS' | 'RETURNS' | 'EXPIRY_MANAGEMENT' | 'PATIENTS' | 'SUPPLIERS' | 'SETTINGS' | 'EMERGENCY_DELIVERY' | 'INVOICES' | 'ONLINE_DELIVERY';
 export type AuthMode = 'SIGN_IN' | 'SIGN_UP';
 
 export interface UserAccount {
@@ -19,6 +19,9 @@ export interface BatchInfo {
   stockQuantity: number;
   location: string;
   mrp: number;
+  purchaseRate?: number; // Cost price paid to distributor
+  clearanceDiscountPercent?: number; // e.g. 25%, 30%, 50% for 30-day dump clearance
+  isDumpStock?: boolean;
 }
 
 export type MedicineType = 'Oral' | 'Injectable' | 'Topical' | 'Inhalation' | 'Ophthalmic' | 'Nasal' | 'Rectal';
@@ -101,6 +104,8 @@ export interface BillingSession {
   scheduleXVerified: boolean;
   scheduleXManagerPin?: string;
   pharmacistSignatureAcknowledged: boolean;
+  uploadedPrescriptionUrl?: string;
+  uploadedPrescriptionName?: string;
   createdAt: string;
 }
 
@@ -230,6 +235,17 @@ export interface DisposalRecord {
   approvalManagerPin: string;
 }
 
+export interface ChronicMedication {
+  productId: string;
+  productName: string;
+  dosage: string; // e.g. "1-0-0 After Breakfast"
+  frequencyDays: number; // e.g. 30 days refill
+  quantity: number; // e.g. 30 tablets
+  conditionCategory: 'DIABETES' | 'HYPERTENSION' | 'THYROID' | 'CARDIAC' | 'GENERAL';
+  lastRefilledDate?: string;
+  doctorName?: string;
+}
+
 export interface PatientRecord {
   patientId: string;
   name: string;
@@ -240,6 +256,7 @@ export interface PatientRecord {
   totalSpent: number;
   lastVisit: string;
   chronicConditions?: string[];
+  chronicMedications?: ChronicMedication[];
 }
 
 export interface SupplierRecord {
@@ -252,6 +269,43 @@ export interface SupplierRecord {
   dlNumber: string;
   address: string;
   pendingBalance: number;
+  tradeDiscountPercent?: number;     // e.g. 20% standard trade discount off MRP
+  rebatePercent?: number;            // e.g. 3% prompt cash discount / quarterly turnover rebate
+  liquidMarginPercent?: number;      // e.g. 24.5% net profit margin after costs & rebates
+  creditPeriodDays?: number;         // e.g. 21 days credit window
+  deliveryLeadTimeHours?: number;    // e.g. 4 hours / 24 hours turnaround
+  topBrandsSupplied?: string[];      // e.g. ['Cipla', 'Sun Pharma', 'Dr. Reddy']
+  recommendationTag?: 'BEST_MARGIN' | 'TOP_REBATE' | 'FAST_FULFILLMENT' | 'OVERALL_VALUE';
+  performanceScore?: number;         // e.g. 96 (out of 100)
+  returnAcceptanceRate?: number;     // e.g. 100% credit on expired items
+}
+
+export interface SupplierBill {
+  billId: string;
+  supplierId: string;
+  supplierName: string;
+  invoiceNumber: string;
+  billDate: string; // YYYY-MM-DD
+  billType: 'CASH' | 'CREDIT';
+  totalAmount: number;
+  paidAmount: number;
+  pendingAmount: number;
+  creditDays: number; // e.g. 10, 15, 21, 30 days
+  dueDate: string; // YYYY-MM-DD
+  status: 'PAID' | 'PENDING' | 'OVERDUE' | 'PARTIAL';
+  notes?: string;
+}
+
+export interface SupplierPaymentLog {
+  paymentId: string;
+  supplierId: string;
+  supplierName: string;
+  amount: number;
+  paymentDate: string; // YYYY-MM-DD HH:MM
+  paymentMode: 'UPI' | 'NEFT_RTGS' | 'CASH' | 'CHEQUE';
+  referenceNo: string;
+  billInvoiceNo?: string;
+  notes?: string;
 }
 
 export interface StoreSettings {

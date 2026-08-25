@@ -12,9 +12,11 @@ import {
 import type { DeliveryOrder, DeliveryStatus, DeliveryType, DeliveryMode } from '../types/pos';
 import {
   Bike, Clock, CheckCircle2, AlertTriangle, Package,
-  XCircle, Plus, Phone, MapPin, Pill, ShieldCheck, ShieldAlert,
-  Truck, Trash2, Search, X, Store, FileText, Printer, Calendar
+  XCircle, Phone, MapPin, Pill, ShieldCheck, ShieldAlert,
+  Truck, Trash2, Search, X, Store, FileText, Printer, Calendar,
+  MessageCircle
 } from 'lucide-react';
+import { shareDeliveryOrderViaWhatsApp } from '../utils/whatsappShare';
 
 type FilterTab = 'ALL' | 'HOME_DELIVERY' | 'STORE_PICKUP' | 'VERIFY_PENDING' | DeliveryStatus;
 
@@ -188,13 +190,6 @@ export const OnlineDeliveryPage: React.FC = () => {
             Pharmacy Orders — Home Delivery 🛵, Store Pickup 🏬, 24h Rx Verification &amp; Instant Invoice
           </p>
         </div>
-        <button
-          onClick={() => setShowNewOrderModal(true)}
-          className="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md cursor-pointer transition-all active:scale-[0.97]"
-        >
-          <Plus className="w-4 h-4" />
-          <span>New Delivery / Pickup Order</span>
-        </button>
       </div>
 
       {/* KPI CARDS */}
@@ -358,8 +353,18 @@ export const OnlineDeliveryPage: React.FC = () => {
                     <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${timeLeft.isLate ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'}`}>
                       ⏱ {formatTime(order.estimatedDeliveryTime)} ({timeLeft.label})
                     </span>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1.5">
                       <span className="text-sm font-black text-emerald-700">₹{order.totalAmount.toFixed(2)}</span>
+                      
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); shareDeliveryOrderViaWhatsApp(order); }}
+                        className="p-1.5 bg-[#25D366]/15 hover:bg-[#25D366] text-[#128C7E] hover:text-white rounded-lg cursor-pointer transition-all active:scale-[0.93]"
+                        title="Share Bill & Order Details on WhatsApp"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                      </button>
+
                       {order.invoiceNumber ? (
                         <span className="text-[9.5px] font-extrabold text-teal-800 bg-teal-100 px-2 py-0.5 rounded-full flex items-center space-x-1">
                           <CheckCircle2 className="w-2.5 h-2.5" />
@@ -499,10 +504,19 @@ export const OnlineDeliveryPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handleGenerateInvoice(selectedOrder)}
-                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center justify-center space-x-2 shadow-md cursor-pointer transition-all active:scale-[0.98]"
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center justify-center space-x-2 shadow-md cursor-pointer transition-all active:scale-[0.98]"
                 >
                   <FileText className="w-4 h-4" />
                   <span>{selectedOrder.invoiceNumber ? 'Reprint / View Tax Invoice' : '🧾 Save & Generate Final Invoice'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => shareDeliveryOrderViaWhatsApp(selectedOrder)}
+                  className="w-full py-2.5 bg-[#25D366] hover:bg-[#1EBE5D] text-white rounded-xl font-bold flex items-center justify-center space-x-2 shadow-md cursor-pointer transition-all active:scale-[0.98]"
+                >
+                  <MessageCircle className="w-4 h-4 fill-white text-[#25D366]" />
+                  <span>📲 Share Bill with Customer on WhatsApp</span>
                 </button>
               </div>
 

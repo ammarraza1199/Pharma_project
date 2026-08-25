@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { addItemToCart } from '../store/posSlice';
+import { addItemToCart, setPrescriptionUploadModalOpen, setChronicRefillModalOpen } from '../store/posSlice';
 import { getMedicineDetails } from '../utils/medicineDetails';
 import { getSortedBatchesFEFO, getEarliestExpiringBatch } from '../utils/fefoHelper';
 import type { Product, BatchInfo, ScheduleCategory, SellingUnitMode } from '../types/pos';
 import {
   Search, ScanBarcode, AlertCircle, Plus, Zap,
-  X, ArrowUpDown, PackageX, TrendingUp, ChevronDown
+  X, ArrowUpDown, PackageX, TrendingUp, ChevronDown,
+  FileText, Repeat
 } from 'lucide-react';
 
 // ── Filter & Sort Types ──────────────────────────────────────────────────────
@@ -171,9 +172,29 @@ export const ProductSearch: React.FC = () => {
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-2xs flex flex-col h-full overflow-hidden">
+      {/* ── TOP ACTION BAR: UPLOAD RX & CHRONIC REFILL ──────────────── */}
+      <div className="px-3 pt-2.5 pb-1 flex items-center justify-between gap-1.5 flex-shrink-0">
+        <button
+          type="button"
+          onClick={() => dispatch(setPrescriptionUploadModalOpen(true))}
+          className="flex-1 flex items-center justify-center space-x-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-1.5 rounded-xl text-[11px] font-extrabold transition-all shadow-2xs cursor-pointer active:scale-98"
+        >
+          <FileText className="w-3.5 h-3.5 text-emerald-600" />
+          <span>Upload Rx (Prescription)</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => dispatch(setChronicRefillModalOpen({ isOpen: true }))}
+          className="flex-1 flex items-center justify-center space-x-1.5 bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-300 px-2 py-1.5 rounded-xl text-[11px] font-extrabold transition-all shadow-2xs cursor-pointer active:scale-98"
+        >
+          <Repeat className="w-3.5 h-3.5 text-teal-700" />
+          <span>Repeat Refill (BP/Sugar)</span>
+        </button>
+      </div>
 
       {/* ── SEARCH BAR ──────────────────────────────────────────────── */}
-      <div className="p-3 pb-0 flex-shrink-0">
+      <div className="p-3 pt-1.5 pb-0 flex-shrink-0">
         <form onSubmit={handleBarcodeSubmit} className="relative mb-2.5">
           <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
             <Search className="w-4 h-4" />

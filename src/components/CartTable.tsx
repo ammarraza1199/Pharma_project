@@ -8,13 +8,15 @@ import {
   removeFromCart,
   clearActiveCart,
   applyBulkDiscount,
-  openScheduleHDetailsPrompt
+  openScheduleHDetailsPrompt,
+  setPrescriptionUploadModalOpen,
+  setChronicRefillModalOpen
 } from '../store/posSlice';
 import { analyzeDrugInteractions } from '../utils/drugInteractionEngine';
 import { getMedicineDetails } from '../utils/medicineDetails';
 import {
   Trash2, Plus, Minus, AlertTriangle, AlertOctagon, UserCheck,
-  Stethoscope, Edit2, Percent, FileText, RefreshCcw, Pill
+  Stethoscope, Edit2, Percent, FileText, RefreshCcw, Pill, Repeat, CheckCircle2
 } from 'lucide-react';
 
 export const CartTable: React.FC = () => {
@@ -66,7 +68,7 @@ export const CartTable: React.FC = () => {
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-2xs p-3.5 flex flex-col h-full overflow-hidden">
 
-      {/* ── TOP BANNER: PATIENT & DOCTOR DETAILS + RX TAG ─────────────── */}
+      {/* ── TOP BANNER: PATIENT & DOCTOR DETAILS + RX TAG + REPEAT REFILL ─────────────── */}
       <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 mb-2.5 flex items-center justify-between flex-shrink-0 flex-wrap gap-y-1.5">
         <div className="flex items-center space-x-3 text-xs flex-wrap gap-y-1">
           {/* Patient */}
@@ -94,23 +96,52 @@ export const CartTable: React.FC = () => {
             </span>
           </div>
 
-          {/* Rx Tag */}
-          {hasRxItems && (
-            <span className="flex items-center space-x-1 bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-extrabold px-2 py-0.5 rounded-full animate-pulse">
+          {/* Uploaded Rx Attached Pill */}
+          {currentSession?.uploadedPrescriptionUrl && (
+            <button
+              onClick={() => dispatch(setPrescriptionUploadModalOpen(true))}
+              className="flex items-center space-x-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 text-[10px] font-extrabold px-2 py-0.5 rounded-full cursor-pointer transition-all"
+              title="View Attached Prescription"
+            >
+              <CheckCircle2 className="w-3 h-3 text-emerald-700" />
+              <span>Rx Attached</span>
+            </button>
+          )}
+
+          {/* Rx Required Tag if not uploaded */}
+          {hasRxItems && !currentSession?.uploadedPrescriptionUrl && (
+            <button
+              onClick={() => dispatch(setPrescriptionUploadModalOpen(true))}
+              className="flex items-center space-x-1 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 text-[10px] font-extrabold px-2 py-0.5 rounded-full animate-pulse cursor-pointer"
+              title="Click to Upload Prescription"
+            >
               <FileText className="w-3 h-3 text-amber-700" />
-              <span>Rx Required</span>
-            </span>
+              <span>Rx Required (Upload)</span>
+            </button>
           )}
         </div>
 
-        {/* Edit Action */}
-        <button
-          onClick={() => dispatch(openScheduleHDetailsPrompt())}
-          className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 flex items-center space-x-1 hover:underline cursor-pointer"
-        >
-          <Edit2 className="w-3 h-3" />
-          <span>Edit Patient Info</span>
-        </button>
+        {/* Action Buttons */}
+        <div className="flex items-center space-x-2">
+          {/* Quick Repeat Refill Trigger */}
+          <button
+            onClick={() => dispatch(setChronicRefillModalOpen({ isOpen: true }))}
+            className="text-[11px] font-bold text-teal-800 bg-teal-50 hover:bg-teal-100 border border-teal-300 px-2 py-0.5 rounded-lg flex items-center space-x-1 cursor-pointer transition-all shadow-2xs"
+            title="1-Click Repeat Chronic Refill (BP, Sugar, Thyroid)"
+          >
+            <Repeat className="w-3 h-3 text-teal-600" />
+            <span>Repeat Refill</span>
+          </button>
+
+          {/* Edit Patient Info Action */}
+          <button
+            onClick={() => dispatch(openScheduleHDetailsPrompt())}
+            className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 flex items-center space-x-1 hover:underline cursor-pointer"
+          >
+            <Edit2 className="w-3 h-3" />
+            <span>Edit Info</span>
+          </button>
+        </div>
       </div>
 
       {/* ── CART HEADER CONTROL BAR (Bulk Discount & Clear) ─────────── */}

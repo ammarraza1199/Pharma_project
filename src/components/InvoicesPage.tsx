@@ -12,8 +12,10 @@ import { getMedicineDetails } from '../utils/medicineDetails';
 import {
   History, Search, Download, Printer, Trash2, ChevronDown, ChevronUp,
   CreditCard, DollarSign, Calendar, Filter, ShoppingCart, Eye,
-  CheckCircle2, ArrowUpDown, FileSpreadsheet, Plus, AlertCircle, Sparkles
+  CheckCircle2, ArrowUpDown, FileSpreadsheet, Plus, AlertCircle, Sparkles,
+  MessageCircle
 } from 'lucide-react';
+import { shareInvoiceViaWhatsApp } from '../utils/whatsappShare';
 
 export const InvoicesPage: React.FC = () => {
   const dispatch = useDispatch();
@@ -456,11 +458,21 @@ export const InvoicesPage: React.FC = () => {
                             {/* View & Print Official Invoice */}
                             <button
                               onClick={() => handleReprint(inv.invoiceNumber)}
-                              className="flex items-center space-x-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg shadow-2xs transition-all active:scale-95 cursor-pointer"
+                              className="flex items-center space-x-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-2xs transition-all active:scale-95 cursor-pointer"
                               title="Preview and Print Official Tax Invoice (A4 & Thermal)"
                             >
                               <Printer className="w-3.5 h-3.5" />
                               <span>View / Print</span>
+                            </button>
+
+                            {/* Share on WhatsApp */}
+                            <button
+                              onClick={() => shareInvoiceViaWhatsApp(inv)}
+                              className="flex items-center space-x-1 bg-[#25D366] hover:bg-[#1EBE5D] text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-2xs transition-all active:scale-95 cursor-pointer"
+                              title="Share this tax invoice directly with customer via WhatsApp"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5 fill-white text-[#25D366]" />
+                              <span>WhatsApp</span>
                             </button>
 
                             {/* Download Single CSV */}
