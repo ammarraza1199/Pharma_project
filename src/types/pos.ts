@@ -202,15 +202,21 @@ export interface GRNEntry {
   status: 'COMPLETED' | 'DRAFT';
 }
 
+export type ReturnPolicyType = 'FULL_100' | 'LOW_PRICE_15' | 'CLEARANCE_50';
+export type ShelfStatus = 'PENDING_SHELF_CONFIRMATION' | 'RESTOCKED_TO_SHELF' | 'MARKED_DAMAGED';
+
 export interface ReturnItem {
   productId: string;
   productName: string;
   batchNumber: string;
   quantityReturned: number;
   unitPrice: number;
+  policyApplied?: ReturnPolicyType;
+  deductionAmount?: number;
   refundAmount: number;
   reason: 'EXPIRED' | 'DAMAGED' | 'CUSTOMER_CANCELLED' | 'WRONG_MEDICINE';
   restocked: boolean;
+  shelfStatus?: ShelfStatus;
 }
 
 export interface ReturnCreditNote {
@@ -221,6 +227,7 @@ export interface ReturnCreditNote {
   items: ReturnItem[];
   totalRefundAmount: number;
   refundMethod: 'CASH' | 'UPI' | 'STORE_CREDIT';
+  policySummary?: string;
 }
 
 export interface DisposalRecord {
@@ -278,6 +285,37 @@ export interface SupplierRecord {
   recommendationTag?: 'BEST_MARGIN' | 'TOP_REBATE' | 'FAST_FULFILLMENT' | 'OVERALL_VALUE';
   performanceScore?: number;         // e.g. 96 (out of 100)
   returnAcceptanceRate?: number;     // e.g. 100% credit on expired items
+}
+
+export type SchemeDealType = 'BUY_X_GET_Y' | 'COMBO_OFFER' | 'HIGH_MARGIN_SCHEME' | 'SUBSTITUTE_COST_SAVER';
+
+export interface ProcurementSubstituteOption {
+  brandName: string;
+  saltComposition: string;
+  manufacturer: string;
+  mrp: number;
+  purchaseRate: number;
+  marginPercent: number;
+  availability: 'IN_STOCK' | 'PRE_ORDER';
+}
+
+export interface DistributorScheme {
+  schemeId: string;
+  supplierId: string;
+  supplierName: string;
+  title: string;
+  dealType: SchemeDealType;
+  primaryProduct: string;
+  saltComposition: string;
+  buyQuantity: number;
+  freeQuantity: number;
+  discountPercent: number;
+  effectiveMarginPercent: number;
+  comboItems?: string[];
+  substituteOption?: ProcurementSubstituteOption;
+  validTill: string;
+  minOrderValue?: number;
+  badgeTag: string;
 }
 
 export interface SupplierBill {

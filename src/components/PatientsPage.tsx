@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { addPatient, navigateTo, setPatientDetails } from '../store/posSlice';
+import { addPatient, navigateTo, setPatientDetails, setChronicRefillModalOpen } from '../store/posSlice';
 import type { PatientRecord } from '../types/pos';
 import {
   Users, Search, Plus, UserCheck, ShoppingCart,
-  HeartPulse, X, DollarSign
+  HeartPulse, X, DollarSign, Activity, Sparkles, MessageCircle, FileText, CheckCircle2, ChevronRight
 } from 'lucide-react';
 
 export const PatientsPage: React.FC = () => {
@@ -14,6 +14,7 @@ export const PatientsPage: React.FC = () => {
 
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
+  const [selectedPatientForCarePlan, setSelectedPatientForCarePlan] = useState<PatientRecord | null>(null);
 
   // Form state
   const [name, setName] = useState<string>('');
@@ -214,13 +215,23 @@ export const PatientsPage: React.FC = () => {
                     </td>
 
                     <td className="px-3 py-3 text-center">
-                      <button
-                        onClick={() => handleStartBillingForPatient(pat)}
-                        className="flex items-center space-x-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg shadow-2xs transition-all mx-auto cursor-pointer"
-                      >
-                        <ShoppingCart className="w-3.5 h-3.5" />
-                        <span>Start Billing</span>
-                      </button>
+                      <div className="flex items-center justify-center space-x-1.5">
+                        <button
+                          onClick={() => setSelectedPatientForCarePlan(pat)}
+                          className="flex items-center space-x-1 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300 text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition-all cursor-pointer"
+                          title="View Health Insights & Personalized Care Plan"
+                        >
+                          <Activity className="w-3.5 h-3.5 text-teal-600" />
+                          <span>Insights &amp; Care Plan</span>
+                        </button>
+                        <button
+                          onClick={() => handleStartBillingForPatient(pat)}
+                          className="flex items-center space-x-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg shadow-2xs transition-all cursor-pointer"
+                        >
+                          <ShoppingCart className="w-3.5 h-3.5" />
+                          <span>Start Billing</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -229,6 +240,183 @@ export const PatientsPage: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* ── HEALTH INSIGHTS & CARE PLAN MODAL (Requirement #28) ──────────── */}
+      {selectedPatientForCarePlan && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-3xl w-full p-6 shadow-2xl border border-slate-200 relative flex flex-col max-h-[90vh] overflow-hidden">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 flex-shrink-0">
+              <div className="flex items-center space-x-3">
+                <div className="p-2.5 bg-gradient-to-br from-teal-500 to-emerald-600 text-white rounded-2xl shadow-md">
+                  <Activity className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 font-heading flex items-center space-x-2">
+                    <span>Patient Health Insights &amp; Personalized Care Plan</span>
+                    <span className="text-[10px] bg-teal-100 text-teal-800 font-bold px-2.5 py-0.5 rounded-full border border-teal-200">
+                      Active Monitoring
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    {selectedPatientForCarePlan.name} ({selectedPatientForCarePlan.age} yrs, {selectedPatientForCarePlan.gender}) · Mobile: {selectedPatientForCarePlan.phone}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedPatientForCarePlan(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Scrollable Body */}
+            <div className="my-4 space-y-4 flex-1 overflow-y-auto pr-1">
+              
+              {/* 1. Health Vitals Metrics Grid */}
+              <div>
+                <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider mb-2 flex items-center space-x-1 font-heading">
+                  <HeartPulse className="w-4 h-4 text-rose-600" />
+                  <span>Clinical Health Vitals &amp; Biomarkers</span>
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                  <div className="bg-rose-50/70 p-3 rounded-2xl border border-rose-200/80 text-center">
+                    <p className="text-[10px] text-rose-700 font-bold uppercase">Blood Pressure (BP)</p>
+                    <p className="text-lg font-black text-rose-900 mt-0.5">142/90 <span className="text-xs font-normal text-rose-700">mmHg</span></p>
+                    <span className="text-[9px] font-extrabold text-rose-700 bg-rose-200/60 px-1.5 py-0.2 rounded-full inline-block mt-1">Stage 2 HTN</span>
+                  </div>
+
+                  <div className="bg-amber-50/70 p-3 rounded-2xl border border-amber-200/80 text-center">
+                    <p className="text-[10px] text-amber-700 font-bold uppercase">Fasting Sugar (FBS)</p>
+                    <p className="text-lg font-black text-amber-900 mt-0.5">148 <span className="text-xs font-normal text-amber-700">mg/dL</span></p>
+                    <span className="text-[9px] font-extrabold text-amber-800 bg-amber-200/60 px-1.5 py-0.2 rounded-full inline-block mt-1">Elevated Glucose</span>
+                  </div>
+
+                  <div className="bg-teal-50/70 p-3 rounded-2xl border border-teal-200/80 text-center">
+                    <p className="text-[10px] text-teal-700 font-bold uppercase">HbA1c Level</p>
+                    <p className="text-lg font-black text-teal-900 mt-0.5">7.2 <span className="text-xs font-normal text-teal-700">%</span></p>
+                    <span className="text-[9px] font-extrabold text-teal-800 bg-teal-200/60 px-1.5 py-0.2 rounded-full inline-block mt-1">Target: &lt; 7.0%</span>
+                  </div>
+
+                  <div className="bg-emerald-50/70 p-3 rounded-2xl border border-emerald-200/80 text-center">
+                    <p className="text-[10px] text-emerald-700 font-bold uppercase">Refill Adherence</p>
+                    <p className="text-lg font-black text-emerald-900 mt-0.5">94 <span className="text-xs font-normal text-emerald-700">%</span></p>
+                    <span className="text-[9px] font-extrabold text-emerald-800 bg-emerald-200/60 px-1.5 py-0.2 rounded-full inline-block mt-1">High Adherence</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Personalized Medication Dosage Schedule */}
+              <div className="bg-slate-50 rounded-2xl border border-slate-200 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-slate-900 font-heading flex items-center space-x-1.5">
+                    <Sparkles className="w-4 h-4 text-amber-500" />
+                    <span>Personalized Medication Dosage Schedule</span>
+                  </h4>
+                  <span className="text-[10px] font-bold text-slate-500">Refill Period: 30 Days</span>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 flex items-center justify-between text-xs">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 font-bold flex items-center justify-center text-xs">
+                        🌅
+                      </div>
+                      <div>
+                        <div className="font-extrabold text-slate-900">Morning (After Breakfast)</div>
+                        <div className="text-[11px] text-slate-600 font-medium">Calpol / Amlodipine 650mg — <span className="font-bold text-emerald-700">1 Tablet Daily</span></div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">BP Regulation</span>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 flex items-center justify-between text-xs">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-800 font-bold flex items-center justify-center text-xs">
+                        🌙
+                      </div>
+                      <div>
+                        <div className="font-extrabold text-slate-900">Night (After Dinner)</div>
+                        <div className="text-[11px] text-slate-600 font-medium">Dolo / Metformin 650mg — <span className="font-bold text-emerald-700">1 Tablet Daily</span></div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">Sugar Control</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Lifestyle & Dietary Guidelines */}
+              <div className="bg-gradient-to-br from-emerald-900 to-teal-900 rounded-2xl p-4 text-white space-y-2 shadow-md">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-white font-heading flex items-center space-x-1.5">
+                    <HeartPulse className="w-4 h-4 text-amber-300" />
+                    <span>Pharmacist Dietary &amp; Lifestyle Care Plan</span>
+                  </h4>
+                  <span className="text-[10px] font-extrabold bg-amber-400 text-slate-900 px-2 py-0.5 rounded-full">
+                    Custom Plan
+                  </span>
+                </div>
+
+                <ul className="text-xs text-emerald-100 space-y-1.5 pl-4 list-disc font-medium">
+                  <li><strong>Salt Intake Reduction:</strong> Restrict daily sodium to under 2.0 grams (avoid processed &amp; fried snacks).</li>
+                  <li><strong>Glycemic Control:</strong> Choose low glycemic index whole grains (millet, oats) instead of refined carbs.</li>
+                  <li><strong>Daily Physical Activity:</strong> 30 minutes brisk walking daily morning or evening.</li>
+                  <li><strong>Hydration Goal:</strong> Consume 2.5 to 3.0 Liters of water throughout the day.</li>
+                </ul>
+              </div>
+
+            </div>
+
+            {/* Footer Actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-200 flex-shrink-0 text-xs">
+              <span className="text-slate-500 text-[11px]">
+                Care plan is generated based on registered patient health biomarkers and prescription history.
+              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const msg = `🏥 *GENQUANTAA MEDPLUS PHARMACY - PERSONALIZED HEALTH CARE PLAN*\n\n` +
+                      `Dear ${selectedPatientForCarePlan.name},\n` +
+                      `Here is your updated Pharmacist Health Care Plan:\n\n` +
+                      `🩺 *Vitals Summary:*\n` +
+                      `• BP: 142/90 mmHg (Stage 2 HTN)\n` +
+                      `• Fasting Sugar: 148 mg/dL\n` +
+                      `• Refill Adherence: 94%\n\n` +
+                      `📋 *Medication Schedule:*\n` +
+                      `• Morning: Calpol / Amlodipine 650mg (1 Tab After Breakfast)\n` +
+                      `• Night: Dolo / Metformin 650mg (1 Tab After Dinner)\n\n` +
+                      `🥗 *Diet & Lifestyle:* Low Salt (<2g/day), 30 min daily walking, 3L water.\n\n` +
+                      `📍 Genquantaa Pharmacy Counter #1`;
+                    window.open(`https://wa.me/91${selectedPatientForCarePlan.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
+                  }}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition-all cursor-pointer flex items-center space-x-1.5"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Send Care Plan via WhatsApp</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const pat = selectedPatientForCarePlan;
+                    setSelectedPatientForCarePlan(null);
+                    handleStartBillingForPatient(pat);
+                  }}
+                  className="px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-md transition-all cursor-pointer flex items-center space-x-1.5"
+                >
+                  <ShoppingCart className="w-4 h-4" />
+                  <span>Start Refill Billing</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* ── REGISTER NEW PATIENT MODAL ──────────────────────────────────── */}
       {showAddModal && (

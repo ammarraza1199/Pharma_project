@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { processReturnCreditNote, navigateTo } from '../store/posSlice';
-import type { ReturnItem, ReturnCreditNote } from '../types/pos';
+import { processReturnCreditNote, confirmRestockToShelf, navigateTo } from '../store/posSlice';
+import type { ReturnItem, ReturnCreditNote, ReturnPolicyType } from '../types/pos';
 import {
   RotateCcw, CheckCircle2, FileText,
-  ShoppingBag, Plus, Trash2
+  ShoppingBag, Plus, Trash2, ShieldAlert, Sparkles, PackageCheck, AlertCircle
 } from 'lucide-react';
 
 export const ReturnsPage: React.FC = () => {
@@ -22,6 +22,7 @@ export const ReturnsPage: React.FC = () => {
   const [selectedProdId, setSelectedProdId] = useState<string>(products[0]?._id || '');
   const [returnQty, setReturnQty] = useState<number>(1);
   const [returnReason, setReturnReason] = useState<'CUSTOMER_CANCELLED' | 'EXPIRED' | 'DAMAGED' | 'WRONG_MEDICINE'>('CUSTOMER_CANCELLED');
+  const [returnPolicy, setReturnPolicy] = useState<ReturnPolicyType>('LOW_PRICE_15');
   const [autoRestock, setAutoRestock] = useState<boolean>(true);
 
   const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
@@ -37,7 +38,14 @@ export const ReturnsPage: React.FC = () => {
     }
 
     const batch = selectedProduct.batches[0]?.batchNumber || 'BT-DEF';
-    const refundAmt = Number((selectedProduct.sellingPrice * returnQty).toFixed(2));
+    const grossPrice = selectedProduct.sellingPrice * returnQty;
+    
+    let deductionRate = 0;
+    if (returnPolicy === 'LOW_PRICE_15') deductionRate = 0.15;
+    if (returnPolicy === 'CLEARANCE_50') deductionRate = 0.50;
+
+    const deductionAmt = Number((grossPrice * deductionRate).toFixed(2));
+    const refundAmt = Number((grossPrice - deductionAmt).toFixed(2));
 
     const newItem: ReturnItem = {
       productId: selectedProduct._id,
@@ -45,9 +53,12 @@ export const ReturnsPage: React.FC = () => {
       batchNumber: batch,
       quantityReturned: returnQty,
       unitPrice: selectedProduct.sellingPrice,
+      policyApplied: returnPolicy,
+      deductionAmount: deductionAmt,
       refundAmount: refundAmt,
       reason: returnReason,
-      restocked: autoRestock
+      restocked: autoRestock,
+      shelfStatus: autoRestock ? 'PENDING_SHELF_CONFIRMATION' : 'MARKED_DAMAGED'
     };
 
     setReturnItems(prev => [...prev, newItem]);
@@ -186,6 +197,19 @@ export const ReturnsPage: React.FC = () => {
           </div>
 
           <div>
+            <label className="block text-slate-700 mb-1">Return / Refund Policy *</label>
+            <select
+              value={returnPolicy}
+              onChange={e => setReturnPolicy(e.target.value as ReturnPolicyType)}
+              className="w-full p-2 border border-slate-300 rounded-xl bg-white font-bold text-rose-700"
+            >
+              <option value="LOW_PRICE_15">15% Low-Price Return Policy (-15% Fee)</option>
+              <option value="FULL_100">100% Full Standard Refund (No Deduction)</option>
+              <option value="CLEARANCE_50">50% Clearance/Dump Return (-50% Fee)</option>
+            </select>
+          </div>
+
+          <div>
             <label className="block text-slate-700 mb-1">Reason for Return</label>
             <select
               value={returnReason}
@@ -200,14 +224,14 @@ export const ReturnsPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-slate-700 mb-1">Restock Item?</label>
+            <label className="block text-slate-700 mb-1">Add to Shelf Stock?</label>
             <select
               value={autoRestock ? 'YES' : 'NO'}
               onChange={e => setAutoRestock(e.target.value === 'YES')}
               className="w-full p-2 border border-slate-300 rounded-xl bg-white font-bold"
             >
-              <option value="YES">Yes (Add to Stock)</option>
-              <option value="NO">No (Mark Damaged)</option>
+              <option value="YES">Yes (Add to Pharmacist Shelf)</option>
+              <option value="NO">No (Mark Damaged / Disposed)</option>
             </select>
           </div>
 
@@ -233,15 +257,15 @@ export const ReturnsPage: React.FC = () => {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs" style={{ minWidth: '650px' }}>
+          <table className="w-full text-left border-collapse text-xs" style={{ minWidth: '700px' }}>
             <thead>
               <tr className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                 <th className="px-4 py-2.5">Medicine Name</th>
                 <th className="px-3 py-2.5 text-center">Batch No</th>
                 <th className="px-3 py-2.5 text-center">Returned Qty</th>
-                <th className="px-3 py-2.5 text-right">Unit Rate</th>
-                <th className="px-3 py-2.5 text-center">Reason</th>
-                <th className="px-3 py-2.5 text-center">Restocked</th>
+                <th className="px-3 py-2.5 text-right">Orig Price</th>
+                <th className="px-3 py-2.5 text-center">Policy Applied</th>
+                <th className="px-3 py-2.5 text-right">Fee Deduction</th>
                 <th className="px-4 py-2.5 text-right">Refund Line Total</th>
                 <th className="px-3 py-2.5 text-center"></th>
               </tr>
@@ -259,20 +283,21 @@ export const ReturnsPage: React.FC = () => {
                     <td className="px-4 py-2.5 font-bold text-slate-900">{item.productName}</td>
                     <td className="px-3 py-2.5 text-center font-mono text-slate-700">{item.batchNumber}</td>
                     <td className="px-3 py-2.5 text-center font-bold text-slate-900">{item.quantityReturned}</td>
-                    <td className="px-3 py-2.5 text-right font-semibold text-slate-800">₹{item.unitPrice.toFixed(2)}</td>
+                    <td className="px-3 py-2.5 text-right font-semibold text-slate-600">₹{(item.unitPrice * item.quantityReturned).toFixed(2)}</td>
                     <td className="px-3 py-2.5 text-center">
-                      <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">
-                        {item.reason.replace(/_/g, ' ')}
+                      <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                        item.policyApplied === 'LOW_PRICE_15' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                        item.policyApplied === 'CLEARANCE_50' ? 'bg-rose-100 text-rose-800 border border-rose-200' :
+                        'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                      }`}>
+                        {item.policyApplied === 'LOW_PRICE_15' ? '15% Low Price Return' :
+                         item.policyApplied === 'CLEARANCE_50' ? '50% Clearance Fee' : '100% Full Refund'}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 text-center">
-                      {item.restocked ? (
-                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">Yes (+Stock)</span>
-                      ) : (
-                        <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full">No (Disposed)</span>
-                      )}
+                    <td className="px-3 py-2.5 text-right font-bold text-rose-600">
+                      -₹{(item.deductionAmount || 0).toFixed(2)}
                     </td>
-                    <td className="px-4 py-2.5 text-right font-extrabold text-rose-700">₹{item.refundAmount.toFixed(2)}</td>
+                    <td className="px-4 py-2.5 text-right font-extrabold text-emerald-700">₹{item.refundAmount.toFixed(2)}</td>
                     <td className="px-3 py-2.5 text-center">
                       <button onClick={() => handleRemoveReturnItem(idx)} className="text-slate-400 hover:text-rose-600 p-1">
                         <Trash2 className="w-3.5 h-3.5" />
@@ -288,7 +313,7 @@ export const ReturnsPage: React.FC = () => {
         {/* Action Button */}
         <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
           <span className="text-xs text-slate-500">
-            Issuing credit note records refund transaction and updates inventory stock instantly.
+            Issuing credit note applies policy deductions and sends item to Pharmacist Shelf Restock Queue.
           </span>
           <button
             onClick={handleProcessReturn}
@@ -323,6 +348,73 @@ export const ReturnsPage: React.FC = () => {
           </button>
         </div>
       )}
+
+      {/* ── PHARMACIST RETURNED MEDICINE SHELF RESTOCK QUEUE (Requirement #23) ── */}
+      <div className="bg-gradient-to-br from-slate-900 to-teal-950 rounded-2xl border border-teal-800 p-4 shadow-lg text-white space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <div className="p-2 bg-emerald-500/20 text-emerald-300 rounded-xl border border-emerald-400/30">
+              <PackageCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-white tracking-tight">
+                Pharmacist Returned Medicine Shelf Queue (Stock Re-entry)
+              </h3>
+              <p className="text-xs text-emerald-200/80">
+                Confirm returned items to restock them back onto physical store shelf stock.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          {returnNotes.flatMap(note =>
+            note.items.map((item, itemIdx) => ({ note, item, itemIdx }))
+          ).filter(({ item }) => item.restocked || item.shelfStatus === 'PENDING_SHELF_CONFIRMATION').length === 0 ? (
+            <div className="p-6 text-center text-xs text-slate-400 bg-white/5 rounded-xl border border-white/10">
+              No returned medicines pending shelf restock confirmation.
+            </div>
+          ) : (
+            returnNotes.flatMap(note =>
+              note.items.map((item, itemIdx) => ({ note, item, itemIdx }))
+            ).filter(({ item }) => item.restocked || item.shelfStatus === 'PENDING_SHELF_CONFIRMATION').map(({ note, item, itemIdx }) => (
+              <div
+                key={`${note.creditNoteNo}-${itemIdx}`}
+                className="bg-white/10 border border-white/15 rounded-xl p-3 flex flex-col md:flex-row md:items-center justify-between gap-3"
+              >
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-extrabold text-sm text-white">{item.productName}</span>
+                    <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-md border border-emerald-400/30">
+                      Batch: {item.batchNumber}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    Qty: <strong className="text-amber-300">{item.quantityReturned} units</strong> · Credit Note: <span className="font-mono text-slate-300">{note.creditNoteNo}</span> · Patient: {note.patientName}
+                  </p>
+                </div>
+
+                <div>
+                  {item.shelfStatus === 'RESTOCKED_TO_SHELF' ? (
+                    <span className="inline-flex items-center space-x-1 text-xs font-bold text-emerald-400 bg-emerald-500/20 px-3 py-1.5 rounded-xl border border-emerald-400/30">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      <span>Restocked to Shelf</span>
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => dispatch(confirmRestockToShelf({ creditNoteNo: note.creditNoteNo, itemIndex: itemIdx }))}
+                      className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition-all flex items-center space-x-1.5 cursor-pointer"
+                    >
+                      <PackageCheck className="w-4 h-4" />
+                      <span>Confirm &amp; Add to Shelf Stock (+{item.quantityReturned})</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
 
       {/* ── RECENT CREDIT NOTES LOG TABLE ───────────────────────────── */}
       {returnNotes.length > 0 && (

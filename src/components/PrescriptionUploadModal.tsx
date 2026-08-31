@@ -187,6 +187,12 @@ export const PrescriptionUploadModal: React.FC = () => {
     });
   };
 
+  const handlePopulateAndClose = () => {
+    handleAttachSampleRx(activeSample);
+    handleAddAllRecognizedToCart();
+    dispatch(setPrescriptionUploadModalOpen(false));
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -416,17 +422,23 @@ export const PrescriptionUploadModal: React.FC = () => {
         </div>
 
         {/* Modal Footer */}
-        <div className="flex justify-between items-center pt-3 border-t border-slate-200 flex-shrink-0 text-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-200 flex-shrink-0 text-xs">
           <span className="text-slate-500 text-[11px]">
             Prescription is automatically attached to invoice and Schedule H register.
           </span>
-          <div className="flex space-x-2">
+          <div className="flex items-center space-x-2">
             <button
               onClick={() => dispatch(setPrescriptionUploadModalOpen(false))}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs cursor-pointer transition-all active:scale-95 flex items-center space-x-1.5"
+              className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Done &amp; Continue Billing</span>
+              Cancel
+            </button>
+            <button
+              onClick={handlePopulateAndClose}
+              className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold rounded-xl shadow-md cursor-pointer transition-all active:scale-95 flex items-center space-x-1.5"
+            >
+              <Sparkles className="w-4 h-4 text-amber-300" />
+              <span>⚡ Add Prescribed Items Directly to Billing</span>
             </button>
           </div>
         </div>

@@ -12,18 +12,19 @@ import {
 } from 'lucide-react';
 
 // ── Filter & Sort Types ──────────────────────────────────────────────────────
-type FilterTab = 'ALL' | 'REGULAR' | 'SCHEDULE_H' | 'SCHEDULE_H1' | 'SCHEDULE_X' | 'LOW_STOCK' | 'NEAR_EXPIRY' | 'OUT_OF_STOCK';
+type FilterTab = 'ALL' | 'PREVIOUSLY_ORDERED' | 'REGULAR' | 'SCHEDULE_H' | 'SCHEDULE_H1' | 'SCHEDULE_X' | 'LOW_STOCK' | 'NEAR_EXPIRY' | 'OUT_OF_STOCK';
 type SortKey   = 'name' | 'price_asc' | 'price_desc' | 'stock' | 'margin';
 
 const FILTER_TABS: { key: FilterTab; label: string; color: string }[] = [
-  { key: 'ALL',          label: 'All',         color: 'text-slate-700 bg-slate-100 border-slate-300'    },
-  { key: 'REGULAR',      label: 'Regular',      color: 'text-emerald-700 bg-emerald-50 border-emerald-300' },
-  { key: 'SCHEDULE_H',   label: 'Sch-H',        color: 'text-amber-700 bg-amber-50 border-amber-300'    },
-  { key: 'SCHEDULE_H1',  label: 'Sch-H1',       color: 'text-orange-700 bg-orange-50 border-orange-300' },
-  { key: 'SCHEDULE_X',   label: 'Sch-X',        color: 'text-rose-700 bg-rose-50 border-rose-300'       },
-  { key: 'LOW_STOCK',    label: 'Low Stock',    color: 'text-yellow-700 bg-yellow-50 border-yellow-300' },
-  { key: 'NEAR_EXPIRY',  label: 'Near Expiry',  color: 'text-amber-900 bg-amber-100 border-amber-400 font-extrabold' },
-  { key: 'OUT_OF_STOCK', label: 'Out of Stock', color: 'text-red-700 bg-red-50 border-red-300'          },
+  { key: 'ALL',                label: 'All',                color: 'text-slate-700 bg-slate-100 border-slate-300'    },
+  { key: 'PREVIOUSLY_ORDERED', label: '🕒 Previously Ordered', color: 'text-purple-700 bg-purple-50 border-purple-300 font-bold' },
+  { key: 'REGULAR',            label: 'Regular',            color: 'text-emerald-700 bg-emerald-50 border-emerald-300' },
+  { key: 'SCHEDULE_H',         label: 'Sch-H',              color: 'text-amber-700 bg-amber-50 border-amber-300'    },
+  { key: 'SCHEDULE_H1',        label: 'Sch-H1',             color: 'text-orange-700 bg-orange-50 border-orange-300' },
+  { key: 'SCHEDULE_X',         label: 'Sch-X',              color: 'text-rose-700 bg-rose-50 border-rose-300'       },
+  { key: 'LOW_STOCK',          label: 'Low Stock',          color: 'text-yellow-700 bg-yellow-50 border-yellow-300' },
+  { key: 'NEAR_EXPIRY',        label: 'Near Expiry',        color: 'text-amber-900 bg-amber-100 border-amber-400 font-extrabold' },
+  { key: 'OUT_OF_STOCK',       label: 'Out of Stock',       color: 'text-red-700 bg-red-50 border-red-300'          },
 ];
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
@@ -45,6 +46,8 @@ const SCHEDULE_BADGE: Record<ScheduleCategory, { label: string; cls: string } | 
 export const ProductSearch: React.FC = () => {
   const dispatch    = useDispatch();
   const products    = useSelector((state: RootState) => state.pos.products);
+  const invoices    = useSelector((state: RootState) => state.pos.invoices || []);
+  const patients    = useSelector((state: RootState) => state.pos.patients || []);
 
   const [searchTerm,       setSearchTerm]       = useState<string>('');
   const [activeFilter,     setActiveFilter]     = useState<FilterTab>('ALL');
@@ -57,6 +60,30 @@ export const ProductSearch: React.FC = () => {
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const sortMenuRef    = useRef<HTMLDivElement>(null);
+
+  // Set of product IDs that have been previously ordered or prescribed
+  const previouslyOrderedProdIds = React.useMemo(() => {
+    const ids = new Set<string>();
+    // Add items from past finalized invoices
+    invoices.forEach(inv => {
+      inv.billingSession?.items?.forEach(item => {
+        if (item.productId) ids.add(item.productId);
+      });
+    });
+    // Add items from patient chronic medication histories
+    patients.forEach(pat => {
+      pat.chronicMedications?.forEach(med => {
+        if (med.productId) ids.add(med.productId);
+      });
+    });
+    // Always include top 3 mock items if invoices empty
+    if (ids.size === 0 && products.length > 0) {
+      ids.add(products[0]._id);
+      if (products[1]) ids.add(products[1]._id);
+      if (products[2]) ids.add(products[2]._id);
+    }
+    return ids;
+  }, [invoices, patients, products]);
 
   // Auto-focus & keyboard shortcuts
   useEffect(() => {
@@ -97,8 +124,9 @@ export const ProductSearch: React.FC = () => {
       if (!textMatch) return false;
     }
     // Category filter
-    if (activeFilter === 'LOW_STOCK')    return p.stockStatus === 'LOW_STOCK' || (p.totalStock > 0 && p.totalStock <= 20);
-    if (activeFilter === 'OUT_OF_STOCK') return p.stockStatus === 'OUT_OF_STOCK' || p.totalStock === 0;
+    if (activeFilter === 'PREVIOUSLY_ORDERED') return previouslyOrderedProdIds.has(p._id);
+    if (activeFilter === 'LOW_STOCK')          return p.stockStatus === 'LOW_STOCK' || (p.totalStock > 0 && p.totalStock <= 20);
+    if (activeFilter === 'OUT_OF_STOCK')       return p.stockStatus === 'OUT_OF_STOCK' || p.totalStock === 0;
     if (activeFilter === 'NEAR_EXPIRY') {
       const thirtyDays = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
       return p.batches.some(b => {
@@ -106,7 +134,7 @@ export const ProductSearch: React.FC = () => {
         return exp < thirtyDays && exp > new Date();
       });
     }
-    if (activeFilter !== 'ALL')          return p.scheduleCategory === (activeFilter as ScheduleCategory);
+    if (activeFilter !== 'ALL')                return p.scheduleCategory === (activeFilter as ScheduleCategory);
     return true;
   });
 
@@ -341,6 +369,13 @@ export const ProductSearch: React.FC = () => {
                       <h3 className="text-xs font-bold text-slate-900 group-hover:text-emerald-800 transition-colors font-heading truncate">
                         {product.name}
                       </h3>
+
+                      {/* Previously Ordered badge */}
+                      {previouslyOrderedProdIds.has(product._id) && (
+                        <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-300">
+                          🕒 Previously Ordered
+                        </span>
+                      )}
 
                       {/* Stock badge */}
                       {isOut ? (

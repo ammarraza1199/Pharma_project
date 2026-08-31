@@ -16,20 +16,23 @@ import {
   Send, History, Landmark, QrCode
 } from 'lucide-react';
 
-type PageTab = 'DIRECTORY' | 'BILLS_LEDGER' | 'PAYMENT_LOGS';
+type PageTab = 'PROCUREMENT_INTELLIGENCE' | 'DIRECTORY' | 'BILLS_LEDGER' | 'PAYMENT_LOGS';
 type FilterCategory = 'ALL' | 'RECOMMENDED' | 'HIGH_MARGIN' | 'HIGH_REBATE' | 'FAST_DELIVERY' | 'ZERO_DUES';
 type BillFilter = 'ALL' | 'CREDIT_PENDING' | 'CASH_PAID' | 'DUE_SOON' | 'OVERDUE';
 type SortOption = 'margin_desc' | 'discount_desc' | 'rebate_desc' | 'speed_asc' | 'score_desc' | 'dues_desc';
+type SchemeCategoryFilter = 'ALL' | 'BUY_X_GET_Y' | 'COMBO_OFFER' | 'SUBSTITUTE_SAVER' | 'HIGH_MARGIN';
 
 export const SuppliersPage: React.FC = () => {
   const dispatch = useDispatch();
   const suppliers = useSelector((state: RootState) => state.pos.suppliers);
   const supplierBills = useSelector((state: RootState) => state.pos.supplierBills || []);
   const supplierPaymentLogs = useSelector((state: RootState) => state.pos.supplierPaymentLogs || []);
+  const distributorSchemes = useSelector((state: RootState) => state.pos.distributorSchemes || []);
 
-  const [activePageTab, setActivePageTab] = useState<PageTab>('DIRECTORY');
+  const [activePageTab, setActivePageTab] = useState<PageTab>('PROCUREMENT_INTELLIGENCE');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [filterCategory, setFilterCategory] = useState<FilterCategory>('ALL');
+  const [schemeCategoryFilter, setSchemeCategoryFilter] = useState<SchemeCategoryFilter>('ALL');
   const [billFilter, setBillFilter] = useState<BillFilter>('ALL');
   const [sortOption, setSortOption] = useState<SortOption>('margin_desc');
 
@@ -188,6 +191,26 @@ export const SuppliersPage: React.FC = () => {
       return true;
     });
   }, [supplierPaymentLogs, searchTerm]);
+
+  // Filtered Distributor Schemes for Procurement Intelligence
+  const processedSchemes = useMemo(() => {
+    return distributorSchemes.filter(s => {
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase();
+        const matches = s.title.toLowerCase().includes(q) ||
+          s.primaryProduct.toLowerCase().includes(q) ||
+          s.saltComposition.toLowerCase().includes(q) ||
+          s.supplierName.toLowerCase().includes(q) ||
+          (s.substituteOption?.brandName || '').toLowerCase().includes(q);
+        if (!matches) return false;
+      }
+      if (schemeCategoryFilter === 'BUY_X_GET_Y') return s.dealType === 'BUY_X_GET_Y';
+      if (schemeCategoryFilter === 'COMBO_OFFER') return s.dealType === 'COMBO_OFFER';
+      if (schemeCategoryFilter === 'SUBSTITUTE_SAVER') return s.dealType === 'SUBSTITUTE_COST_SAVER' || !!s.substituteOption;
+      if (schemeCategoryFilter === 'HIGH_MARGIN') return s.effectiveMarginPercent >= 30;
+      return true;
+    });
+  }, [distributorSchemes, searchTerm, schemeCategoryFilter]);
 
   // Handlers
   const handleOpenPaymentForSupplier = (sup: SupplierRecord) => {
@@ -433,44 +456,286 @@ export const SuppliersPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ── THREE MAIN PAGE TABS ────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-1.5 shadow-xs flex items-center space-x-1.5">
+      {/* ── FOUR MAIN PAGE TABS ────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-1.5 shadow-xs flex items-center space-x-1.5 overflow-x-auto">
+        <button
+          onClick={() => setActivePageTab('PROCUREMENT_INTELLIGENCE')}
+          className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center space-x-2 transition-all cursor-pointer whitespace-nowrap ${
+            activePageTab === 'PROCUREMENT_INTELLIGENCE'
+              ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+          <span>Procurement Intelligence ({distributorSchemes.length} Deals)</span>
+        </button>
+
         <button
           onClick={() => setActivePageTab('DIRECTORY')}
-          className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center space-x-2 transition-all cursor-pointer ${
+          className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center space-x-2 transition-all cursor-pointer whitespace-nowrap ${
             activePageTab === 'DIRECTORY'
               ? 'bg-emerald-600 text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
           <Building className="w-4 h-4" />
-          <span>Suppliers &amp; Commercial Margins ({suppliers.length})</span>
+          <span>Suppliers &amp; Margins ({suppliers.length})</span>
         </button>
 
         <button
           onClick={() => setActivePageTab('BILLS_LEDGER')}
-          className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center space-x-2 transition-all cursor-pointer ${
+          className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center space-x-2 transition-all cursor-pointer whitespace-nowrap ${
             activePageTab === 'BILLS_LEDGER'
               ? 'bg-emerald-600 text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
           <Receipt className="w-4 h-4" />
-          <span>Cash &amp; Credit Invoices Ledger ({supplierBills.length})</span>
+          <span>Invoices Ledger ({supplierBills.length})</span>
         </button>
 
         <button
           onClick={() => setActivePageTab('PAYMENT_LOGS')}
-          className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center space-x-2 transition-all cursor-pointer ${
+          className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center space-x-2 transition-all cursor-pointer whitespace-nowrap ${
             activePageTab === 'PAYMENT_LOGS'
               ? 'bg-emerald-600 text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
           <History className="w-4 h-4" />
-          <span>Payment Settlement Logs ({supplierPaymentLogs.length})</span>
+          <span>Payment Logs ({supplierPaymentLogs.length})</span>
         </button>
       </div>
+
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {/* TAB 0: PROCUREMENT INTELLIGENCE & DISTRIBUTOR SCHEMES              */}
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {activePageTab === 'PROCUREMENT_INTELLIGENCE' && (
+        <div className="space-y-5">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-br from-emerald-900 via-teal-900 to-slate-900 rounded-3xl p-5 text-white shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+              <div>
+                <div className="inline-flex items-center space-x-2 bg-emerald-500/20 border border-emerald-400/30 px-3 py-1 rounded-full text-emerald-300 text-xs font-bold mb-2">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Procurement Intelligence Engine</span>
+                </div>
+                <h2 className="text-xl md:text-2xl font-black text-white tracking-tight">
+                  Distributor Schemes, Combo Deals &amp; Wholesale Substitutes
+                </h2>
+                <p className="text-xs text-emerald-200/80 mt-1 max-w-2xl">
+                  Compare live distributor discount schemes (10+2 Free, Combo packs) and wholesale generic substitute picks with high margins to lower purchasing costs.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 border border-white/15 text-center min-w-[110px]">
+                  <p className="text-[10px] uppercase tracking-wider text-emerald-200 font-bold">Active Deals</p>
+                  <p className="text-xl font-black text-white">{distributorSchemes.length}</p>
+                </div>
+                <div className="bg-emerald-500/20 backdrop-blur-md rounded-2xl p-3 border border-emerald-400/30 text-center min-w-[110px]">
+                  <p className="text-[10px] uppercase tracking-wider text-amber-300 font-bold">Max Margin</p>
+                  <p className="text-xl font-black text-amber-300">69.2%</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Search & Filter Bar */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+              <input
+                type="text"
+                placeholder="Search by medicine, salt composition, distributor, or generic substitute..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white"
+              />
+            </div>
+
+            {/* Scheme Category Pills */}
+            <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 md:pb-0">
+              <button
+                onClick={() => setSchemeCategoryFilter('ALL')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  schemeCategoryFilter === 'ALL'
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                All Schemes ({distributorSchemes.length})
+              </button>
+              <button
+                onClick={() => setSchemeCategoryFilter('BUY_X_GET_Y')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  schemeCategoryFilter === 'BUY_X_GET_Y'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                🎁 10+2 Free Schemes
+              </button>
+              <button
+                onClick={() => setSchemeCategoryFilter('COMBO_OFFER')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  schemeCategoryFilter === 'COMBO_OFFER'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                📦 Combo Deals
+              </button>
+              <button
+                onClick={() => setSchemeCategoryFilter('SUBSTITUTE_SAVER')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  schemeCategoryFilter === 'SUBSTITUTE_SAVER'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                🔄 Substitute Pick
+              </button>
+              <button
+                onClick={() => setSchemeCategoryFilter('HIGH_MARGIN')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  schemeCategoryFilter === 'HIGH_MARGIN'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                🔥 High Margin (&gt;30%)
+              </button>
+            </div>
+          </div>
+
+          {/* Schemes Cards Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {processedSchemes.map((scheme) => (
+              <div
+                key={scheme.schemeId}
+                className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
+              >
+                <div>
+                  {/* Card Header: Supplier & Badge */}
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="flex items-center space-x-2">
+                      <div className="p-2 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100">
+                        <Building className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-800">{scheme.supplierName}</h4>
+                        <p className="text-[10px] text-slate-500 flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-slate-400" />
+                          <span>Valid till: {scheme.validTill}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-extrabold rounded-full border border-emerald-200 tracking-wide">
+                      {scheme.badgeTag}
+                    </span>
+                  </div>
+
+                  {/* Title & Salt */}
+                  <div className="mb-4 bg-slate-50 rounded-xl p-3 border border-slate-100">
+                    <h3 className="text-sm font-extrabold text-slate-900">{scheme.title}</h3>
+                    <p className="text-xs text-slate-600 font-medium mt-0.5">
+                      Salt Composition: <span className="font-semibold text-slate-800">{scheme.saltComposition}</span>
+                    </p>
+                  </div>
+
+                  {/* Deal Details & Combos */}
+                  <div className="grid grid-cols-3 gap-2 mb-4 text-center">
+                    <div className="bg-emerald-50/60 p-2.5 rounded-xl border border-emerald-100">
+                      <p className="text-[10px] text-slate-500 font-bold uppercase">Buy Qty</p>
+                      <p className="text-sm font-black text-emerald-800">{scheme.buyQuantity} Boxes</p>
+                    </div>
+                    <div className="bg-amber-50/60 p-2.5 rounded-xl border border-amber-100">
+                      <p className="text-[10px] text-amber-700 font-bold uppercase">Free Bonus</p>
+                      <p className="text-sm font-black text-amber-800">+{scheme.freeQuantity} Free</p>
+                    </div>
+                    <div className="bg-teal-50/60 p-2.5 rounded-xl border border-teal-100">
+                      <p className="text-[10px] text-teal-700 font-bold uppercase">Trade Margin</p>
+                      <p className="text-sm font-black text-teal-800">{scheme.effectiveMarginPercent}%</p>
+                    </div>
+                  </div>
+
+                  {/* Combo Items if present */}
+                  {scheme.comboItems && scheme.comboItems.length > 0 && (
+                    <div className="mb-4 bg-amber-50/40 rounded-xl p-3 border border-amber-200/60">
+                      <p className="text-[11px] font-bold text-amber-900 mb-1 flex items-center gap-1">
+                        <Zap className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Included Combo Bundles:</span>
+                      </p>
+                      <ul className="text-xs text-amber-900/80 space-y-0.5 pl-4 list-disc font-medium">
+                        {scheme.comboItems.map((item, idx) => (
+                          <li key={idx}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Wholesale Substitute Pick Feature (Requirement #20 / #21) */}
+                  {scheme.substituteOption && (
+                    <div className="mb-4 bg-gradient-to-r from-teal-50 to-emerald-50 rounded-xl p-3 border border-teal-200/80">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[11px] font-black text-teal-900 flex items-center gap-1">
+                          <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+                          Wholesale Generic Substitute Pick
+                        </span>
+                        <span className="text-[10px] font-extrabold px-2 py-0.5 bg-teal-600 text-white rounded-full">
+                          {scheme.substituteOption.marginPercent}% MARGIN
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-slate-800">
+                        <div>
+                          <p className="font-bold text-slate-900">{scheme.substituteOption.brandName}</p>
+                          <p className="text-[10px] text-slate-500">By {scheme.substituteOption.manufacturer}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] text-slate-500 line-through">MRP: ₹{scheme.substituteOption.mrp}</p>
+                          <p className="font-black text-emerald-700">Rate: ₹{scheme.substituteOption.purchaseRate}/strip</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer Action: Order in Advance to Selected Distributor */}
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
+                  <div className="text-[11px] text-slate-500">
+                    <span>Min Order: </span>
+                    <span className="font-bold text-slate-700">₹{scheme.minOrderValue || 2000}</span>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setSuccessToast(`Advance Purchase Order initiated with ${scheme.supplierName} for ${scheme.title}!`);
+                      setTimeout(() => {
+                        dispatch(navigateTo('PURCHASE_GRN'));
+                      }, 1200);
+                    }}
+                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center space-x-1.5 cursor-pointer"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Place Advance PO ({scheme.supplierName.split(' ')[0]})</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {processedSchemes.length === 0 && (
+            <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-500">
+              <Sparkles className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p className="text-sm font-bold">No distributor deals match your search criteria.</p>
+              <p className="text-xs text-slate-400 mt-1">Try searching for other brand names or clearing category filters.</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ─────────────────────────────────────────────────────────────────── */}
       {/* TAB 1: SUPPLIERS & COMMERCIAL MARGINS DIRECTORY                     */}

@@ -24,7 +24,8 @@ import type {
   SellingUnitMode,
   DeliveryOrder,
   SupplierBill,
-  SupplierPaymentLog
+  SupplierPaymentLog,
+  DistributorScheme
 } from '../types/pos';
 import { MOCK_PRODUCTS } from '../mock/products';
 import { calculateItemGST } from '../utils/gstCalculator';
@@ -51,6 +52,7 @@ interface PosState {
   suppliers: SupplierRecord[];
   supplierBills: SupplierBill[];
   supplierPaymentLogs: SupplierPaymentLog[];
+  distributorSchemes: DistributorScheme[];
   pharmacists: PharmacistCounter[];
   activePharmacistId: string;
   sessions: BillingSession[];
@@ -611,6 +613,109 @@ const initialState: PosState = {
       notes: 'Spot delivery cash bill settlement'
     }
   ],
+  distributorSchemes: [
+    {
+      schemeId: 'sch-101',
+      supplierId: 'sup-002',
+      supplierName: 'Sun Pharma Wholesale Depot',
+      title: 'Pantocid 40mg Strip Scheme (10 + 2 Free)',
+      dealType: 'BUY_X_GET_Y',
+      primaryProduct: 'Pantocid 40mg Tablet',
+      saltComposition: 'Pantoprazole Sodium 40mg',
+      buyQuantity: 10,
+      freeQuantity: 2,
+      discountPercent: 25.0,
+      effectiveMarginPercent: 32.5,
+      validTill: '2026-09-15',
+      minOrderValue: 2500,
+      badgeTag: '10+2 FREE BOX SCHEME',
+      substituteOption: {
+        brandName: 'Panto-D Fast 40mg (Generic Pick)',
+        saltComposition: 'Pantoprazole Sodium 40mg',
+        manufacturer: 'Generic Remedies Lab',
+        mrp: 140,
+        purchaseRate: 45,
+        marginPercent: 67.8,
+        availability: 'IN_STOCK'
+      }
+    },
+    {
+      schemeId: 'sch-102',
+      supplierId: 'sup-003',
+      supplierName: 'Cipla Regional Depot',
+      title: 'Foracort Inhaler 200 Wholesale Combo Deal',
+      dealType: 'COMBO_OFFER',
+      primaryProduct: 'Foracort 200 Inhaler',
+      saltComposition: 'Formoterol Fumarate + Budesonide',
+      buyQuantity: 5,
+      freeQuantity: 1,
+      discountPercent: 28.0,
+      effectiveMarginPercent: 34.0,
+      comboItems: ['Foracort 200 Inhaler (5 Units)', 'Budecort 100 Respules (2 Boxes Free)'],
+      validTill: '2026-09-10',
+      minOrderValue: 5000,
+      badgeTag: 'INHALER COMBO PACK',
+      substituteOption: {
+        brandName: 'Budair-F 200 Inhaler (Substitute)',
+        saltComposition: 'Formoterol Fumarate + Budesonide',
+        manufacturer: 'PulmoCare Labs',
+        mrp: 580,
+        purchaseRate: 260,
+        marginPercent: 55.1,
+        availability: 'IN_STOCK'
+      }
+    },
+    {
+      schemeId: 'sch-103',
+      supplierId: 'sup-001',
+      supplierName: 'MedLife Distributors Pvt Ltd',
+      title: 'Montek-LC Super Rebate (Flat 30% Off)',
+      dealType: 'HIGH_MARGIN_SCHEME',
+      primaryProduct: 'Montek-LC Tablet',
+      saltComposition: 'Montelukast 10mg + Levocetirizine 5mg',
+      buyQuantity: 20,
+      freeQuantity: 3,
+      discountPercent: 30.0,
+      effectiveMarginPercent: 36.8,
+      validTill: '2026-09-20',
+      minOrderValue: 3500,
+      badgeTag: '30% REBATE + 3 FREE',
+      substituteOption: {
+        brandName: 'Montair-L Generic (Substitute)',
+        saltComposition: 'Montelukast 10mg + Levocetirizine 5mg',
+        manufacturer: 'PharmaValue Ltd',
+        mrp: 195,
+        purchaseRate: 60,
+        marginPercent: 69.2,
+        availability: 'IN_STOCK'
+      }
+    },
+    {
+      schemeId: 'sch-104',
+      supplierId: 'sup-004',
+      supplierName: "Dr. Reddy's Direct Supply Logistics",
+      title: 'Omez 20mg Bulk Box Deal',
+      dealType: 'SUBSTITUTE_COST_SAVER',
+      primaryProduct: 'Omez 20mg Capsule',
+      saltComposition: 'Omeprazole 20mg',
+      buyQuantity: 15,
+      freeQuantity: 3,
+      discountPercent: 26.0,
+      effectiveMarginPercent: 31.0,
+      validTill: '2026-09-18',
+      minOrderValue: 3000,
+      badgeTag: 'WHOLESALE COST SAVER',
+      substituteOption: {
+        brandName: 'Omecip 20mg (Cipla Generic Pick)',
+        saltComposition: 'Omeprazole 20mg',
+        manufacturer: 'Cipla Ltd',
+        mrp: 65,
+        purchaseRate: 22,
+        marginPercent: 66.1,
+        availability: 'IN_STOCK'
+      }
+    }
+  ],
   pharmacists: DEFAULT_PHARMACISTS,
   activePharmacistId: 'pharm-1',
   sessions: [initialSession],
@@ -847,22 +952,33 @@ export const posSlice = createSlice({
 
     processReturnCreditNote: (state, action: PayloadAction<ReturnCreditNote>) => {
       const note = action.payload;
+      // Set initial shelf status
+      note.items = note.items.map(item => ({
+        ...item,
+        shelfStatus: item.restocked ? 'PENDING_SHELF_CONFIRMATION' : 'MARKED_DAMAGED'
+      }));
       state.returnNotes.unshift(note);
+    },
 
-      // Re-stock valid items
-      note.items.forEach(retItem => {
-        if (retItem.restocked) {
-          const prod = state.products.find(p => p._id === retItem.productId);
-          if (prod) {
-            const batch = prod.batches.find(b => b.batchNumber === retItem.batchNumber) || prod.batches[0];
-            if (batch) {
-              batch.stockQuantity += retItem.quantityReturned;
-              prod.totalStock = prod.batches.reduce((sum, b) => sum + b.stockQuantity, 0);
-              prod.stockStatus = prod.totalStock > 20 ? 'IN_STOCK' : prod.totalStock > 0 ? 'LOW_STOCK' : 'OUT_OF_STOCK';
-            }
+    confirmRestockToShelf: (state, action: PayloadAction<{ creditNoteNo: string; itemIndex: number }>) => {
+      const { creditNoteNo, itemIndex } = action.payload;
+      const note = state.returnNotes.find(n => n.creditNoteNo === creditNoteNo);
+      if (note && note.items[itemIndex]) {
+        const item = note.items[itemIndex];
+        item.shelfStatus = 'RESTOCKED_TO_SHELF';
+        item.restocked = true;
+
+        // Increase product stock
+        const prod = state.products.find(p => p._id === item.productId);
+        if (prod) {
+          const batch = prod.batches.find(b => b.batchNumber === item.batchNumber) || prod.batches[0];
+          if (batch) {
+            batch.stockQuantity += item.quantityReturned;
+            prod.totalStock = prod.batches.reduce((sum, b) => sum + b.stockQuantity, 0);
+            prod.stockStatus = prod.totalStock > 20 ? 'IN_STOCK' : prod.totalStock > 0 ? 'LOW_STOCK' : 'OUT_OF_STOCK';
           }
         }
-      });
+      }
     },
 
     markStockDisposed: (state, action: PayloadAction<DisposalRecord>) => {
@@ -1832,6 +1948,7 @@ export const {
   updateProduct,
   submitGRNEntry,
   processReturnCreditNote,
+  confirmRestockToShelf,
   markStockDisposed,
   addPatient,
   addSupplier,

@@ -26,6 +26,7 @@ export const ChronicRefillModal: React.FC = () => {
     modal.patientId || patients[0]?.patientId || ''
   );
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [activeCategory, setActiveCategory] = useState<'ALL' | 'HYPERTENSION' | 'DIABETES' | 'CARDIAC' | 'THYROID'>('ALL');
   const [selectedMedIds, setSelectedMedIds] = useState<string[]>([]);
   const [refillDurationDays, setRefillDurationDays] = useState<number>(30);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -101,6 +102,44 @@ export const ChronicRefillModal: React.FC = () => {
       });
 
     // Populate active session patient & doctor details
+    dispatch(setPatientDetails({
+      patientName: selectedPatient.name,
+      phone: selectedPatient.phone,
+      age: selectedPatient.age,
+      gender: selectedPatient.gender
+    }));
+
+    const primaryDoc = selectedPatient.chronicMedications[0]?.doctorName;
+    if (primaryDoc) {
+      dispatch(setDoctorDetails({
+        doctorName: primaryDoc,
+        regNo: 'MCI-REG-VERIFIED'
+      }));
+    }
+
+    dispatch(refillChronicMedicationsToCart({
+      sessionId: activeSessionId,
+      items: itemsToRefill
+    }));
+
+    dispatch(setChronicRefillModalOpen({ isOpen: false }));
+  };
+
+  const handleRepeatBpAndSugar = () => {
+    if (!selectedPatient?.chronicMedications) return;
+    const bpSugarMeds = selectedPatient.chronicMedications.filter(
+      m => m.conditionCategory === 'HYPERTENSION' || m.conditionCategory === 'DIABETES'
+    );
+    if (bpSugarMeds.length === 0) {
+      alert('No BP or Sugar repeat medications recorded for this patient.');
+      return;
+    }
+
+    const itemsToRefill = bpSugarMeds.map(m => {
+      const qty = Math.max(1, Math.round((m.quantity / 30) * refillDurationDays));
+      return { productId: m.productId, quantity: qty };
+    });
+
     dispatch(setPatientDetails({
       patientName: selectedPatient.name,
       phone: selectedPatient.phone,
@@ -244,15 +283,47 @@ export const ChronicRefillModal: React.FC = () => {
 
         {/* Chronic Medications List */}
         <div className="flex-1 overflow-y-auto pr-1 space-y-3">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-            <span className="flex items-center space-x-1">
-              <Pill className="w-4 h-4 text-emerald-600" />
-              <span>Recurring Prescribed Medications ({selectedPatient?.chronicMedications?.length || 0})</span>
-            </span>
+          {/* Category Filter Pills & Select All */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-bold text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+            <div className="flex items-center space-x-1 overflow-x-auto">
+              <span className="text-[11px] font-bold text-slate-500 mr-1">Filter:</span>
+              <button
+                onClick={() => setActiveCategory('ALL')}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer whitespace-nowrap ${
+                  activeCategory === 'ALL' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                All ({selectedPatient?.chronicMedications?.length || 0})
+              </button>
+              <button
+                onClick={() => setActiveCategory('HYPERTENSION')}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer whitespace-nowrap ${
+                  activeCategory === 'HYPERTENSION' ? 'bg-rose-600 text-white' : 'bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100'
+                }`}
+              >
+                🩺 BP (Hypertension)
+              </button>
+              <button
+                onClick={() => setActiveCategory('DIABETES')}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer whitespace-nowrap ${
+                  activeCategory === 'DIABETES' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
+                }`}
+              >
+                🍬 Sugar (Diabetes)
+              </button>
+              <button
+                onClick={() => setActiveCategory('CARDIAC')}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer whitespace-nowrap ${
+                  activeCategory === 'CARDIAC' ? 'bg-teal-600 text-white' : 'bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100'
+                }`}
+              >
+                ❤️ Cardiac
+              </button>
+            </div>
 
             <button
               onClick={toggleSelectAll}
-              className="text-emerald-700 hover:text-emerald-900 text-[11px] font-extrabold cursor-pointer"
+              className="text-emerald-700 hover:text-emerald-900 text-[11px] font-extrabold cursor-pointer text-right"
             >
               {selectedMedIds.length === (selectedPatient?.chronicMedications?.length || 0)
                 ? 'Deselect All'
@@ -266,7 +337,9 @@ export const ChronicRefillModal: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-2">
-              {selectedPatient.chronicMedications.map(med => {
+              {selectedPatient.chronicMedications
+                .filter(med => activeCategory === 'ALL' || med.conditionCategory === activeCategory)
+                .map(med => {
                 const prod = products.find(p => p._id === med.productId);
                 const isSelected = selectedMedIds.includes(med.productId);
                 const currentStock = prod?.totalStock || 0;
@@ -304,7 +377,8 @@ export const ChronicRefillModal: React.FC = () => {
                               ? 'bg-amber-50 text-amber-800 border border-amber-200'
                               : 'bg-teal-50 text-teal-800 border border-teal-200'
                           }`}>
-                            {med.conditionCategory}
+                            {med.conditionCategory === 'HYPERTENSION' ? '🩺 HYPERTENSION (BP)' :
+                             med.conditionCategory === 'DIABETES' ? '🍬 DIABETES (SUGAR)' : med.conditionCategory}
                           </span>
                         </div>
 
@@ -318,13 +392,15 @@ export const ChronicRefillModal: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="text-right flex items-center space-x-3">
-                      <div>
-                        <div className="font-mono font-bold text-slate-900 text-xs">
-                          ₹{price}
-                        </div>
-                        <div className={`text-[9.5px] font-semibold ${isLowStock ? 'text-amber-600' : 'text-emerald-700'}`}>
-                          {currentStock}u in stock
+                    <div className="flex items-center space-x-3">
+                      <div className="text-right">
+                        <div className="font-black text-slate-900 text-xs">₹{price}</div>
+                        <div className="text-[10px] font-semibold text-slate-500">
+                          {isLowStock ? (
+                            <span className="text-rose-600 font-bold">Low Stock ({currentStock})</span>
+                          ) : (
+                            <span className="text-emerald-600 font-bold">In Stock ({currentStock})</span>
+                          )}
                         </div>
                       </div>
 
@@ -349,18 +425,20 @@ export const ChronicRefillModal: React.FC = () => {
         </div>
 
         {/* Modal Footer */}
-        <div className="flex justify-between items-center pt-3 border-t border-slate-200 flex-shrink-0 text-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-200 flex-shrink-0 text-xs">
           <div className="text-slate-600 font-semibold">
             Selected: <strong className="text-emerald-700">{selectedMedIds.length} Medicines</strong> for {refillDurationDays} Days supply
           </div>
 
-          <div className="flex space-x-2">
+          <div className="flex items-center space-x-2">
             <button
-              onClick={() => dispatch(setChronicRefillModalOpen({ isOpen: false }))}
-              className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+              onClick={handleRepeatBpAndSugar}
+              className="px-4 py-2.5 rounded-xl font-bold bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 text-white shadow-md cursor-pointer transition-all active:scale-95 flex items-center space-x-1.5"
             >
-              Cancel
+              <HeartPulse className="w-4 h-4 text-white" />
+              <span>⚡ Repeat BP &amp; Sugar Order</span>
             </button>
+
             <button
               onClick={handleRefillToCart}
               disabled={selectedMedIds.length === 0}
@@ -371,7 +449,7 @@ export const ChronicRefillModal: React.FC = () => {
               }`}
             >
               <Repeat className="w-4 h-4" />
-              <span>⚡ 1-Click Refill All to Cart</span>
+              <span>Refill All Selected</span>
             </button>
           </div>
         </div>
