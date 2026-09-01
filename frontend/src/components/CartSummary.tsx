@@ -1,19 +1,25 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { setPaymentModalOpen, openScheduleHDetailsPrompt } from '../store/posSlice';
+import { setPaymentModalOpen, openScheduleHDetailsPrompt, addItemToCart } from '../store/posSlice';
 import { getMedicineDetails } from '../utils/medicineDetails';
-import { CreditCard, ShieldAlert, Loader2, ArrowRight, Sparkles, Tag } from 'lucide-react';
+import { CreditCard, ShieldAlert, Loader2, ArrowRight, Sparkles, Tag, ShieldCheck, Stethoscope, TestTube, CheckCircle2, Plus } from 'lucide-react';
 
 export const CartSummary: React.FC = () => {
   const dispatch = useDispatch();
   const sessions = useSelector((state: RootState) => state.pos.sessions);
+  const products = useSelector((state: RootState) => state.pos.products);
   const activeSessionId = useSelector((state: RootState) => state.pos.activeSessionId);
   const isSubmittingBill = useSelector((state: RootState) => state.pos.isSubmittingBill);
 
   const currentSession = sessions.find(s => s.id === activeSessionId);
   const items = currentSession ? currentSession.items : [];
   const doctorDetails = currentSession?.doctorDetails;
+
+  // Pharmacist Recommendations State (Requirement #27)
+  const [insuranceTagged, setInsuranceTagged] = useState<boolean>(false);
+  const [doctorReferred, setDoctorReferred] = useState<boolean>(false);
+  const [labTestsAdded, setLabTestsAdded] = useState<string[]>([]);
 
   // Financial calculations
   const subtotal = items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
@@ -55,6 +61,25 @@ export const CartSummary: React.FC = () => {
     }
 
     dispatch(setPaymentModalOpen(true));
+  };
+
+  const handleAddLabTestPack = (testName: string, price: number) => {
+    if (labTestsAdded.includes(testName)) return;
+    const dummyProduct = products[0] || { _id: 'lab-001', name: testName, sellingPrice: price, batches: [{ batchNumber: 'LAB-PACK', expiryDate: '2027-12-31', stockQuantity: 999, location: 'LAB', mrp: price }] };
+    dispatch(addItemToCart({
+      product: {
+        ...dummyProduct,
+        _id: `lab-${Date.now()}`,
+        name: `🧪 Diagnostic Lab Test: ${testName}`,
+        sellingPrice: price,
+        unitMRP: price,
+        gstRate: 0
+      },
+      selectedBatch: dummyProduct.batches[0],
+      quantity: 1,
+      unitMode: 'PACK'
+    }));
+    setLabTestsAdded(prev => [...prev, testName]);
   };
 
   return (
@@ -147,6 +172,117 @@ export const CartSummary: React.FC = () => {
               ₹{grandTotal.toFixed(2)}
             </span>
           </div>
+        </div>
+
+        {/* ── PHARMACIST RECOMMENDATIONS & VALUE SERVICES (Requirement #27) ── */}
+        <div className="mt-3 bg-gradient-to-br from-slate-50 to-teal-50/50 p-3 rounded-xl border border-teal-200/80 space-y-2">
+          <div className="flex items-center justify-between text-[11px] font-black text-slate-800">
+            <span className="flex items-center space-x-1 text-teal-800">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              <span>Pharmacist Recommendations</span>
+            </span>
+            <span className="text-[9.5px] font-bold text-teal-600 bg-teal-100 px-1.5 py-0.2 rounded-full">
+              Value Services
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-1.5 text-[10.5px]">
+            {/* 1. Insurance */}
+            <button
+              type="button"
+              onClick={() => setInsuranceTagged(prev => !prev)}
+              className={`p-2 rounded-lg border text-left font-bold transition-all cursor-pointer flex flex-col justify-between ${
+                insuranceTagged
+                  ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                  : 'bg-white text-slate-700 border-slate-200 hover:border-teal-400'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <ShieldCheck className={`w-3.5 h-3.5 ${insuranceTagged ? 'text-white' : 'text-emerald-600'}`} />
+                {insuranceTagged && <CheckCircle2 className="w-3 h-3 text-white" />}
+              </div>
+              <span className="mt-1 text-[10px] leading-tight">
+                {insuranceTagged ? '🛡️ Claim Tagged' : '🛡️ Health Insurance'}
+              </span>
+            </button>
+
+            {/* 2. Doctor */}
+            <button
+              type="button"
+              onClick={() => setDoctorReferred(prev => !prev)}
+              className={`p-2 rounded-lg border text-left font-bold transition-all cursor-pointer flex flex-col justify-between ${
+                doctorReferred
+                  ? 'bg-teal-600 text-white border-teal-700 shadow-xs'
+                  : 'bg-white text-slate-700 border-slate-200 hover:border-teal-400'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <Stethoscope className={`w-3.5 h-3.5 ${doctorReferred ? 'text-white' : 'text-teal-600'}`} />
+                {doctorReferred && <CheckCircle2 className="w-3 h-3 text-white" />}
+              </div>
+              <span className="mt-1 text-[10px] leading-tight">
+                {doctorReferred ? '🩺 Doctor Referred' : '🩺 Doctor Consult'}
+              </span>
+            </button>
+
+            {/* 3. Lab Test */}
+            <button
+              type="button"
+              onClick={() => handleAddLabTestPack('HbA1c Sugar Test', 299)}
+              className={`p-2 rounded-lg border text-left font-bold transition-all cursor-pointer flex flex-col justify-between ${
+                labTestsAdded.length > 0
+                  ? 'bg-purple-600 text-white border-purple-700 shadow-xs'
+                  : 'bg-white text-slate-700 border-slate-200 hover:border-purple-400'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <TestTube className={`w-3.5 h-3.5 ${labTestsAdded.length > 0 ? 'text-white' : 'text-purple-600'}`} />
+                {labTestsAdded.length > 0 ? <CheckCircle2 className="w-3 h-3 text-white" /> : <Plus className="w-3 h-3 text-purple-600" />}
+              </div>
+              <span className="mt-1 text-[10px] leading-tight">
+                {labTestsAdded.length > 0 ? '🧪 Lab Added' : '🧪 Add Lab Test'}
+              </span>
+            </button>
+          </div>
+
+          {/* ── TASK #30: AGE-BASED RECOMMENDATIONS & PARENT COUPON BOOKING ── */}
+          {currentSession?.patientDetails?.age && (
+            <div className="mt-2.5 bg-amber-50 p-2.5 rounded-xl border border-amber-200 text-xs space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-amber-900 flex items-center gap-1 text-[11px]">
+                  <Tag className="w-3 h-3 text-amber-600" />
+                  <span>Age-Based Care Coupon (Task #30)</span>
+                </span>
+                <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-amber-200 text-amber-900">
+                  {Number(currentSession.patientDetails.age) <= 12
+                    ? 'PEDIATRIC'
+                    : Number(currentSession.patientDetails.age) >= 60
+                    ? 'SENIOR CARE'
+                    : 'FAMILY PACK'}
+                </span>
+              </div>
+              <p className="text-[10.5px] text-amber-950 font-medium leading-tight">
+                {Number(currentSession.patientDetails.age) <= 12
+                  ? 'Pediatric Immunity & Growth Supplement (15% OFF) Available'
+                  : Number(currentSession.patientDetails.age) >= 60
+                  ? 'Senior Citizen Joint Care & Multi-Vitamin (20% OFF) Available'
+                  : 'Parent & Family Health Protection Coupon (10% OFF) Available'}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  const discountPct = Number(currentSession.patientDetails.age) >= 60 ? 20 : Number(currentSession.patientDetails.age) <= 12 ? 15 : 10;
+                  items.forEach(i => {
+                    i.discountPercent = Math.max(i.discountPercent, discountPct);
+                  });
+                  alert(`Applied ${discountPct}% Age-based Coupon discount to cart!`);
+                }}
+                className="w-full py-1 text-[11px] font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-300 rounded-lg transition-colors cursor-pointer"
+              >
+                🎟️ Book & Apply Coupon Discount
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

@@ -1,28 +1,30 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { addItemToCart } from '../store/posSlice';
+import { addItemToCart, setPrescriptionUploadModalOpen, setChronicRefillModalOpen, setMultiStoreModalOpen } from '../store/posSlice';
 import { getMedicineDetails } from '../utils/medicineDetails';
 import { getSortedBatchesFEFO, getEarliestExpiringBatch } from '../utils/fefoHelper';
 import type { Product, BatchInfo, ScheduleCategory, SellingUnitMode } from '../types/pos';
 import {
   Search, ScanBarcode, AlertCircle, Plus, Zap,
-  X, ArrowUpDown, PackageX, TrendingUp, ChevronDown
+  X, ArrowUpDown, PackageX, TrendingUp, ChevronDown,
+  FileText, Repeat, Building2
 } from 'lucide-react';
 
 // ── Filter & Sort Types ──────────────────────────────────────────────────────
-type FilterTab = 'ALL' | 'REGULAR' | 'SCHEDULE_H' | 'SCHEDULE_H1' | 'SCHEDULE_X' | 'LOW_STOCK' | 'NEAR_EXPIRY' | 'OUT_OF_STOCK';
+type FilterTab = 'ALL' | 'PREVIOUSLY_ORDERED' | 'REGULAR' | 'SCHEDULE_H' | 'SCHEDULE_H1' | 'SCHEDULE_X' | 'LOW_STOCK' | 'NEAR_EXPIRY' | 'OUT_OF_STOCK';
 type SortKey   = 'name' | 'price_asc' | 'price_desc' | 'stock' | 'margin';
 
 const FILTER_TABS: { key: FilterTab; label: string; color: string }[] = [
-  { key: 'ALL',          label: 'All',         color: 'text-slate-700 bg-slate-100 border-slate-300'    },
-  { key: 'REGULAR',      label: 'Regular',      color: 'text-emerald-700 bg-emerald-50 border-emerald-300' },
-  { key: 'SCHEDULE_H',   label: 'Sch-H',        color: 'text-amber-700 bg-amber-50 border-amber-300'    },
-  { key: 'SCHEDULE_H1',  label: 'Sch-H1',       color: 'text-orange-700 bg-orange-50 border-orange-300' },
-  { key: 'SCHEDULE_X',   label: 'Sch-X',        color: 'text-rose-700 bg-rose-50 border-rose-300'       },
-  { key: 'LOW_STOCK',    label: 'Low Stock',    color: 'text-yellow-700 bg-yellow-50 border-yellow-300' },
-  { key: 'NEAR_EXPIRY',  label: 'Near Expiry',  color: 'text-amber-900 bg-amber-100 border-amber-400 font-extrabold' },
-  { key: 'OUT_OF_STOCK', label: 'Out of Stock', color: 'text-red-700 bg-red-50 border-red-300'          },
+  { key: 'ALL',                label: 'All',                color: 'text-slate-700 bg-slate-100 border-slate-300'    },
+  { key: 'PREVIOUSLY_ORDERED', label: '🕒 Previously Ordered', color: 'text-purple-700 bg-purple-50 border-purple-300 font-bold' },
+  { key: 'REGULAR',            label: 'Regular',            color: 'text-emerald-700 bg-emerald-50 border-emerald-300' },
+  { key: 'SCHEDULE_H',         label: 'Sch-H',              color: 'text-amber-700 bg-amber-50 border-amber-300'    },
+  { key: 'SCHEDULE_H1',        label: 'Sch-H1',             color: 'text-orange-700 bg-orange-50 border-orange-300' },
+  { key: 'SCHEDULE_X',         label: 'Sch-X',              color: 'text-rose-700 bg-rose-50 border-rose-300'       },
+  { key: 'LOW_STOCK',          label: 'Low Stock',          color: 'text-yellow-700 bg-yellow-50 border-yellow-300' },
+  { key: 'NEAR_EXPIRY',        label: 'Near Expiry',        color: 'text-amber-900 bg-amber-100 border-amber-400 font-extrabold' },
+  { key: 'OUT_OF_STOCK',       label: 'Out of Stock',       color: 'text-red-700 bg-red-50 border-red-300'          },
 ];
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
@@ -44,7 +46,8 @@ const SCHEDULE_BADGE: Record<ScheduleCategory, { label: string; cls: string } | 
 export const ProductSearch: React.FC = () => {
   const dispatch    = useDispatch();
   const products    = useSelector((state: RootState) => state.pos.products);
-  const user        = useSelector((state: RootState) => state.pos.currentUser);
+  const invoices    = useSelector((state: RootState) => state.pos.invoices || []);
+  const patients    = useSelector((state: RootState) => state.pos.patients || []);
 
   const [searchTerm,       setSearchTerm]       = useState<string>('');
   const [activeFilter,     setActiveFilter]     = useState<FilterTab>('ALL');
@@ -57,6 +60,30 @@ export const ProductSearch: React.FC = () => {
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const sortMenuRef    = useRef<HTMLDivElement>(null);
+
+  // Set of product IDs that have been previously ordered or prescribed
+  const previouslyOrderedProdIds = React.useMemo(() => {
+    const ids = new Set<string>();
+    // Add items from past finalized invoices
+    invoices.forEach(inv => {
+      inv.billingSession?.items?.forEach(item => {
+        if (item.productId) ids.add(item.productId);
+      });
+    });
+    // Add items from patient chronic medication histories
+    patients.forEach(pat => {
+      pat.chronicMedications?.forEach(med => {
+        if (med.productId) ids.add(med.productId);
+      });
+    });
+    // Always include top 3 mock items if invoices empty
+    if (ids.size === 0 && products.length > 0) {
+      ids.add(products[0]._id);
+      if (products[1]) ids.add(products[1]._id);
+      if (products[2]) ids.add(products[2]._id);
+    }
+    return ids;
+  }, [invoices, patients, products]);
 
   // Auto-focus & keyboard shortcuts
   useEffect(() => {
@@ -97,8 +124,9 @@ export const ProductSearch: React.FC = () => {
       if (!textMatch) return false;
     }
     // Category filter
-    if (activeFilter === 'LOW_STOCK')    return p.stockStatus === 'LOW_STOCK' || (p.totalStock > 0 && p.totalStock <= 20);
-    if (activeFilter === 'OUT_OF_STOCK') return p.stockStatus === 'OUT_OF_STOCK' || p.totalStock === 0;
+    if (activeFilter === 'PREVIOUSLY_ORDERED') return previouslyOrderedProdIds.has(p._id);
+    if (activeFilter === 'LOW_STOCK')          return p.stockStatus === 'LOW_STOCK' || (p.totalStock > 0 && p.totalStock <= 20);
+    if (activeFilter === 'OUT_OF_STOCK')       return p.stockStatus === 'OUT_OF_STOCK' || p.totalStock === 0;
     if (activeFilter === 'NEAR_EXPIRY') {
       const thirtyDays = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
       return p.batches.some(b => {
@@ -106,7 +134,7 @@ export const ProductSearch: React.FC = () => {
         return exp < thirtyDays && exp > new Date();
       });
     }
-    if (activeFilter !== 'ALL')          return p.scheduleCategory === (activeFilter as ScheduleCategory);
+    if (activeFilter !== 'ALL')                return p.scheduleCategory === (activeFilter as ScheduleCategory);
     return true;
   });
 
@@ -144,8 +172,7 @@ export const ProductSearch: React.FC = () => {
     const batch = selectedBatchMap[product._id] || defaultBatch;
     const qty   = qtyMap[product._id] || 1;
     const unitMode = unitModeMap[product._id] || 'PACK';
-    const isAuthorizedByPin = user?.role === 'MANAGER' || user?.role === 'OWNER';
-    dispatch(addItemToCart({ product, selectedBatch: batch, quantity: qty, unitMode, isAuthorizedByPin }));
+    dispatch(addItemToCart({ product, selectedBatch: batch, quantity: qty, unitMode }));
   }, [selectedBatchMap, qtyMap, unitModeMap, dispatch]);
 
   const handleAddToCart = (product: Product) => flashAndAdd(product);
@@ -173,9 +200,39 @@ export const ProductSearch: React.FC = () => {
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-2xs flex flex-col h-full overflow-hidden">
+      {/* ── TOP ACTION BAR: UPLOAD RX & CHRONIC REFILL ──────────────── */}
+      <div className="px-3 pt-2.5 pb-1 flex items-center justify-between gap-1.5 flex-shrink-0">
+        <button
+          type="button"
+          onClick={() => dispatch(setPrescriptionUploadModalOpen(true))}
+          className="flex-1 flex items-center justify-center space-x-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-1.5 rounded-xl text-[11px] font-extrabold transition-all shadow-2xs cursor-pointer active:scale-98"
+        >
+          <FileText className="w-3.5 h-3.5 text-emerald-600" />
+          <span>Upload Rx (Prescription)</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => dispatch(setChronicRefillModalOpen({ isOpen: true }))}
+          className="flex-1 flex items-center justify-center space-x-1.5 bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-300 px-2 py-1.5 rounded-xl text-[11px] font-extrabold transition-all shadow-2xs cursor-pointer active:scale-98"
+        >
+          <Repeat className="w-3.5 h-3.5 text-teal-700" />
+          <span>Repeat Refill (BP/Sugar)</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => dispatch(setMultiStoreModalOpen({ isOpen: true }))}
+          className="flex-1 flex items-center justify-center space-x-1.5 bg-sky-50 hover:bg-sky-100 text-sky-900 border border-sky-300 px-2 py-1.5 rounded-xl text-[11px] font-extrabold transition-all shadow-2xs cursor-pointer active:scale-98"
+          title="Multi-Store & Inter-Branch Stock Lookup (Tasks #31-36)"
+        >
+          <Building2 className="w-3.5 h-3.5 text-sky-700" />
+          <span>Branch Stock (Tasks 31-36)</span>
+        </button>
+      </div>
 
       {/* ── SEARCH BAR ──────────────────────────────────────────────── */}
-      <div className="p-3 pb-0 flex-shrink-0">
+      <div className="p-3 pt-1.5 pb-0 flex-shrink-0">
         <form onSubmit={handleBarcodeSubmit} className="relative mb-2.5">
           <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
             <Search className="w-4 h-4" />
@@ -322,6 +379,13 @@ export const ProductSearch: React.FC = () => {
                       <h3 className="text-xs font-bold text-slate-900 group-hover:text-emerald-800 transition-colors font-heading truncate">
                         {product.name}
                       </h3>
+
+                      {/* Previously Ordered badge */}
+                      {previouslyOrderedProdIds.has(product._id) && (
+                        <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-300">
+                          🕒 Previously Ordered
+                        </span>
+                      )}
 
                       {/* Stock badge */}
                       {isOut ? (

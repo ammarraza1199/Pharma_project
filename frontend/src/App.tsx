@@ -1,7 +1,5 @@
 import React from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import { setProducts } from './store/posSlice';
-import api from './utils/api';
+import { useSelector } from 'react-redux';
 import type { RootState } from './store';
 import { LandingPage } from './components/LandingPage';
 import { AuthPage } from './components/AuthPage';
@@ -20,6 +18,7 @@ import { ReceiptPrintView } from './components/ReceiptPrintView';
 import { InvoiceHistoryModal } from './components/InvoiceHistoryModal';
 import { Dashboard } from './components/Dashboard';
 import { InventoryPage } from './components/InventoryPage';
+import { InventoryDashboardPage } from './components/InventoryDashboardPage';
 import { PurchaseGRNPage } from './components/PurchaseGRNPage';
 import { ReportsPage } from './components/ReportsPage';
 import { ReturnsPage } from './components/ReturnsPage';
@@ -31,21 +30,14 @@ import { EmergencyDeliveryPage } from './components/EmergencyDeliveryPage';
 import { InvoicesPage } from './components/InvoicesPage';
 import { AssignBillModal } from './components/AssignBillModal';
 import { OnlineDeliveryPage } from './components/OnlineDeliveryPage';
+import { PrescriptionUploadModal } from './components/PrescriptionUploadModal';
+import { ChronicRefillModal } from './components/ChronicRefillModal';
+import { WellnessBrochureModal } from './components/WellnessBrochureModal';
+import { MultiStoreModal } from './components/MultiStoreModal';
+import { InterStoreChatbotModal } from './components/InterStoreChatbotModal';
 
 export const App: React.FC = () => {
-  const dispatch = useDispatch();
   const currentView = useSelector((state: RootState) => state.pos.currentView);
-  const currentUser = useSelector((state: RootState) => state.pos.currentUser);
-
-  React.useEffect(() => {
-    if (currentUser?.isLoggedIn) {
-      api.get('/products?limit=10000').then((res) => {
-        if (res.data.success) {
-          dispatch(setProducts(res.data.data));
-        }
-      }).catch((err) => console.error('Failed to load products:', err));
-    }
-  }, [currentUser?.isLoggedIn, dispatch]);
 
   if (currentView === 'LANDING') return <LandingPage />;
   if (currentView === 'AUTH')    return <AuthPage />;
@@ -64,6 +56,11 @@ export const App: React.FC = () => {
       {/* ── INVENTORY MANAGEMENT VIEW ── */}
       {currentView === 'INVENTORY' && (
         <InventoryPage />
+      )}
+
+      {/* ── DEDICATED INVENTORY & SHELF-LIFE DASHBOARD VIEW ── */}
+      {currentView === 'INVENTORY_DASHBOARD' && (
+        <InventoryDashboardPage />
       )}
 
       {/* ── STOCK PURCHASE (GRN) VIEW ── */}
@@ -148,12 +145,17 @@ export const App: React.FC = () => {
           <HeldBillsModal />
           <CustomerDisplayModal />
           <AssignBillModal />
+          <PrescriptionUploadModal />
+          <ChronicRefillModal />
         </>
       )}
 
       {/* Global Overlays accessible from all tabs */}
       <ReceiptPrintView />
       <InvoiceHistoryModal />
+      <WellnessBrochureModal />
+      <MultiStoreModal />
+      <InterStoreChatbotModal />
     </div>
   );
 };

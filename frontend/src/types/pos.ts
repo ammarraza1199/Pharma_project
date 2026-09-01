@@ -314,3 +314,82 @@ export interface DeliveryOrder {
   updatedAt: string;
 }
 
+export type WellnessBrochureCategory = 
+  | 'DIABETES' 
+  | 'HYPERTENSION' 
+  | 'ASTHMA' 
+  | 'GERIATRIC' 
+  | 'PEDIATRIC' 
+  | 'MATERNITY';
+
+export interface WellnessBrochurePlan {
+  id: string;
+  category: WellnessBrochureCategory;
+  title: string;
+  subtitle: string;
+  icon: string;
+  badgeColor: string;
+  targetCondition: string;
+  recommendedDiet: string[];
+  foodsToAvoid: string[];
+  lifestyleTips: string[];
+  medicationAdherenceTips: string[];
+  warningSigns: string[];
+  recommendedCheckups: string[];
+}
+
+export interface BranchStore {
+  branchId: string;
+  branchName: string;
+  location: string;
+  distanceKm: number;
+  phone: string;
+  isCentralGodown?: boolean;
+  status: 'OPEN' | 'BUSY' | 'CLOSED';
+}
+
+export interface BorrowedMedicineRecord {
+  borrowId: string;
+  medicineName: string;
+  saltComposition?: string;
+  sourceType: 'NEIGHBOR_PHARMACY' | 'CENTRAL_GODOWN' | 'DISTRIBUTOR';
+  sourceName: string;
+  quantity: number;
+  unit: string;
+  purchaseCostRate: number;
+  newDisplayPrice: number; // Task #35 price adjustment
+  borrowDate: string;
+  status: 'PENDING_REPAYMENT' | 'SETTLED' | 'RETURNED';
+  notes?: string;
+}
+
+export interface AgeRecommendationCoupon {
+  id: string;
+  targetAgeGroup: 'PEDIATRIC' | 'ADULT' | 'SENIOR';
+  minAge: number;
+  maxAge: number;
+  title: string;
+  description: string;
+  couponCode: string;
+  discountPercent: number;
+  recommendedProducts: string[];
+}
+
+export interface InterStoreChatMessage {
+  id: string;
+  sender: 'PHARMACIST' | 'BOT' | 'BRANCH_DISPATCHER';
+  senderName: string;
+  branchName?: string;
+  text: string;
+  timestamp: string;
+  actionPayload?: {
+    type: 'STOCK_CHECK' | 'RESERVE_PICKUP' | 'TRANSFER_REQUEST';
+    productId?: string;
+    productName?: string;
+    availableBranch?: string;
+    stockQty?: number;
+  };
+}
+
+
+
