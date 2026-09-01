@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { addPatient, navigateTo, setPatientDetails, setChronicRefillModalOpen } from '../store/posSlice';
-import type { PatientRecord } from '../types/pos';
+import { addPatient, navigateTo, setPatientDetails, setChronicRefillModalOpen, setWellnessBrochureModalOpen } from '../store/posSlice';
+import type { PatientRecord, WellnessBrochureCategory } from '../types/pos';
 import {
   Users, Search, Plus, UserCheck, ShoppingCart,
   HeartPulse, X, DollarSign, Activity, Sparkles, MessageCircle, FileText, CheckCircle2, ChevronRight
@@ -216,6 +216,28 @@ export const PatientsPage: React.FC = () => {
 
                     <td className="px-3 py-3 text-center">
                       <div className="flex items-center justify-center space-x-1.5">
+                        <button
+                          onClick={() => {
+                            let cat: WellnessBrochureCategory = 'DIABETES';
+                            if (pat.chronicConditions && pat.chronicConditions.length > 0) {
+                              const condStr = pat.chronicConditions.join(' ').toLowerCase();
+                              if (condStr.includes('asthma')) cat = 'ASTHMA';
+                              else if (condStr.includes('hyper') || condStr.includes('bp')) cat = 'HYPERTENSION';
+                              else if (condStr.includes('diab') || condStr.includes('sugar')) cat = 'DIABETES';
+                            }
+                            dispatch(setWellnessBrochureModalOpen({
+                              isOpen: true,
+                              category: cat,
+                              patientName: pat.name,
+                              phone: pat.phone
+                            }));
+                          }}
+                          className="flex items-center space-x-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-bold px-2 py-1.5 rounded-lg transition-all cursor-pointer"
+                          title="Generate Health & Wellness Plan Brochure (Task #29)"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Brochure</span>
+                        </button>
                         <button
                           onClick={() => setSelectedPatientForCarePlan(pat)}
                           className="flex items-center space-x-1 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300 text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition-all cursor-pointer"

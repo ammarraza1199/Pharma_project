@@ -244,6 +244,45 @@ export const CartSummary: React.FC = () => {
               </span>
             </button>
           </div>
+
+          {/* ── TASK #30: AGE-BASED RECOMMENDATIONS & PARENT COUPON BOOKING ── */}
+          {currentSession?.patientDetails?.age && (
+            <div className="mt-2.5 bg-amber-50 p-2.5 rounded-xl border border-amber-200 text-xs space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-amber-900 flex items-center gap-1 text-[11px]">
+                  <Tag className="w-3 h-3 text-amber-600" />
+                  <span>Age-Based Care Coupon (Task #30)</span>
+                </span>
+                <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-amber-200 text-amber-900">
+                  {Number(currentSession.patientDetails.age) <= 12
+                    ? 'PEDIATRIC'
+                    : Number(currentSession.patientDetails.age) >= 60
+                    ? 'SENIOR CARE'
+                    : 'FAMILY PACK'}
+                </span>
+              </div>
+              <p className="text-[10.5px] text-amber-950 font-medium leading-tight">
+                {Number(currentSession.patientDetails.age) <= 12
+                  ? 'Pediatric Immunity & Growth Supplement (15% OFF) Available'
+                  : Number(currentSession.patientDetails.age) >= 60
+                  ? 'Senior Citizen Joint Care & Multi-Vitamin (20% OFF) Available'
+                  : 'Parent & Family Health Protection Coupon (10% OFF) Available'}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  const discountPct = Number(currentSession.patientDetails.age) >= 60 ? 20 : Number(currentSession.patientDetails.age) <= 12 ? 15 : 10;
+                  items.forEach(i => {
+                    i.discountPercent = Math.max(i.discountPercent, discountPct);
+                  });
+                  alert(`Applied ${discountPct}% Age-based Coupon discount to cart!`);
+                }}
+                className="w-full py-1 text-[11px] font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-300 rounded-lg transition-colors cursor-pointer"
+              >
+                🎟️ Book & Apply Coupon Discount
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

@@ -25,7 +25,12 @@ import type {
   DeliveryOrder,
   SupplierBill,
   SupplierPaymentLog,
-  DistributorScheme
+  DistributorScheme,
+  WellnessBrochureCategory,
+  BranchStore,
+  BorrowedMedicineRecord,
+  AgeRecommendationCoupon,
+  InterStoreChatMessage
 } from '../types/pos';
 import { MOCK_PRODUCTS } from '../mock/products';
 import { calculateItemGST } from '../utils/gstCalculator';
@@ -105,6 +110,24 @@ interface PosState {
   chronicRefillModal: {
     isOpen: boolean;
     patientId?: string;
+  };
+  wellnessBrochureModal: {
+    isOpen: boolean;
+    category?: WellnessBrochureCategory;
+    patientName?: string;
+    phone?: string;
+  };
+  branchStores: BranchStore[];
+  borrowedMedicines: BorrowedMedicineRecord[];
+  ageCoupons: AgeRecommendationCoupon[];
+  chatbotMessages: InterStoreChatMessage[];
+  multiStoreModal: {
+    isOpen: boolean;
+    selectedProductId?: string;
+    activeTab?: 'BRANCH_STORES' | 'BORROWED_LOG' | 'TRANSFER_REQUEST';
+  };
+  interStoreChatbotModal: {
+    isOpen: boolean;
   };
 
   // Printing & Finalization
@@ -757,6 +780,103 @@ const initialState: PosState = {
   chronicRefillModal: {
     isOpen: false,
     patientId: undefined
+  },
+  wellnessBrochureModal: {
+    isOpen: false,
+    category: 'DIABETES'
+  },
+
+  branchStores: [
+    { branchId: 'br-001', branchName: 'Hi-Tech City Main Branch (Current)', location: 'Plot 44, Tech City, Hyderabad', distanceKm: 0.0, phone: '+91 98765 43210', status: 'OPEN' },
+    { branchId: 'br-002', branchName: 'Jubilee Hills Branch', location: 'Road No 36, Jubilee Hills, Hyderabad', distanceKm: 3.2, phone: '+91 98765 43211', status: 'OPEN' },
+    { branchId: 'br-003', branchName: 'Madhapur Express Store', location: 'Near Cyber Towers, Madhapur', distanceKm: 1.8, phone: '+91 98765 43212', status: 'OPEN' },
+    { branchId: 'br-004', branchName: 'Secunderabad Central Wholesale Godown', location: 'Phase 2, Wholesale Pharma Complex, Secunderabad', distanceKm: 11.5, phone: '+91 98765 43213', isCentralGodown: true, status: 'OPEN' }
+  ],
+
+  borrowedMedicines: [
+    {
+      borrowId: 'bor-001',
+      medicineName: 'Augmentin 625 Duo Tablet',
+      saltComposition: 'Amoxicillin 500mg + Clavulanic Acid 125mg',
+      sourceType: 'CENTRAL_GODOWN',
+      sourceName: 'Secunderabad Central Wholesale Godown',
+      quantity: 5,
+      unit: 'Strips',
+      purchaseCostRate: 145.00,
+      newDisplayPrice: 175.00,
+      borrowDate: '2026-08-30 11:30 AM',
+      status: 'PENDING_REPAYMENT',
+      notes: 'Emergency stock request fulfilled via godown express transit'
+    },
+    {
+      borrowId: 'bor-002',
+      medicineName: 'Dolo 650 Tablet',
+      saltComposition: 'Paracetamol 650mg',
+      sourceType: 'NEIGHBOR_PHARMACY',
+      sourceName: 'Apollo Pharmacy - Madhapur Branch',
+      quantity: 10,
+      unit: 'Strips',
+      purchaseCostRate: 22.00,
+      newDisplayPrice: 28.00,
+      borrowDate: '2026-08-28 04:15 PM',
+      status: 'SETTLED',
+      notes: 'Inter-pharmacy peer borrow settled via cash'
+    }
+  ],
+
+  ageCoupons: [
+    {
+      id: 'coup-pedia',
+      targetAgeGroup: 'PEDIATRIC',
+      minAge: 0,
+      maxAge: 12,
+      title: 'Pediatric Immunity & Growth Supplement 15% OFF',
+      description: 'Applicable on pediatric multivitamins, calcium syrups & health drops.',
+      couponCode: 'KIDSCARE15',
+      discountPercent: 15,
+      recommendedProducts: ['Seven Seas Kid Drops', 'Zincovit Syrup', 'Ostocalcium Suspension']
+    },
+    {
+      id: 'coup-senior',
+      targetAgeGroup: 'SENIOR',
+      minAge: 60,
+      maxAge: 120,
+      title: 'Senior Citizen Wellness & Joint Care 20% OFF',
+      description: 'Special care discount on joint pain relievers, Omega-3 & BP monitors.',
+      couponCode: 'SENIORCARE20',
+      discountPercent: 20,
+      recommendedProducts: ['JointAce DN', 'Supradyn Daily', 'Omron BP Monitor']
+    },
+    {
+      id: 'coup-parent',
+      targetAgeGroup: 'ADULT',
+      minAge: 25,
+      maxAge: 59,
+      title: 'Parent & Family Preventive Health Pack 10% OFF',
+      description: 'Discount on family health supplements & routine care products.',
+      couponCode: 'PARENTHEALTH10',
+      discountPercent: 10,
+      recommendedProducts: ['Revital H Capsule', 'Dabur Chyawanprash', 'Horlicks Protein Plus']
+    }
+  ],
+
+  chatbotMessages: [
+    {
+      id: 'msg-1',
+      sender: 'BOT',
+      senderName: 'PharmaConnect Assistant',
+      text: 'Hello Pharmacist! I am your Inter-Store AI Assistant. Ask me about medicine stock availability in nearby branches, borrowed stock logs, or transfer requests.',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }
+  ],
+
+  multiStoreModal: {
+    isOpen: false,
+    activeTab: 'BRANCH_STORES'
+  },
+
+  interStoreChatbotModal: {
+    isOpen: false
   },
 
   invoices: getInitialInvoices(),
@@ -1657,6 +1777,80 @@ export const posSlice = createSlice({
       state.chronicRefillModal.patientId = action.payload.patientId;
     },
 
+    setWellnessBrochureModalOpen: (state, action: PayloadAction<{ isOpen: boolean; category?: WellnessBrochureCategory; patientName?: string; phone?: string }>) => {
+      state.wellnessBrochureModal.isOpen = action.payload.isOpen;
+      if (action.payload.category) {
+        state.wellnessBrochureModal.category = action.payload.category;
+      }
+      if (action.payload.patientName !== undefined) {
+        state.wellnessBrochureModal.patientName = action.payload.patientName;
+      }
+      if (action.payload.phone !== undefined) {
+        state.wellnessBrochureModal.phone = action.payload.phone;
+      }
+    },
+
+    setMultiStoreModalOpen: (state, action: PayloadAction<{ isOpen: boolean; selectedProductId?: string; activeTab?: 'BRANCH_STORES' | 'BORROWED_LOG' | 'TRANSFER_REQUEST' }>) => {
+      state.multiStoreModal.isOpen = action.payload.isOpen;
+      if (action.payload.selectedProductId) {
+        state.multiStoreModal.selectedProductId = action.payload.selectedProductId;
+      }
+      if (action.payload.activeTab) {
+        state.multiStoreModal.activeTab = action.payload.activeTab;
+      }
+    },
+
+    setInterStoreChatbotModalOpen: (state, action: PayloadAction<boolean>) => {
+      state.interStoreChatbotModal.isOpen = action.payload;
+    },
+
+    sendInterStoreChatMessage: (state, action: PayloadAction<string>) => {
+      const userText = action.payload;
+      const userMsg: InterStoreChatMessage = {
+        id: `msg-${Date.now()}`,
+        sender: 'PHARMACIST',
+        senderName: state.currentUser?.pharmacistName || 'Lead Pharmacist',
+        text: userText,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      state.chatbotMessages.push(userMsg);
+
+      const lower = userText.toLowerCase();
+      let botResponseText = "I checked our multi-branch inventory network. All 4 branch stores are online and synchronized.";
+      let actionPayload: InterStoreChatMessage['actionPayload'] = undefined;
+
+      if (lower.includes('augmentin') || lower.includes('amoxicillin')) {
+        botResponseText = "Augmentin 625 Duo is available at Jubilee Hills Branch (18 strips) and Secunderabad Central Godown (140 strips). Would you like to reserve a store pickup?";
+        actionPayload = { type: 'STOCK_CHECK', productName: 'Augmentin 625 Duo', availableBranch: 'Jubilee Hills Branch', stockQty: 18 };
+      } else if (lower.includes('dolo') || lower.includes('paracetamol')) {
+        botResponseText = "Dolo 650mg is IN STOCK across all 4 branches. Madhapur Express Store has 45 strips available for immediate transfer.";
+        actionPayload = { type: 'STOCK_CHECK', productName: 'Dolo 650 Tablet', availableBranch: 'Madhapur Express Store', stockQty: 45 };
+      } else if (lower.includes('borrow') || lower.includes('godown')) {
+        botResponseText = "Central Godown express transit is active. You have 1 pending borrowed stock repayment (Augmentin 625 Duo - 5 strips).";
+        actionPayload = { type: 'TRANSFER_REQUEST' };
+      }
+
+      const botMsg: InterStoreChatMessage = {
+        id: `msg-${Date.now() + 1}`,
+        sender: 'BOT',
+        senderName: 'PharmaConnect Assistant',
+        text: botResponseText,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        actionPayload
+      };
+      state.chatbotMessages.push(botMsg);
+    },
+
+    recordBorrowedStock: (state, action: PayloadAction<Omit<BorrowedMedicineRecord, 'borrowId' | 'borrowDate' | 'status'>>) => {
+      const newBorrow: BorrowedMedicineRecord = {
+        borrowId: `bor-${Date.now()}`,
+        borrowDate: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+        status: 'PENDING_REPAYMENT',
+        ...action.payload
+      };
+      state.borrowedMedicines.unshift(newBorrow);
+    },
+
     attachPrescriptionToSession: (state, action: PayloadAction<{ sessionId?: string; prescriptionUrl: string; prescriptionName?: string }>) => {
       const sessId = action.payload.sessionId || state.activeSessionId;
       const sess = state.sessions.find(s => s.id === sessId);
@@ -1986,6 +2180,11 @@ export const {
   setCustomerDisplayModalOpen,
   setPrescriptionUploadModalOpen,
   setChronicRefillModalOpen,
+  setWellnessBrochureModalOpen,
+  setMultiStoreModalOpen,
+  setInterStoreChatbotModalOpen,
+  sendInterStoreChatMessage,
+  recordBorrowedStock,
   attachPrescriptionToSession,
   removePrescriptionFromSession,
   refillChronicMedicationsToCart,

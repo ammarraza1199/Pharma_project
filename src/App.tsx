@@ -32,6 +32,9 @@ import { AssignBillModal } from './components/AssignBillModal';
 import { OnlineDeliveryPage } from './components/OnlineDeliveryPage';
 import { PrescriptionUploadModal } from './components/PrescriptionUploadModal';
 import { ChronicRefillModal } from './components/ChronicRefillModal';
+import { WellnessBrochureModal } from './components/WellnessBrochureModal';
+import { MultiStoreModal } from './components/MultiStoreModal';
+import { InterStoreChatbotModal } from './components/InterStoreChatbotModal';
 
 export const App: React.FC = () => {
   const currentView = useSelector((state: RootState) => state.pos.currentView);
@@ -150,6 +153,9 @@ export const App: React.FC = () => {
       {/* Global Overlays accessible from all tabs */}
       <ReceiptPrintView />
       <InvoiceHistoryModal />
+      <WellnessBrochureModal />
+      <MultiStoreModal />
+      <InterStoreChatbotModal />
     </div>
   );
 };
