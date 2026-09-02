@@ -18,6 +18,44 @@ export const ReturnsPage: React.FC = () => {
   const [invoiceNo, setInvoiceNo] = useState<string>('INV-2026-841201');
   const [patientName, setPatientName] = useState<string>('Ramesh Kumar');
   const [refundMethod, setRefundMethod] = useState<'CASH' | 'UPI' | 'STORE_CREDIT'>('CASH');
+  const [invoiceLookupLoading, setInvoiceLookupLoading] = useState<boolean>(false);
+
+  // ── Auto-fill from invoice number ─────────────────────────────────
+  const handleInvoiceLookup = async () => {
+    if (!invoiceNo.trim()) return;
+    setInvoiceLookupLoading(true);
+    try {
+      const res = await api.get(`/invoices/${invoiceNo.trim()}`);
+      if (res.data.success && res.data.data) {
+        const inv = res.data.data;
+        const pName = inv.billingSession?.patientDetails?.patientName || 'Walk-in Customer';
+        setPatientName(pName);
+        // Pre-populate return items from invoice
+        const items: ReturnItem[] = inv.billingSession.items.map((item: any) => ({
+          productId: item.product?._id || item.productId || '',
+          productName: item.product?.name || item.productName || '',
+          batchNumber: item.selectedBatch?.batchNumber || '',
+          quantityReturned: item.quantity,
+          unitPrice: item.unitPrice,
+          refundAmount: Number((item.unitPrice * item.quantity).toFixed(2)),
+          reason: 'CUSTOMER_CANCELLED' as const,
+          restocked: true,
+        }));
+        setReturnItems(items);
+        alert(`✓ Invoice found. Patient: ${pName} — ${items.length} item(s) pre-filled.`);
+      } else {
+        alert(`Invoice "${invoiceNo}" not found in the database.`);
+      }
+    } catch (err: any) {
+      if (err.response?.status === 404) {
+        alert(`Invoice "${invoiceNo}" not found.`);
+      } else {
+        console.error('[ReturnsPage] Invoice lookup failed:', err);
+      }
+    } finally {
+      setInvoiceLookupLoading(false);
+    }
+  };
 
   // Return Items Draft Table
   const [selectedProdId, setSelectedProdId] = useState<string>(products[0]?._id || '');
@@ -125,9 +163,14 @@ export const ReturnsPage: React.FC = () => {
                 type="text"
                 value={invoiceNo}
                 onChange={e => setInvoiceNo(e.target.value)}
+                onBlur={handleInvoiceLookup}
+                onKeyDown={e => { if (e.key === 'Enter') handleInvoiceLookup(); }}
                 placeholder="INV-2026-841201"
-                className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl font-mono focus:ring-2 focus:ring-rose-500 focus:outline-hidden"
+                className={`w-full pl-9 pr-3 py-2 border rounded-xl font-mono focus:ring-2 focus:ring-rose-500 focus:outline-hidden ${invoiceLookupLoading ? 'border-amber-400 bg-amber-50' : 'border-slate-300'}`}
               />
+              {invoiceLookupLoading && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-amber-600 font-bold">Looking up...</span>
+              )}
             </div>
           </div>
 

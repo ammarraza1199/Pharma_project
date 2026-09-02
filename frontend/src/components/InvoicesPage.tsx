@@ -4,8 +4,7 @@ import type { RootState } from '../store';
 import {
   navigateTo,
   reprintInvoice,
-  deleteSavedInvoice,
-  clearAllSavedInvoices
+  deleteSavedInvoice
 } from '../store/posSlice';
 import api from '../utils/api';
 import type { FinalizedInvoice } from '../types/pos';
@@ -106,7 +105,6 @@ export const InvoicesPage: React.FC = () => {
     invoices.forEach(inv => {
       csv += `"${inv.invoiceNumber}","${inv.invoiceDate}","${inv.billingSession.patientDetails?.patientName || 'Walk-in'}","${inv.billingSession.patientDetails?.phone || ''}","${inv.billingSession.doctorDetails?.doctorName || 'Direct'}",${inv.billingSession.items.length},${inv.subtotal.toFixed(2)},${inv.totalDiscount.toFixed(2)},${inv.totalCGST.toFixed(2)},${inv.totalSGST.toFixed(2)},${inv.grandTotal.toFixed(2)},"${inv.payment.method}","${inv.pharmacistName || 'Ramesh Kumar'}"\n`;
     });
-
     const encodedUri = encodeURI('data:text/csv;charset=utf-8,' + csv);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
@@ -114,6 +112,35 @@ export const InvoicesPage: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  // ── Full DB export (up to 500 invoices via backend) ───────────────────
+  const handleExportFullCSV = async () => {
+    try {
+      const res = await api.get('/invoices/export/csv', { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Full_Invoices_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Failed to export full CSV from server.');
+    }
+  };
+
+  // ── Per-row delete (calls backend DELETE) ─────────────────────────
+  const handleDeleteInvoice = async (invoiceNumber: string) => {
+    if (!window.confirm(`Delete invoice ${invoiceNumber}? This cannot be undone.`)) return;
+    try {
+      await api.delete(`/invoices/${invoiceNumber}`);
+      setInvoices(prev => prev.filter(inv => inv.invoiceNumber !== invoiceNumber));
+      setTotal(prev => prev - 1);
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to delete invoice.');
+    }
   };
 
   const toggleExpand = (invoiceNumber: string) => {
@@ -143,24 +170,21 @@ export const InvoicesPage: React.FC = () => {
             <button
               onClick={handleExportAllCSV}
               className="flex items-center space-x-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-300 transition-colors cursor-pointer"
-              title="Export all invoices to Excel / CSV"
+              title="Export current page invoices to CSV"
             >
               <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-              <span>Export All CSV</span>
+              <span>Export Page CSV</span>
             </button>
           )}
 
           {invoices.length > 0 && (
             <button
-              onClick={() => {
-                if (window.confirm('Are you sure you want to delete ALL saved invoices? This action cannot be undone.')) {
-                  dispatch(clearAllSavedInvoices());
-                }
-              }}
-              className="flex items-center space-x-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl border border-rose-200 transition-colors cursor-pointer"
+              onClick={handleExportFullCSV}
+              className="flex items-center space-x-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold rounded-xl border border-emerald-300 transition-colors cursor-pointer"
+              title="Export all invoices from database (up to 500)"
             >
-              <Trash2 className="w-4 h-4" />
-              <span>Clear History</span>
+              <Download className="w-4 h-4 text-emerald-700" />
+              <span>Full Export CSV</span>
             </button>
           )}
 
@@ -419,13 +443,9 @@ export const InvoicesPage: React.FC = () => {
 
                             {/* Delete Invoice Record */}
                             <button
-                              onClick={() => {
-                                if (window.confirm(`Are you sure you want to remove invoice ${inv.invoiceNumber} from history?`)) {
-                                  dispatch(deleteSavedInvoice(inv.invoiceNumber));
-                                }
-                              }}
+                              onClick={() => handleDeleteInvoice(inv.invoiceNumber)}
                               className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                              title="Delete Record"
+                              title="Delete Invoice from Database"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>

@@ -1149,12 +1149,28 @@ export const posSlice = createSlice({
       state.patients.unshift(newPatient);
     },
 
+    // Bulk-set patients from API fetch (replaces stale seed data)
+    setPatients: (state, action: PayloadAction<PatientRecord[]>) => {
+      state.patients = action.payload;
+    },
+
     addSupplier: (state, action: PayloadAction<Omit<SupplierRecord, 'supplierId'> & { supplierId?: string }>) => {
       const newSupplier: SupplierRecord = {
         ...action.payload,
         supplierId: action.payload.supplierId || `sup-${Date.now()}`
       };
       state.suppliers.unshift(newSupplier);
+    },
+
+    // Bulk-set suppliers from API fetch (replaces stale seed data)
+    setSuppliers: (state, action: PayloadAction<SupplierRecord[]>) => {
+      state.suppliers = action.payload;
+    },
+
+    // Update a single supplier record in-place
+    updateSupplier: (state, action: PayloadAction<SupplierRecord>) => {
+      const idx = state.suppliers.findIndex(s => s.supplierId === action.payload.supplierId);
+      if (idx !== -1) state.suppliers[idx] = action.payload;
     },
 
     recordSupplierPayment: (state, action: PayloadAction<{
@@ -2145,7 +2161,10 @@ export const {
   confirmRestockToShelf,
   markStockDisposed,
   addPatient,
+  setPatients,
   addSupplier,
+  setSuppliers,
+  updateSupplier,
   updateStoreSettings,
   switchActivePharmacist,
   addNewTab,

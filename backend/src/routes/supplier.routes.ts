@@ -52,4 +52,13 @@ router.put('/:id/balance', protect, async (req: AuthRequest, res: Response, next
   } catch (err) { next(err); }
 });
 
+// DELETE /api/suppliers/:id (soft delete — preserves GRN purchase history)
+router.delete('/:id', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const supplier = await Supplier.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
+    if (!supplier) return res.status(404).json({ success: false, message: 'Supplier not found.' });
+    res.json({ success: true, message: 'Supplier deactivated.' });
+  } catch (err) { next(err); }
+});
+
 export default router;

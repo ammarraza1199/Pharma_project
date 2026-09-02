@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { addSupplier, setSuppliers, navigateTo } from '../store/posSlice';
+import { addSupplier, setSuppliers, updateSupplier, navigateTo } from '../store/posSlice';
 import api from '../utils/api';
 import {
   Building, Search, Plus, Truck,
-  DollarSign, X, ShieldCheck
+  DollarSign, X, ShieldCheck, Edit2, Trash2
 } from 'lucide-react';
 
 export const SuppliersPage: React.FC = () => {
@@ -14,6 +14,16 @@ export const SuppliersPage: React.FC = () => {
 
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
+
+  // Edit modal state
+  const [editingSupplier, setEditingSupplier] = useState<any | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editContactPerson, setEditContactPerson] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editGstin, setEditGstin] = useState('');
+  const [editDlNumber, setEditDlNumber] = useState('');
+  const [editAddress, setEditAddress] = useState('');
 
   // Form State
   const [name, setName] = useState<string>('');
@@ -47,6 +57,50 @@ export const SuppliersPage: React.FC = () => {
     };
     fetchSuppliers();
   }, [dispatch]);
+
+  // ── Edit supplier ───────────────────────────────────────
+  const handleOpenEdit = (sup: any) => {
+    setEditingSupplier(sup);
+    setEditName(sup.name);
+    setEditContactPerson(sup.contactPerson);
+    setEditPhone(sup.phone);
+    setEditEmail(sup.email);
+    setEditGstin(sup.gstin);
+    setEditDlNumber(sup.dlNumber);
+    setEditAddress(sup.address);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSupplier) return;
+    try {
+      const res = await api.put(`/suppliers/${editingSupplier.supplierId || editingSupplier._id}`, {
+        name: editName, contactPerson: editContactPerson, phone: editPhone,
+        email: editEmail, gstin: editGstin, dlNumber: editDlNumber, address: editAddress,
+      });
+      if (res.data.success) {
+        const updated = res.data.data;
+        dispatch(setSuppliers(suppliers.map(s =>
+          (s.supplierId === (editingSupplier.supplierId || editingSupplier._id)) ? { ...updated, supplierId: updated._id } : s
+        )));
+      }
+      setEditingSupplier(null);
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to update supplier.');
+    }
+  };
+
+  // ── Delete supplier (soft) ───────────────────────────────
+  const handleDeleteSupplier = async (sup: any) => {
+    if (!window.confirm(`Deactivate supplier "${sup.name}"? Their GRN history will be preserved.`)) return;
+    try {
+      await api.delete(`/suppliers/${sup.supplierId || sup._id}`);
+      const res = await api.get('/suppliers');
+      if (res.data.success) dispatch(setSuppliers(res.data.data.map((s: any) => ({ ...s, supplierId: s._id }))));
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to delete supplier.');
+    }
+  };
 
   const handleCreateSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -198,13 +252,29 @@ export const SuppliersPage: React.FC = () => {
                     </td>
 
                     <td className="px-3 py-3 text-center">
-                      <button
-                        onClick={() => dispatch(navigateTo('PURCHASE_GRN'))}
-                        className="flex items-center space-x-1 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg shadow-2xs transition-all mx-auto cursor-pointer"
-                      >
-                        <Truck className="w-3.5 h-3.5" />
-                        <span>+ GRN Purchase</span>
-                      </button>
+                      <div className="flex items-center justify-center space-x-1.5">
+                        <button
+                          onClick={() => handleOpenEdit(sup)}
+                          className="flex items-center space-x-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-300 text-[11px] font-bold px-2 py-1.5 rounded-lg transition-all cursor-pointer"
+                          title="Edit Supplier"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteSupplier(sup)}
+                          className="flex items-center space-x-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-bold px-2 py-1.5 rounded-lg transition-all cursor-pointer"
+                          title="Deactivate Supplier"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => dispatch(navigateTo('PURCHASE_GRN'))}
+                          className="flex items-center space-x-1 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg shadow-2xs transition-all cursor-pointer"
+                        >
+                          <Truck className="w-3.5 h-3.5" />
+                          <span>+ GRN</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -231,103 +301,114 @@ export const SuppliersPage: React.FC = () => {
             <form onSubmit={handleCreateSupplier} className="space-y-3 text-xs font-semibold">
               <div>
                 <label className="block text-slate-700 mb-1">Company / Vendor Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={e => setName(e.target.value)}
+                <input type="text" required value={name} onChange={e => setName(e.target.value)}
                   placeholder="Sun Pharma Wholesale"
-                  className="w-full p-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-                />
+                  className="w-full p-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden" />
               </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-700 mb-1">Contact Person Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={contactPerson}
-                    onChange={e => setContactPerson(e.target.value)}
-                    placeholder="Suresh Nair"
-                    className="w-full p-2 border border-slate-300 rounded-xl"
-                  />
+                  <label className="block text-slate-700 mb-1">Contact Person *</label>
+                  <input type="text" required value={contactPerson} onChange={e => setContactPerson(e.target.value)}
+                    placeholder="Suresh Nair" className="w-full p-2 border border-slate-300 rounded-xl" />
                 </div>
-
                 <div>
-                  <label className="block text-slate-700 mb-1">Phone Number *</label>
-                  <input
-                    type="tel"
-                    required
-                    value={phone}
-                    onChange={e => setPhone(e.target.value)}
-                    placeholder="+91 98490 12345"
-                    className="w-full p-2 border border-slate-300 rounded-xl"
-                  />
+                  <label className="block text-slate-700 mb-1">Phone *</label>
+                  <input type="tel" required value={phone} onChange={e => setPhone(e.target.value)}
+                    placeholder="+91 98490 12345" className="w-full p-2 border border-slate-300 rounded-xl" />
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-700 mb-1">GSTIN Number *</label>
-                  <input
-                    type="text"
-                    required
-                    value={gstin}
-                    onChange={e => setGstin(e.target.value)}
-                    placeholder="36AAACS5512B1Z5"
-                    className="w-full p-2 border border-slate-300 rounded-xl font-mono"
-                  />
+                  <label className="block text-slate-700 mb-1">GSTIN *</label>
+                  <input type="text" required value={gstin} onChange={e => setGstin(e.target.value)}
+                    placeholder="36AAACS5512B1Z5" className="w-full p-2 border border-slate-300 rounded-xl font-mono" />
                 </div>
-
                 <div>
                   <label className="block text-slate-700 mb-1">Drug License No. *</label>
-                  <input
-                    type="text"
-                    required
-                    value={dlNumber}
-                    onChange={e => setDlNumber(e.target.value)}
-                    placeholder="DL-1003/HYD"
-                    className="w-full p-2 border border-slate-300 rounded-xl font-mono"
-                  />
+                  <input type="text" required value={dlNumber} onChange={e => setDlNumber(e.target.value)}
+                    placeholder="DL-1003/HYD" className="w-full p-2 border border-slate-300 rounded-xl font-mono" />
                 </div>
               </div>
-
               <div>
-                <label className="block text-slate-700 mb-1">Email Address</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="supplier@company.com"
-                  className="w-full p-2 border border-slate-300 rounded-xl"
-                />
+                <label className="block text-slate-700 mb-1">Email</label>
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                  placeholder="supplier@company.com" className="w-full p-2 border border-slate-300 rounded-xl" />
               </div>
-
               <div>
-                <label className="block text-slate-700 mb-1">Office / Depot Address</label>
-                <input
-                  type="text"
-                  value={address}
-                  onChange={e => setAddress(e.target.value)}
-                  placeholder="Industrial Area, Hyderabad"
-                  className="w-full p-2 border border-slate-300 rounded-xl"
-                />
+                <label className="block text-slate-700 mb-1">Address</label>
+                <input type="text" value={address} onChange={e => setAddress(e.target.value)}
+                  placeholder="Industrial Area, Hyderabad" className="w-full p-2 border border-slate-300 rounded-xl" />
               </div>
-
               <div className="flex justify-end space-x-2 pt-3 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md cursor-pointer"
-                >
+                <button type="button" onClick={() => setShowAddModal(false)}
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl">Cancel</button>
+                <button type="submit"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md cursor-pointer">
                   Register Supplier
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── EDIT SUPPLIER MODAL ───────────────────────────────────────────── */}
+      {editingSupplier && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-200">
+              <h3 className="text-sm font-extrabold text-slate-900 font-heading flex items-center space-x-2">
+                <Edit2 className="w-4 h-4 text-emerald-700" />
+                <span>Edit Supplier — {editingSupplier.name}</span>
+              </h3>
+              <button onClick={() => setEditingSupplier(null)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+            </div>
+            <form onSubmit={handleSaveEdit} className="space-y-3 text-xs font-semibold">
+              <div>
+                <label className="block text-slate-700 mb-1">Company Name *</label>
+                <input type="text" required value={editName} onChange={e => setEditName(e.target.value)}
+                  className="w-full p-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 mb-1">Contact Person</label>
+                  <input type="text" value={editContactPerson} onChange={e => setEditContactPerson(e.target.value)}
+                    className="w-full p-2 border border-slate-300 rounded-xl" />
+                </div>
+                <div>
+                  <label className="block text-slate-700 mb-1">Phone</label>
+                  <input type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)}
+                    className="w-full p-2 border border-slate-300 rounded-xl" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 mb-1">GSTIN</label>
+                  <input type="text" value={editGstin} onChange={e => setEditGstin(e.target.value)}
+                    className="w-full p-2 border border-slate-300 rounded-xl font-mono" />
+                </div>
+                <div>
+                  <label className="block text-slate-700 mb-1">DL Number</label>
+                  <input type="text" value={editDlNumber} onChange={e => setEditDlNumber(e.target.value)}
+                    className="w-full p-2 border border-slate-300 rounded-xl font-mono" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-slate-700 mb-1">Email</label>
+                <input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)}
+                  className="w-full p-2 border border-slate-300 rounded-xl" />
+              </div>
+              <div>
+                <label className="block text-slate-700 mb-1">Address</label>
+                <input type="text" value={editAddress} onChange={e => setEditAddress(e.target.value)}
+                  className="w-full p-2 border border-slate-300 rounded-xl" />
+              </div>
+              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-200">
+                <button type="button" onClick={() => setEditingSupplier(null)}
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl">Cancel</button>
+                <button type="submit"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md cursor-pointer">
+                  Save Changes
                 </button>
               </div>
             </form>

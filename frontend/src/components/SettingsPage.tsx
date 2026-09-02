@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import api from '../utils/api';
@@ -45,6 +45,40 @@ export const SettingsPage: React.FC = () => {
   const [nearExpiryDaysThreshold, setNearExpiryDaysThreshold] = useState<number>(settings.nearExpiryDaysThreshold || 30);
 
   const [savedBanner, setSavedBanner] = useState<boolean>(false);
+  const [settingsLoading, setSettingsLoading] = useState<boolean>(true);
+
+  // ── Load settings from DB on mount ──────────────────────────────────────
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const res = await api.get('/settings');
+        if (res.data.success && res.data.data) {
+          const s = res.data.data;
+          if (s.storeName)              setStoreName(s.storeName);
+          if (s.dlNo)                   setDlNo(s.dlNo);
+          if (s.gstin)                  setGstin(s.gstin);
+          if (s.phone)                  setPhone(s.phone);
+          if (s.address)                setAddress(s.address);
+          if (s.defaultTaxType)         setDefaultTaxType(s.defaultTaxType);
+          if (s.termsAndConditions)     setTermsAndConditions(s.termsAndConditions);
+          if (s.managerName)            setManagerName(s.managerName);
+          if (s.managerEmail)           setManagerEmail(s.managerEmail);
+          if (s.ownerName)              setOwnerName(s.ownerName);
+          if (s.ownerEmail)             setOwnerEmail(s.ownerEmail);
+          if (s.defaultPrintFormat)     setDefaultPrintFormat(s.defaultPrintFormat);
+          if (s.autoPrintReceipt !== undefined) setAutoPrintReceipt(s.autoPrintReceipt);
+          if (s.soundEffects !== undefined)     setSoundEffects(s.soundEffects);
+          if (s.autoAddOnScan !== undefined)    setAutoAddOnScan(s.autoAddOnScan);
+          if (s.nearExpiryDaysThreshold)        setNearExpiryDaysThreshold(s.nearExpiryDaysThreshold);
+        }
+      } catch (err) {
+        console.error('[SettingsPage] Failed to load settings from DB:', err);
+      } finally {
+        setSettingsLoading(false);
+      }
+    };
+    loadSettings();
+  }, []);
 
   const activeEmail = currentUser?.email || 'navyasri@genquantaa.com';
   const activePharmacistName = currentUser?.pharmacistName || 'Navya Sri';

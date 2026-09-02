@@ -1,18 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import { submitGRNEntry, navigateTo } from '../store/posSlice';
 import type { GRNItem, GRNEntry } from '../types/pos';
 import api from '../utils/api';
 import {
-  Truck, Plus, Trash2, CheckCircle2, Package,
-  Calendar, FileText, Building
+  Loader2,
+  Package, Plus, CheckCircle2, Trash2, FileText, Building, Calendar, Truck
 } from 'lucide-react';
 
 export const PurchaseGRNPage: React.FC = () => {
   const dispatch = useDispatch();
   const products = useSelector((state: RootState) => state.pos.products);
   const grnEntries = useSelector((state: RootState) => state.pos.grnEntries);
+
+  const [grnHistoryFromApi, setGrnHistoryFromApi] = useState<any[]>([]);
+  const [grnHistoryLoading, setGrnHistoryLoading] = useState<boolean>(true);
+
+  // ── Fetch GRN history from API on mount ────────────────────────
+  useEffect(() => {
+    const fetchGrnHistory = async () => {
+      try {
+        const res = await api.get('/grn?limit=50&sort=-receivedDate');
+        if (res.data.success) {
+          setGrnHistoryFromApi(res.data.data);
+        }
+      } catch (err) {
+        console.error('[PurchaseGRNPage] Failed to fetch GRN history:', err);
+      } finally {
+        setGrnHistoryLoading(false);
+      }
+    };
+    fetchGrnHistory();
+  }, []);
+
+  const grnDisplayList = grnHistoryFromApi.length > 0 ? grnHistoryFromApi : grnEntries;
 
   // Supplier & Invoice Header State
   const [supplierName, setSupplierName] = useState<string>('MedLife Distributors Pvt Ltd');
@@ -350,16 +372,22 @@ export const PurchaseGRNPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ── RECENT COMPLETED GRN HISTORY ──────────────────────────────── */}
-      {grnEntries.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-3">
-          <h3 className="text-xs font-bold text-slate-900 font-heading">
-            Completed GRN Purchase Log ({grnEntries.length})
-          </h3>
+      {/* ── RECENT COMPLETED GRN HISTORY ─────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-3">
+        <h3 className="text-xs font-bold text-slate-900 font-heading">
+          Completed GRN Purchase Log ({grnDisplayList.length})
+        </h3>
 
+        {grnHistoryLoading ? (
+          <div className="flex items-center justify-center py-8 text-slate-500 text-xs">
+            <Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading GRN history...
+          </div>
+        ) : grnDisplayList.length === 0 ? (
+          <div className="text-center py-8 text-slate-400 text-xs">No completed GRN entries yet.</div>
+        ) : (
           <div className="space-y-2">
-            {grnEntries.map((grn, idx) => (
-              <div key={grn.grnId || (grn as any)._id || idx} className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex justify-between items-center text-xs">
+            {grnDisplayList.map((grn: any, idx: number) => (
+              <div key={grn.grnId || grn._id || idx} className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex justify-between items-center text-xs">
                 <div>
                   <span className="font-mono font-bold text-slate-800">{grn.grnNumber}</span>
                   <span className="text-slate-400 mx-2">•</span>
@@ -368,16 +396,16 @@ export const PurchaseGRNPage: React.FC = () => {
                   <span className="text-slate-500">Inv #: {grn.supplierInvoiceNo}</span>
                 </div>
                 <div className="text-right">
-                  <span className="font-bold text-amber-800">₹{grn.totalAmount.toFixed(2)}</span>
+                  <span className="font-bold text-amber-800">₹{grn.totalAmount?.toFixed(2)}</span>
                   <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full ml-2">
-                    {grn.items.length} Items Received
+                    {grn.items?.length || '?'} Items Received
                   </span>
                 </div>
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import { markStockDisposed, updateProduct, navigateTo } from '../store/posSlice';
@@ -6,7 +6,7 @@ import api from '../utils/api';
 import type { Product, BatchInfo, DisposalRecord } from '../types/pos';
 import {
   AlertCircle, Clock, Trash2, ShieldAlert,
-  Calendar, Layers, X, PackageX
+  Calendar, Layers, X, PackageX, Loader2
 } from 'lucide-react';
 
 type ExpiryFilterTab = 'EXPIRED' | 'NEAR_3' | 'NEAR_7' | 'NEAR_20' | 'NEAR_30' | 'NEAR_60';
@@ -24,6 +24,32 @@ export const ExpiryManagementPage: React.FC = () => {
   const disposalRecords = useSelector((state: RootState) => state.pos.disposalRecords);
 
   const [activeTab, setActiveTab] = useState<ExpiryFilterTab>('NEAR_30');
+  const [apiRows, setApiRows] = useState<BatchRow[] | null>(null); // null = use Redux fallback
+  const [expiryLoading, setExpiryLoading] = useState<boolean>(true);
+
+  // ── Fetch live expiry data from API on mount ──────────────────────
+  useEffect(() => {
+    const fetchExpiryAlerts = async () => {
+      try {
+        const res = await api.get('/products/expiry/alerts?filter=ALL');
+        if (res.data.success) {
+          const now = new Date();
+          const rows: BatchRow[] = (res.data.data as any[]).map((r) => ({
+            product: { _id: r.productId, name: r.productName, brand: r.brand, sellingPrice: r.sellingPrice } as Product,
+            batch: { batchNumber: r.batchNumber, expiryDate: r.expiryDate, stockQuantity: r.stockQuantity, location: r.location } as BatchInfo,
+            daysLeft: r.daysLeft,
+            isExpired: r.isExpired,
+          }));
+          setApiRows(rows);
+        }
+      } catch (err) {
+        console.error('[ExpiryManagementPage] Failed to fetch expiry alerts:', err);
+      } finally {
+        setExpiryLoading(false);
+      }
+    };
+    fetchExpiryAlerts();
+  }, []);
 
   // Disposal Modal State
   const [targetBatchRow, setTargetBatchRow] = useState<BatchRow | null>(null);
@@ -31,23 +57,20 @@ export const ExpiryManagementPage: React.FC = () => {
   const [managerPin, setManagerPin] = useState<string>('');
   const [disposalQty, setDisposalQty] = useState<number>(1);
 
-  // Compute all batch rows across products with days left
+  // Use API rows if loaded, else fall back to Redux products
   const now = new Date();
-  const allBatchRows: BatchRow[] = [];
-
-  products.forEach(p => {
-    p.batches.forEach(b => {
-      const expDate = new Date(b.expiryDate);
-      const diffTime = expDate.getTime() - now.getTime();
-      const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      allBatchRows.push({
-        product: p,
-        batch: b,
-        daysLeft,
-        isExpired: daysLeft <= 0
+  const allBatchRows: BatchRow[] = apiRows ?? (() => {
+    const rows: BatchRow[] = [];
+    products.forEach(p => {
+      p.batches.forEach(b => {
+        const expDate = new Date(b.expiryDate);
+        const diffTime = expDate.getTime() - now.getTime();
+        const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        rows.push({ product: p, batch: b, daysLeft, isExpired: daysLeft <= 0 });
       });
     });
-  });
+    return rows;
+  })();
 
   // Filter batch rows
   const expiredBatches = allBatchRows.filter(r => r.isExpired);
@@ -86,13 +109,28 @@ export const ExpiryManagementPage: React.FC = () => {
     }
 
     try {
-      const res = await api.post('/auth/verify-manager-pin', { pin: managerPin });
-      if (!res.data.success) {
+      const pinRes = await api.post('/auth/verify-manager-pin', { pin: managerPin });
+      if (!pinRes.data.success || !pinRes.data.authorized) {
         alert('Invalid Manager PIN. Disposal aborted.');
         return;
       }
     } catch (err: any) {
       alert(err.response?.data?.message || 'Verification failed. Disposal aborted.');
+      return;
+    }
+
+    // ── Submit disposal to backend ───────────────────────────────
+    try {
+      await api.post('/disposal', {
+        productId: targetBatchRow.product._id,
+        productName: targetBatchRow.product.name,
+        batchNumber: targetBatchRow.batch.batchNumber,
+        quantityDisposed: disposalQty,
+        reason: disposalReason,
+        managerPin,
+      });
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to record disposal in database.');
       return;
     }
 
@@ -110,6 +148,19 @@ export const ExpiryManagementPage: React.FC = () => {
 
     dispatch(markStockDisposed(record));
     setTargetBatchRow(null);
+    // Refresh expiry alerts after disposal
+    try {
+      const res = await api.get('/products/expiry/alerts?filter=ALL');
+      if (res.data.success) {
+        const rows: BatchRow[] = (res.data.data as any[]).map((r) => ({
+          product: { _id: r.productId, name: r.productName, brand: r.brand, sellingPrice: r.sellingPrice } as Product,
+          batch: { batchNumber: r.batchNumber, expiryDate: r.expiryDate, stockQuantity: r.stockQuantity, location: r.location } as BatchInfo,
+          daysLeft: r.daysLeft,
+          isExpired: r.isExpired,
+        }));
+        setApiRows(rows);
+      }
+    } catch (_) {}
   };
 
   return (

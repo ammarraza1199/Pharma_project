@@ -70,4 +70,13 @@ router.put('/:id', protect, async (req: AuthRequest, res: Response, next: NextFu
   } catch (err) { next(err); }
 });
 
+// DELETE /api/patients/:id (soft delete — preserves invoice history)
+router.delete('/:id', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const patient = await Patient.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
+    if (!patient) return res.status(404).json({ success: false, message: 'Patient not found.' });
+    res.json({ success: true, message: 'Patient deactivated.' });
+  } catch (err) { next(err); }
+});
+
 export default router;

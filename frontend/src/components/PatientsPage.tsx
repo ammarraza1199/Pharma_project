@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { addPatient, navigateTo, setPatientDetails, setChronicRefillModalOpen, setWellnessBrochureModalOpen } from '../store/posSlice';
+import { addPatient, setPatients, navigateTo, setPatientDetails, setChronicRefillModalOpen, setWellnessBrochureModalOpen } from '../store/posSlice';
+import api from '../utils/api';
 import type { PatientRecord, WellnessBrochureCategory } from '../types/pos';
 import {
   Users, Search, Plus, UserCheck, ShoppingCart,
-  HeartPulse, X, DollarSign, Activity, Sparkles, MessageCircle, FileText, CheckCircle2, ChevronRight
+  HeartPulse, X, DollarSign, Activity, Sparkles, MessageCircle, FileText, CheckCircle2, ChevronRight,
+  Edit2, Trash2, Loader2
 } from 'lucide-react';
 
 export const PatientsPage: React.FC = () => {
@@ -15,6 +17,17 @@ export const PatientsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [selectedPatientForCarePlan, setSelectedPatientForCarePlan] = useState<PatientRecord | null>(null);
+  const [patientInvoices, setPatientInvoices] = useState<any[]>([]);
+  const [invoiceHistoryPatient, setInvoiceHistoryPatient] = useState<PatientRecord | null>(null);
+  const [invoicesLoading, setInvoicesLoading] = useState<boolean>(false);
+
+  // Edit modal state
+  const [editingPatient, setEditingPatient] = useState<PatientRecord | null>(null);
+  const [editName, setEditName] = useState<string>('');
+  const [editPhone, setEditPhone] = useState<string>('');
+  const [editAge, setEditAge] = useState<string>('');
+  const [editGender, setEditGender] = useState<'MALE' | 'FEMALE' | 'OTHER'>('MALE');
+  const [editConditions, setEditConditions] = useState<string>('');
 
   // Form state
   const [name, setName] = useState<string>('');
@@ -23,34 +36,107 @@ export const PatientsPage: React.FC = () => {
   const [gender, setGender] = useState<'MALE' | 'FEMALE' | 'OTHER'>('MALE');
   const [conditions, setConditions] = useState<string>('Diabetes');
 
+  // ── Fetch patients from API on mount ──────────────────────────────
+  useEffect(() => {
+    const fetchPatients = async () => {
+      try {
+        const res = await api.get('/patients?limit=200');
+        if (res.data.success) {
+          const mapped = res.data.data.map((p: any) => ({ ...p, patientId: p._id }));
+          dispatch(setPatients(mapped));
+        }
+      } catch (err) {
+        console.error('[PatientsPage] Failed to fetch patients:', err);
+      }
+    };
+    fetchPatients();
+  }, [dispatch]);
+
   const filteredPatients = patients.filter(p => {
     if (!searchTerm.trim()) return true;
     const t = searchTerm.toLowerCase();
-    return p.name.toLowerCase().includes(t) || p.phone.includes(t) || p.patientId.toLowerCase().includes(t);
+    return p.name.toLowerCase().includes(t) || p.phone.includes(t) || (p.patientId || '').toLowerCase().includes(t);
   });
 
   const totalPatients = patients.length;
   const totalSpend = patients.reduce((sum, p) => sum + p.totalSpent, 0);
   const chronicCount = patients.filter(p => p.chronicConditions && p.chronicConditions.length > 0).length;
 
-  const handleCreatePatient = (e: React.FormEvent) => {
+  // ── Create patient ──────────────────────────────────────────
+  const handleCreatePatient = async (e: React.FormEvent) => {
     e.preventDefault();
     const conditionList = conditions.split(',').map(c => c.trim()).filter(Boolean);
-
-    dispatch(addPatient({
-      name,
-      phone,
-      age,
-      gender,
-      totalBills: 0,
-      totalSpent: 0,
-      lastVisit: new Date().toISOString().split('T')[0],
-      chronicConditions: conditionList
-    }));
-
+    try {
+      const res = await api.post('/patients', {
+        name, phone, age, gender,
+        totalBills: 0, totalSpent: 0,
+        lastVisit: new Date().toISOString().split('T')[0],
+        chronicConditions: conditionList,
+      });
+      if (res.data.success) {
+        const newPat = { ...res.data.data, patientId: res.data.data._id };
+        dispatch(addPatient(newPat));
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to create patient.');
+    }
     setShowAddModal(false);
-    setName('');
-    setPhone('');
+    setName(''); setPhone('');
+  };
+
+  // ── Edit patient ──────────────────────────────────────────
+  const handleOpenEdit = (pat: PatientRecord) => {
+    setEditingPatient(pat);
+    setEditName(pat.name);
+    setEditPhone(pat.phone);
+    setEditAge(pat.age);
+    setEditGender(pat.gender);
+    setEditConditions((pat.chronicConditions || []).join(', '));
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPatient) return;
+    const conditionList = editConditions.split(',').map(c => c.trim()).filter(Boolean);
+    try {
+      await api.put(`/patients/${editingPatient.patientId || (editingPatient as any)._id}`, {
+        name: editName, phone: editPhone, age: editAge, gender: editGender,
+        chronicConditions: conditionList,
+      });
+      // Re-fetch to update list
+      const res = await api.get('/patients?limit=200');
+      if (res.data.success) dispatch(setPatients(res.data.data.map((p: any) => ({ ...p, patientId: p._id }))));
+      setEditingPatient(null);
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to update patient.');
+    }
+  };
+
+  // ── Delete patient (soft) ──────────────────────────────────
+  const handleDeletePatient = async (pat: PatientRecord) => {
+    if (!window.confirm(`Deactivate patient "${pat.name}"? Their invoice history will be preserved.`)) return;
+    try {
+      await api.delete(`/patients/${pat.patientId || (pat as any)._id}`);
+      const res = await api.get('/patients?limit=200');
+      if (res.data.success) dispatch(setPatients(res.data.data.map((p: any) => ({ ...p, patientId: p._id }))));
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to delete patient.');
+    }
+  };
+
+  // ── Invoice history ──────────────────────────────────────
+  const handleViewInvoiceHistory = async (pat: PatientRecord) => {
+    setInvoiceHistoryPatient(pat);
+    setPatientInvoices([]);
+    setInvoicesLoading(true);
+    try {
+      const res = await api.get(`/patients/${pat.patientId || (pat as any)._id}/invoices`);
+      if (res.data.success) setPatientInvoices(res.data.data);
+    } catch (err) {
+      console.error('[PatientsPage] Failed to fetch patient invoices:', err);
+    } finally {
+      setInvoicesLoading(false);
+    }
   };
 
   const handleStartBillingForPatient = (pat: PatientRecord) => {
@@ -215,7 +301,7 @@ export const PatientsPage: React.FC = () => {
                     </td>
 
                     <td className="px-3 py-3 text-center">
-                      <div className="flex items-center justify-center space-x-1.5">
+                      <div className="flex items-center justify-center flex-wrap gap-1">
                         <button
                           onClick={() => {
                             let cat: WellnessBrochureCategory = 'DIABETES';
@@ -233,7 +319,7 @@ export const PatientsPage: React.FC = () => {
                             }));
                           }}
                           className="flex items-center space-x-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-bold px-2 py-1.5 rounded-lg transition-all cursor-pointer"
-                          title="Generate Health & Wellness Plan Brochure (Task #29)"
+                          title="Generate Health & Wellness Plan Brochure"
                         >
                           <Sparkles className="w-3.5 h-3.5 text-amber-600" />
                           <span>Brochure</span>
@@ -241,10 +327,32 @@ export const PatientsPage: React.FC = () => {
                         <button
                           onClick={() => setSelectedPatientForCarePlan(pat)}
                           className="flex items-center space-x-1 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300 text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition-all cursor-pointer"
-                          title="View Health Insights & Personalized Care Plan"
+                          title="View Health Insights & Care Plan"
                         >
                           <Activity className="w-3.5 h-3.5 text-teal-600" />
-                          <span>Insights &amp; Care Plan</span>
+                          <span>Insights</span>
+                        </button>
+                        <button
+                          onClick={() => handleViewInvoiceHistory(pat)}
+                          className="flex items-center space-x-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-300 text-[11px] font-bold px-2 py-1.5 rounded-lg transition-all cursor-pointer"
+                          title="View Invoice History"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>History</span>
+                        </button>
+                        <button
+                          onClick={() => handleOpenEdit(pat)}
+                          className="flex items-center space-x-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-300 text-[11px] font-bold px-2 py-1.5 rounded-lg transition-all cursor-pointer"
+                          title="Edit Patient"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeletePatient(pat)}
+                          className="flex items-center space-x-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-bold px-2 py-1.5 rounded-lg transition-all cursor-pointer"
+                          title="Deactivate Patient"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleStartBillingForPatient(pat)}
@@ -531,6 +639,105 @@ export const PatientsPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── EDIT PATIENT MODAL ────────────────────────────────────────────── */}
+      {editingPatient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 relative">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-200">
+              <h3 className="text-sm font-extrabold text-slate-900 font-heading flex items-center space-x-2">
+                <Edit2 className="w-4 h-4 text-orange-600" />
+                <span>Edit Patient — {editingPatient.name}</span>
+              </h3>
+              <button onClick={() => setEditingPatient(null)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+            </div>
+            <form onSubmit={handleSaveEdit} className="space-y-3 text-xs font-semibold">
+              <div>
+                <label className="block text-slate-700 mb-1">Full Name *</label>
+                <input type="text" required value={editName} onChange={e => setEditName(e.target.value)}
+                  className="w-full p-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-hidden" />
+              </div>
+              <div>
+                <label className="block text-slate-700 mb-1">Mobile Number *</label>
+                <input type="tel" required value={editPhone} onChange={e => setEditPhone(e.target.value)}
+                  className="w-full p-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-hidden" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 mb-1">Age</label>
+                  <input type="number" value={editAge} onChange={e => setEditAge(e.target.value)}
+                    className="w-full p-2 border border-slate-300 rounded-xl font-bold" />
+                </div>
+                <div>
+                  <label className="block text-slate-700 mb-1">Gender</label>
+                  <select value={editGender} onChange={e => setEditGender(e.target.value as any)}
+                    className="w-full p-2 border border-slate-300 rounded-xl bg-white font-bold">
+                    <option value="MALE">Male</option>
+                    <option value="FEMALE">Female</option>
+                    <option value="OTHER">Other</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-slate-700 mb-1">Chronic Conditions (comma separated)</label>
+                <input type="text" value={editConditions} onChange={e => setEditConditions(e.target.value)}
+                  placeholder="Hypertension, Diabetes"
+                  className="w-full p-2 border border-slate-300 rounded-xl" />
+              </div>
+              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-200">
+                <button type="button" onClick={() => setEditingPatient(null)}
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl">Cancel</button>
+                <button type="submit"
+                  className="px-5 py-2 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-md cursor-pointer">
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── INVOICE HISTORY MODAL ─────────────────────────────────────────── */}
+      {invoiceHistoryPatient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-200 flex-shrink-0">
+              <h3 className="text-sm font-extrabold text-slate-900 font-heading flex items-center space-x-2">
+                <FileText className="w-4 h-4 text-indigo-600" />
+                <span>Invoice History — {invoiceHistoryPatient.name}</span>
+              </h3>
+              <button onClick={() => setInvoiceHistoryPatient(null)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto space-y-2 text-xs">
+              {invoicesLoading ? (
+                <div className="flex items-center justify-center py-12 text-slate-500">
+                  <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading invoices...
+                </div>
+              ) : patientInvoices.length === 0 ? (
+                <div className="text-center py-12 text-slate-400">No invoices found for this patient.</div>
+              ) : (
+                patientInvoices.map((inv: any) => (
+                  <div key={inv._id} className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex justify-between items-center">
+                    <div>
+                      <span className="font-mono font-bold text-slate-800">{inv.invoiceNumber}</span>
+                      <span className="text-slate-400 mx-2">•</span>
+                      <span className="text-slate-600">{new Date(inv.invoiceDate).toLocaleDateString('en-IN')}</span>
+                      <span className="text-slate-400 mx-2">•</span>
+                      <span className="text-slate-600">{inv.billingSession?.items?.length || 0} items</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-black text-emerald-800">₹{inv.grandTotal?.toFixed(2)}</span>
+                      <span className="text-[10px] ml-2 bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full">
+                        {inv.payment?.method}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}
