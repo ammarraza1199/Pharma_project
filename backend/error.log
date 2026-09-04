@@ -1,7 +1,0 @@
-[ERROR] 2026-08-25T10:10:55.548Z POST /api/billing/hold-bill → 500: HeldBill validation failed: totalAmount: Path `totalAmount` is required.
-ValidationError: HeldBill validation failed: totalAmount: Path `totalAmount` is required.
-    at Document.invalidate (C:\Users\DELL\Downloads\ZeroKost\Pharmacy_project\Genquantaa_Pharmacy_Billing\Pharma_project\backend\node_modules\mongoose\lib\document.js:3387:32)
-    at C:\Users\DELL\Downloads\ZeroKost\Pharmacy_project\Genquantaa_Pharmacy_Billing\Pharma_project\backend\node_modules\mongoose\lib\document.js:3148:17
-    at C:\Users\DELL\Downloads\ZeroKost\Pharmacy_project\Genquantaa_Pharmacy_Billing\Pharma_project\backend\node_modules\mongoose\lib\schemaType.js:1443:9
-    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
-

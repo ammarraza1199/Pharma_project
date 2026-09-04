@@ -74,8 +74,7 @@ app.use(notFound);
 app.use(errorHandler);
 
 // ── Start Server ────────────────────────────────────────────────────────────────
-const start = async () => {
-  await connectDB();
+const start = () => {
   httpServer.listen(config.port, () => {
     console.log(`\n🏥 Genquantaa Pharmacy Backend`);
     console.log(`🚀 Server running on http://localhost:${config.port}`);
@@ -94,6 +93,10 @@ const start = async () => {
     console.log(`   /api/settings       → Store Configuration & Secure PINs`);
     console.log(`   /api/drug-interactions → Drug Interaction Rules\n`);
   });
+
+  connectDB().catch((err) => {
+    console.error('Initial DB connection attempt error:', err?.message || err);
+  });
 };
 
-start().catch((err) => { console.error('Failed to start server:', err); process.exit(1); });
+start();

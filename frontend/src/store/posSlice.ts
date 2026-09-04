@@ -1739,6 +1739,20 @@ export const posSlice = createSlice({
       currentSession.patientDetails = { patientName: '', phone: '', age: '', gender: 'MALE' };
     },
 
+    setHeldBills: (state, action: PayloadAction<HeldBill[]>) => {
+      state.heldBills = action.payload;
+    },
+
+    clearActiveSession: (state) => {
+      const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
+      if (currentSession) {
+        currentSession.items = [];
+        currentSession.doctorDetails = { doctorName: '', regNo: '' };
+        currentSession.patientDetails = { patientName: '', phone: '', age: '', gender: 'MALE' };
+        currentSession.pharmacistSignatureAcknowledged = false;
+      }
+    },
+
     restoreHeldBill: (state, action: PayloadAction<string>) => {
       const heldIndex = state.heldBills.findIndex(h => h.id === action.payload);
       if (heldIndex !== -1) {
@@ -1911,6 +1925,9 @@ export const posSlice = createSlice({
     // Bill Finalization & Printing
     startSubmittingBill: (state) => {
       state.isSubmittingBill = true;
+    },
+    stopSubmittingBill: (state) => {
+      state.isSubmittingBill = false;
     },
     finalizeBillSuccess: (state, action: PayloadAction<PaymentDetails>) => {
       const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
@@ -2209,7 +2226,10 @@ export const {
   refillChronicMedicationsToCart,
   openScheduleHDetailsPrompt,
   startSubmittingBill,
+  stopSubmittingBill,
   finalizeBillSuccess,
+  setHeldBills,
+  clearActiveSession,
   finalizeEmergencyInvoice,
   clearFinalizedInvoice,
   setInvoiceHistoryModalOpen,
