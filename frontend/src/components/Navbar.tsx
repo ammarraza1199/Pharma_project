@@ -211,44 +211,40 @@ export const Navbar: React.FC = () => {
           <Bike className="w-4 h-4" />
         </button>
 
-        {/* Task #29: Health & Wellness Plan Brochure Nav */}
+        {/* Health & Wellness Plan Brochure Nav - Icon Only */}
         <button
           onClick={() => dispatch(setWellnessBrochureModalOpen({ isOpen: true }))}
-          className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-black bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white shadow-xs transition-all cursor-pointer border border-emerald-400/30"
+          className="p-1.5 rounded-lg bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white shadow-xs transition-all cursor-pointer border border-emerald-400/30 shrink-0 flex items-center justify-center"
           title="Health & Wellness Plan Brochure"
         >
-          <Sparkles className="w-3.5 h-3.5 text-emerald-200" />
-          <span className="font-heading tracking-tight">Wellness Plan</span>
+          <Sparkles className="w-4 h-4 text-emerald-100" />
         </button>
 
-        {/* Tasks 31-36: Multi-Store & Borrowed Stock Hub */}
+        {/* Multi-Store & Borrowed Stock Hub - Icon Only */}
         <button
           onClick={() => dispatch(setMultiStoreModalOpen({ isOpen: true }))}
-          className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-black bg-sky-600 hover:bg-sky-700 text-white shadow-xs transition-all cursor-pointer border border-sky-400/30"
-          title="Multi-Store, Inter-Branch & Borrowed Stock"
+          className="p-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white shadow-xs transition-all cursor-pointer border border-sky-400/30 shrink-0 flex items-center justify-center"
+          title="Multi-Store & Inter-Branch Stock Lookup"
         >
-          <Building2 className="w-3.5 h-3.5 text-sky-200" />
-          <span className="font-heading tracking-tight">Inter-Store</span>
+          <Building2 className="w-4 h-4 text-sky-100" />
         </button>
 
-        {/* Task #32: Inter-Store AI Chatbot Widget */}
+        {/* Inter-Store AI Chatbot Widget - Icon Only */}
         <button
           onClick={() => dispatch(setInterStoreChatbotModalOpen(true))}
-          className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-black bg-slate-900 hover:bg-slate-800 text-emerald-400 shadow-xs transition-all cursor-pointer border border-slate-700"
+          className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-emerald-400 shadow-xs transition-all cursor-pointer border border-slate-700 shrink-0 flex items-center justify-center"
           title="PharmaConnect AI Chatbot"
         >
-          <Bot className="w-3.5 h-3.5 text-emerald-400" />
-          <span className="font-heading tracking-tight text-white">Pharma Bot</span>
+          <Bot className="w-4 h-4 text-emerald-400" />
         </button>
 
-        {/* Customer Voice Record & Notes Nav */}
+        {/* Customer Voice Record & Notes Nav - Icon Only */}
         <button
           onClick={() => dispatch(setVoiceConsultationModalOpen({ isOpen: true }))}
-          className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-black bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition-all cursor-pointer border border-rose-400/30"
+          className="p-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition-all cursor-pointer border border-rose-400/30 shrink-0 flex items-center justify-center"
           title="Customer Voice Record & Discussion Notes"
         >
-          <Mic className="w-3.5 h-3.5 text-rose-200 animate-pulse" />
-          <span className="font-heading tracking-tight">Voice Notes</span>
+          <Mic className="w-4 h-4 text-rose-100 animate-pulse" />
         </button>
 
         {/* 🏪 Active Shift Counter Badge — or Emergency Desk Badge */}
