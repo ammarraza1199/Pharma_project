@@ -30,7 +30,8 @@ import type {
   BranchStore,
   BorrowedMedicineRecord,
   AgeRecommendationCoupon,
-  InterStoreChatMessage
+  InterStoreChatMessage,
+  VoiceConsultationRecord
 } from '../types/pos';
 import { MOCK_PRODUCTS } from '../mock/products';
 import { calculateItemGST } from '../utils/gstCalculator';
@@ -129,6 +130,15 @@ interface PosState {
   interStoreChatbotModal: {
     isOpen: boolean;
   };
+  voiceConsultationModal: {
+    isOpen: boolean;
+    patientName?: string;
+    phone?: string;
+    age?: string;
+    gender?: 'MALE' | 'FEMALE' | 'OTHER';
+    sessionId?: string;
+  };
+  consultationRecords: VoiceConsultationRecord[];
 
   // Printing & Finalization
   invoices: FinalizedInvoice[];
@@ -878,6 +888,45 @@ const initialState: PosState = {
   interStoreChatbotModal: {
     isOpen: false
   },
+
+  voiceConsultationModal: {
+    isOpen: false
+  },
+
+  consultationRecords: [
+    {
+      id: 'consult-101',
+      patientName: 'Ramesh Kumar',
+      phone: '9876543210',
+      age: '54',
+      gender: 'MALE',
+      date: '2026-09-07',
+      time: '11:45 AM',
+      durationSeconds: 42,
+      category: 'CHRONIC_CARE',
+      chiefDiscussion: 'Patient inquired about fasting vs post-meal Metformin dosage and reported minor gastrointestinal discomfort.',
+      pharmacistAdvice: 'Advised to take Metformin strictly with or immediately after major meals to reduce GI irritation. Highlighted routine HbA1c testing in 3 months.',
+      tags: ['#Diabetes', '#Metformin', '#WithFood', '#RoutineRefill'],
+      pharmacistName: 'Ramesh Kumar',
+      counterNumber: 1
+    },
+    {
+      id: 'consult-102',
+      patientName: 'Sunita Reddy',
+      phone: '9876543220',
+      age: '62',
+      gender: 'FEMALE',
+      date: '2026-09-06',
+      time: '04:15 PM',
+      durationSeconds: 58,
+      category: 'DOSAGE_ADMIN',
+      chiefDiscussion: 'Clarified inhaler technique for Budesonide + Formoterol turbohaler and mouth rinsing protocol.',
+      pharmacistAdvice: 'Demonstrated deep inhalation hold for 10 seconds. Emphasized gargling warm water post-use to prevent oral candidiasis.',
+      tags: ['#AsthmaInhaler', '#MouthRinsing', '#SeniorCare'],
+      pharmacistName: 'Priya Sharma',
+      counterNumber: 2
+    }
+  ],
 
   invoices: getInitialInvoices(),
   latestFinalizedInvoice: null,
@@ -1834,6 +1883,43 @@ export const posSlice = createSlice({
       state.interStoreChatbotModal.isOpen = action.payload;
     },
 
+    setVoiceConsultationModalOpen: (
+      state,
+      action: PayloadAction<{
+        isOpen: boolean;
+        patientName?: string;
+        phone?: string;
+        age?: string;
+        gender?: 'MALE' | 'FEMALE' | 'OTHER';
+        sessionId?: string;
+      }>
+    ) => {
+      state.voiceConsultationModal.isOpen = action.payload.isOpen;
+      if (action.payload.patientName !== undefined) {
+        state.voiceConsultationModal.patientName = action.payload.patientName;
+      }
+      if (action.payload.phone !== undefined) {
+        state.voiceConsultationModal.phone = action.payload.phone;
+      }
+      if (action.payload.age !== undefined) {
+        state.voiceConsultationModal.age = action.payload.age;
+      }
+      if (action.payload.gender !== undefined) {
+        state.voiceConsultationModal.gender = action.payload.gender;
+      }
+      if (action.payload.sessionId !== undefined) {
+        state.voiceConsultationModal.sessionId = action.payload.sessionId;
+      }
+    },
+
+    saveConsultationRecord: (state, action: PayloadAction<VoiceConsultationRecord>) => {
+      state.consultationRecords.unshift(action.payload);
+    },
+
+    deleteConsultationRecord: (state, action: PayloadAction<string>) => {
+      state.consultationRecords = state.consultationRecords.filter(r => r.id !== action.payload);
+    },
+
     sendInterStoreChatMessage: (state, action: PayloadAction<string>) => {
       const userText = action.payload;
       const userMsg: InterStoreChatMessage = {
@@ -2219,6 +2305,9 @@ export const {
   setWellnessBrochureModalOpen,
   setMultiStoreModalOpen,
   setInterStoreChatbotModalOpen,
+  setVoiceConsultationModalOpen,
+  saveConsultationRecord,
+  deleteConsultationRecord,
   sendInterStoreChatMessage,
   recordBorrowedStock,
   attachPrescriptionToSession,

@@ -8,13 +8,14 @@ import {
   removeFromCart,
   clearActiveCart,
   applyBulkDiscount,
-  openScheduleHDetailsPrompt
+  openScheduleHDetailsPrompt,
+  setVoiceConsultationModalOpen
 } from '../store/posSlice';
 import { analyzeDrugInteractions } from '../utils/drugInteractionEngine';
 import { getMedicineDetails } from '../utils/medicineDetails';
 import {
   Trash2, Plus, Minus, AlertTriangle, AlertOctagon, UserCheck,
-  Stethoscope, Edit2, Percent, FileText, RefreshCcw, Pill
+  Stethoscope, Edit2, Percent, FileText, RefreshCcw, Pill, Mic
 } from 'lucide-react';
 
 export const CartTable: React.FC = () => {
@@ -103,14 +104,31 @@ export const CartTable: React.FC = () => {
           )}
         </div>
 
-        {/* Edit Action */}
-        <button
-          onClick={() => dispatch(openScheduleHDetailsPrompt())}
-          className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 flex items-center space-x-1 hover:underline cursor-pointer"
-        >
-          <Edit2 className="w-3 h-3" />
-          <span>Edit Patient Info</span>
-        </button>
+        {/* Patient Bar Actions */}
+        <div className="flex items-center space-x-2.5">
+          <button
+            onClick={() => dispatch(setVoiceConsultationModalOpen({
+              isOpen: true,
+              patientName: patientDetails?.patientName || '',
+              phone: patientDetails?.phone || '',
+              age: patientDetails?.age || '',
+              gender: patientDetails?.gender || 'MALE'
+            }))}
+            className="text-xs font-bold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-lg flex items-center space-x-1 transition-all cursor-pointer"
+            title="Record Counter Voice Consultation & Notes"
+          >
+            <Mic className="w-3 h-3 text-rose-600 animate-pulse" />
+            <span>Voice Note</span>
+          </button>
+
+          <button
+            onClick={() => dispatch(openScheduleHDetailsPrompt())}
+            className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 flex items-center space-x-1 hover:underline cursor-pointer"
+          >
+            <Edit2 className="w-3 h-3" />
+            <span>Edit Patient Info</span>
+          </button>
+        </div>
       </div>
 
       {/* ── CART HEADER CONTROL BAR (Bulk Discount & Clear) ─────────── */}

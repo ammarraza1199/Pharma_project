@@ -391,5 +391,22 @@ export interface InterStoreChatMessage {
   };
 }
 
-
-
+export interface VoiceConsultationRecord {
+  id: string;
+  patientName: string;
+  phone: string;
+  age?: string;
+  gender?: 'MALE' | 'FEMALE' | 'OTHER';
+  date: string;
+  time: string;
+  durationSeconds: number;
+  audioUrl?: string;
+  audioBlobBase64?: string;
+  category: 'CHRONIC_CARE' | 'DOSAGE_ADMIN' | 'ALLERGY_WARNING' | 'OTC_GUIDANCE' | 'PEDIATRIC_GERIATRIC' | 'GENERAL_ADVICE';
+  chiefDiscussion: string;
+  pharmacistAdvice: string;
+  tags: string[];
+  pharmacistName: string;
+  counterNumber?: number;
+  sessionId?: string;
+}

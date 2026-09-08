@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { navigateTo, logoutUser, setInvoiceHistoryModalOpen, switchActivePharmacist, setWellnessBrochureModalOpen, setMultiStoreModalOpen, setInterStoreChatbotModalOpen } from '../store/posSlice';
-import { Clock, Store, LogOut, LayoutDashboard, ShoppingCart, Package, Truck, BarChart3, RotateCcw, Users, Building, Settings, History, FileText, Siren, ChevronDown, Check, Bike, AlertTriangle, Sparkles, Building2, Bot } from 'lucide-react';
+import { navigateTo, logoutUser, setInvoiceHistoryModalOpen, switchActivePharmacist, setWellnessBrochureModalOpen, setMultiStoreModalOpen, setInterStoreChatbotModalOpen, setVoiceConsultationModalOpen } from '../store/posSlice';
+import { Clock, Store, LogOut, LayoutDashboard, ShoppingCart, Package, Truck, BarChart3, RotateCcw, Users, Building, Settings, History, FileText, Siren, ChevronDown, Check, Bike, AlertTriangle, Sparkles, Building2, Bot, Mic } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const dispatch = useDispatch();
@@ -47,8 +47,8 @@ export const Navbar: React.FC = () => {
         <button
           onClick={() => dispatch(navigateTo('DASHBOARD'))}
           className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'DASHBOARD'
-              ? 'bg-violet-100 text-violet-800 font-bold'
-              : 'text-slate-500 hover:text-violet-700 hover:bg-violet-50'
+            ? 'bg-violet-100 text-violet-800 font-bold'
+            : 'text-slate-500 hover:text-violet-700 hover:bg-violet-50'
             }`}
           title="Dashboard"
         >
@@ -59,8 +59,8 @@ export const Navbar: React.FC = () => {
         <button
           onClick={() => dispatch(navigateTo('POS_TERMINAL'))}
           className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'POS_TERMINAL'
-              ? 'bg-emerald-100 text-emerald-800 font-bold'
-              : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
+            ? 'bg-emerald-100 text-emerald-800 font-bold'
+            : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
             }`}
           title="POS Billing Terminal"
         >
@@ -71,8 +71,8 @@ export const Navbar: React.FC = () => {
         <button
           onClick={() => dispatch(navigateTo('INVOICES'))}
           className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'INVOICES'
-              ? 'bg-emerald-100 text-emerald-800 font-bold'
-              : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
+            ? 'bg-emerald-100 text-emerald-800 font-bold'
+            : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
             }`}
           title="Invoices & Sales History"
         >
@@ -83,8 +83,8 @@ export const Navbar: React.FC = () => {
         <button
           onClick={() => dispatch(navigateTo('INVENTORY'))}
           className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'INVENTORY'
-              ? 'bg-emerald-100 text-emerald-800 font-bold'
-              : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
+            ? 'bg-emerald-100 text-emerald-800 font-bold'
+            : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
             }`}
           title="Inventory Catalog"
         >
@@ -95,8 +95,8 @@ export const Navbar: React.FC = () => {
         <button
           onClick={() => dispatch(navigateTo('INVENTORY_DASHBOARD'))}
           className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'INVENTORY_DASHBOARD'
-              ? 'bg-teal-100 text-teal-800 font-bold shadow-2xs'
-              : 'text-slate-500 hover:text-teal-700 hover:bg-teal-50'
+            ? 'bg-teal-100 text-teal-800 font-bold shadow-2xs'
+            : 'text-slate-500 hover:text-teal-700 hover:bg-teal-50'
             }`}
           title="Inventory Shelf, Expiry & Pricing Dashboard"
         >
@@ -107,8 +107,8 @@ export const Navbar: React.FC = () => {
         <button
           onClick={() => dispatch(navigateTo('PURCHASE_GRN'))}
           className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'PURCHASE_GRN'
-              ? 'bg-amber-100 text-amber-800 font-bold'
-              : 'text-slate-500 hover:text-amber-700 hover:bg-amber-50'
+            ? 'bg-amber-100 text-amber-800 font-bold'
+            : 'text-slate-500 hover:text-amber-700 hover:bg-amber-50'
             }`}
           title="Stock Purchase (GRN)"
         >
@@ -119,8 +119,8 @@ export const Navbar: React.FC = () => {
         <button
           onClick={() => dispatch(navigateTo('REPORTS'))}
           className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'REPORTS'
-              ? 'bg-blue-100 text-blue-800 font-bold'
-              : 'text-slate-500 hover:text-blue-700 hover:bg-blue-50'
+            ? 'bg-blue-100 text-blue-800 font-bold'
+            : 'text-slate-500 hover:text-blue-700 hover:bg-blue-50'
             }`}
           title="Sales Reports & GST Analytics"
         >
@@ -131,8 +131,8 @@ export const Navbar: React.FC = () => {
         <button
           onClick={() => dispatch(navigateTo('RETURNS'))}
           className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'RETURNS'
-              ? 'bg-rose-100 text-rose-800 font-bold'
-              : 'text-slate-500 hover:text-rose-700 hover:bg-rose-50'
+            ? 'bg-rose-100 text-rose-800 font-bold'
+            : 'text-slate-500 hover:text-rose-700 hover:bg-rose-50'
             }`}
           title="Returns & Refund Credit Notes"
         >
@@ -143,8 +143,8 @@ export const Navbar: React.FC = () => {
         <button
           onClick={() => dispatch(navigateTo('EXPIRY_MANAGEMENT'))}
           className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'EXPIRY_MANAGEMENT'
-              ? 'bg-amber-100 text-amber-800 font-bold'
-              : 'text-slate-500 hover:text-amber-700 hover:bg-amber-50'
+            ? 'bg-amber-100 text-amber-800 font-bold'
+            : 'text-slate-500 hover:text-amber-700 hover:bg-amber-50'
             }`}
           title="Expiry & Stock Disposal Management"
         >
@@ -155,8 +155,8 @@ export const Navbar: React.FC = () => {
         <button
           onClick={() => dispatch(navigateTo('PATIENTS'))}
           className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'PATIENTS'
-              ? 'bg-orange-100 text-orange-800 font-bold'
-              : 'text-slate-500 hover:text-orange-700 hover:bg-orange-50'
+            ? 'bg-orange-100 text-orange-800 font-bold'
+            : 'text-slate-500 hover:text-orange-700 hover:bg-orange-50'
             }`}
           title="Patients History Directory"
         >
@@ -167,8 +167,8 @@ export const Navbar: React.FC = () => {
         <button
           onClick={() => dispatch(navigateTo('SUPPLIERS'))}
           className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'SUPPLIERS'
-              ? 'bg-emerald-100 text-emerald-800 font-bold'
-              : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
+            ? 'bg-emerald-100 text-emerald-800 font-bold'
+            : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
             }`}
           title="Suppliers & Vendors Directory"
         >
@@ -179,38 +179,36 @@ export const Navbar: React.FC = () => {
         <button
           onClick={() => dispatch(navigateTo('SETTINGS'))}
           className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'SETTINGS'
-              ? 'bg-slate-800 text-white font-bold shadow-xs'
-              : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+            ? 'bg-slate-800 text-white font-bold shadow-xs'
+            : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
             }`}
           title="Store Settings & Hardware Config"
         >
           <Settings className="w-4 h-4" />
         </button>
 
-        {/* Emergency Delivery Nav */}
+        {/* Emergency Delivery Nav - Icon Only */}
         <button
           onClick={() => dispatch(navigateTo('EMERGENCY_DELIVERY'))}
-          className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer shadow-xs ${currentView === 'EMERGENCY_DELIVERY'
-              ? 'bg-red-600 text-white ring-2 ring-red-300 shadow-sm shadow-red-600/40'
-              : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
+          className={`p-1.5 rounded-lg transition-all cursor-pointer shadow-xs shrink-0 flex items-center justify-center ${currentView === 'EMERGENCY_DELIVERY'
+            ? 'bg-red-600 text-white ring-2 ring-red-300 shadow-sm shadow-red-600/40'
+            : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
             }`}
           title="Emergency Fast Delivery"
         >
-          <Siren className="w-3.5 h-3.5 text-red-600 animate-pulse" />
-          <span className="font-heading tracking-tight">🚨 Emergency</span>
+          <Siren className="w-4 h-4 text-red-600 animate-pulse" />
         </button>
 
-        {/* Online Delivery Dashboard Nav */}
+        {/* Online Delivery Dashboard Nav - Icon Only */}
         <button
           onClick={() => dispatch(navigateTo('ONLINE_DELIVERY'))}
-          className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer shadow-xs ${currentView === 'ONLINE_DELIVERY'
-              ? 'bg-emerald-600 text-white ring-2 ring-emerald-300 shadow-sm'
-              : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+          className={`p-1.5 rounded-lg transition-all cursor-pointer shadow-xs shrink-0 flex items-center justify-center ${currentView === 'ONLINE_DELIVERY'
+            ? 'bg-emerald-600 text-white ring-2 ring-emerald-300 shadow-sm'
+            : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
             }`}
           title="Online Home Delivery Dashboard"
         >
-          <Bike className="w-3.5 h-3.5" />
-          <span className="font-heading tracking-tight">🚴 Delivery</span>
+          <Bike className="w-4 h-4" />
         </button>
 
         {/* Task #29: Health & Wellness Plan Brochure Nav */}
@@ -241,6 +239,16 @@ export const Navbar: React.FC = () => {
         >
           <Bot className="w-3.5 h-3.5 text-emerald-400" />
           <span className="font-heading tracking-tight text-white">Pharma Bot</span>
+        </button>
+
+        {/* Customer Voice Record & Notes Nav */}
+        <button
+          onClick={() => dispatch(setVoiceConsultationModalOpen({ isOpen: true }))}
+          className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-black bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition-all cursor-pointer border border-rose-400/30"
+          title="Customer Voice Record & Discussion Notes"
+        >
+          <Mic className="w-3.5 h-3.5 text-rose-200 animate-pulse" />
+          <span className="font-heading tracking-tight">Voice Notes</span>
         </button>
 
         {/* 🏪 Active Shift Counter Badge — or Emergency Desk Badge */}
@@ -287,8 +295,8 @@ export const Navbar: React.FC = () => {
                               setShowCounterDropdown(false);
                             }}
                             className={`w-full flex items-center justify-between p-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${isSelected
-                                ? 'bg-emerald-50 text-emerald-900 font-bold border border-emerald-300'
-                                : 'text-slate-700 hover:bg-slate-50'
+                              ? 'bg-emerald-50 text-emerald-900 font-bold border border-emerald-300'
+                              : 'text-slate-700 hover:bg-slate-50'
                               }`}
                           >
                             <div className="flex items-center space-x-2">
