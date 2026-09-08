@@ -217,7 +217,7 @@ export const Navbar: React.FC = () => {
         <button
           onClick={() => dispatch(setWellnessBrochureModalOpen({ isOpen: true }))}
           className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-black bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white shadow-xs transition-all cursor-pointer border border-emerald-400/30"
-          title="Health & Wellness Plan Brochure (Task #29)"
+          title="Health & Wellness Plan Brochure"
         >
           <Sparkles className="w-3.5 h-3.5 text-emerald-200" />
           <span className="font-heading tracking-tight">Wellness Plan</span>
@@ -227,7 +227,7 @@ export const Navbar: React.FC = () => {
         <button
           onClick={() => dispatch(setMultiStoreModalOpen({ isOpen: true }))}
           className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-black bg-sky-600 hover:bg-sky-700 text-white shadow-xs transition-all cursor-pointer border border-sky-400/30"
-          title="Multi-Store, Inter-Branch & Borrowed Stock (Tasks #31-36)"
+          title="Multi-Store, Inter-Branch & Borrowed Stock"
         >
           <Building2 className="w-3.5 h-3.5 text-sky-200" />
           <span className="font-heading tracking-tight">Inter-Store</span>
@@ -237,7 +237,7 @@ export const Navbar: React.FC = () => {
         <button
           onClick={() => dispatch(setInterStoreChatbotModalOpen(true))}
           className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-black bg-slate-900 hover:bg-slate-800 text-emerald-400 shadow-xs transition-all cursor-pointer border border-slate-700"
-          title="PharmaConnect AI Chatbot (Task #32)"
+          title="PharmaConnect AI Chatbot"
         >
           <Bot className="w-3.5 h-3.5 text-emerald-400" />
           <span className="font-heading tracking-tight text-white">Pharma Bot</span>

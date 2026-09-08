@@ -224,10 +224,10 @@ export const ProductSearch: React.FC = () => {
           type="button"
           onClick={() => dispatch(setMultiStoreModalOpen({ isOpen: true }))}
           className="flex-1 flex items-center justify-center space-x-1.5 bg-sky-50 hover:bg-sky-100 text-sky-900 border border-sky-300 px-2 py-1.5 rounded-xl text-[11px] font-extrabold transition-all shadow-2xs cursor-pointer active:scale-98"
-          title="Multi-Store & Inter-Branch Stock Lookup (Tasks #31-36)"
+          title="Multi-Store & Inter-Branch Stock Lookup"
         >
           <Building2 className="w-3.5 h-3.5 text-sky-700" />
-          <span>Branch Stock (Tasks 31-36)</span>
+          <span>Branch Stock</span>
         </button>
       </div>
 

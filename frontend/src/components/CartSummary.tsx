@@ -251,7 +251,7 @@ export const CartSummary: React.FC = () => {
               <div className="flex items-center justify-between">
                 <span className="font-bold text-amber-900 flex items-center gap-1 text-[11px]">
                   <Tag className="w-3 h-3 text-amber-600" />
-                  <span>Age-Based Care Coupon (Task #30)</span>
+                  <span>Age-Based Care Coupon</span>
                 </span>
                 <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-amber-200 text-amber-900">
                   {Number(currentSession.patientDetails.age) <= 12

@@ -57,9 +57,6 @@ export const InterStoreChatbotModal: React.FC = () => {
           <div>
             <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
               PharmaConnect Bot
-              <span className="text-[10px] px-2 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
-                Task #32
-              </span>
             </h3>
             <p className="text-[10px] text-slate-400">
               Inter-Store Chatbot for branch stock & transfer queries
