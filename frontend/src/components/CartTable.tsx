@@ -17,7 +17,8 @@ import { analyzeDrugInteractions } from '../utils/drugInteractionEngine';
 import { getMedicineDetails } from '../utils/medicineDetails';
 import {
   Trash2, Plus, Minus, AlertTriangle, AlertOctagon, UserCheck,
-  Stethoscope, Edit2, Percent, FileText, RefreshCcw, Pill, Mic, Volume2, Zap
+  Stethoscope, Edit2, Percent, FileText, RefreshCcw, Pill, Mic, Volume2, Zap,
+  PackageOpen, BadgeAlert, Tag
 } from 'lucide-react';
 
 export const CartTable: React.FC = () => {
@@ -35,11 +36,48 @@ export const CartTable: React.FC = () => {
 
   const interactionResult = analyzeDrugInteractions(items);
 
-  const isNearExpiry = (expiryDateStr: string) => {
+  // ── UNIFIED EXPIRY BADGE SYSTEM (Red / Orange / Amber / Green) ──────────
+  type ExpiryLevel = 'URGENT' | 'CRITICAL' | 'WARNING' | 'SAFE' | 'EXPIRED';
+  const getExpiryBadge = (expiryDateStr: string): {
+    level: ExpiryLevel;
+    daysLeft: number;
+    label: string;
+    badgeCls: string;
+    rowCls: string;
+    textCls: string;
+  } => {
     const exp = new Date(expiryDateStr);
-    const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-    return exp < thirtyDaysFromNow && exp > new Date();
+    const now = new Date();
+    const daysLeft = Math.ceil((exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (daysLeft <= 0)  return { level: 'EXPIRED',  daysLeft: 0,        label: 'EXPIRED',                   badgeCls: 'bg-red-700 text-white border-red-800 animate-pulse',                           rowCls: 'bg-red-50/80 border-l-4 border-l-red-600',       textCls: 'text-red-700' };
+    if (daysLeft <= 10) return { level: 'URGENT',   daysLeft,           label: `🔴 ${daysLeft}d — URGENT`,  badgeCls: 'bg-red-500 text-white border-red-600 animate-pulse',                           rowCls: 'bg-red-50/60 border-l-4 border-l-red-500',       textCls: 'text-red-600' };
+    if (daysLeft <= 30) return { level: 'CRITICAL',  daysLeft,          label: `🟠 ${daysLeft}d — CRITICAL`, badgeCls: 'bg-orange-500 text-white border-orange-600 animate-pulse',                     rowCls: 'bg-orange-50/60 border-l-4 border-l-orange-500',  textCls: 'text-orange-600' };
+    if (daysLeft <= 90) return { level: 'WARNING',   daysLeft,          label: `🟡 ${daysLeft}d — Near Exp`, badgeCls: 'bg-amber-400 text-amber-950 border-amber-500',                               rowCls: 'bg-amber-50/40 border-l-4 border-l-amber-400',   textCls: 'text-amber-700' };
+    return               { level: 'SAFE',     daysLeft,                 label: `🟢 ${daysLeft}d`,            badgeCls: 'bg-emerald-100 text-emerald-800 border-emerald-400',                          rowCls: '',                                                textCls: 'text-emerald-700' };
   };
+
+  // Legacy helpers (kept for backward compat)
+  const isNearExpiry = (expiryDateStr: string) => {
+    const { level } = getExpiryBadge(expiryDateStr);
+    return level === 'URGENT' || level === 'CRITICAL' || level === 'WARNING';
+  };
+
+  // ── DUMP STOCK: batch expiring within 60 days = old clearance stock ──────
+  const isDumpStock = (expiryDateStr: string): { isDump: boolean; daysLeft: number; urgency: 'CRITICAL' | 'WARNING' | 'NORMAL' } => {
+    const { level, daysLeft } = getExpiryBadge(expiryDateStr);
+    if (level === 'EXPIRED' || level === 'SAFE') return { isDump: false, daysLeft, urgency: 'NORMAL' };
+    if (level === 'URGENT' || level === 'CRITICAL') return { isDump: true, daysLeft, urgency: 'CRITICAL' };
+    return { isDump: true, daysLeft, urgency: 'WARNING' };
+  };
+
+  // Check if ANY cart item has dump stock
+  const dumpStockItems = items.filter(item => isDumpStock(item.selectedBatch.expiryDate).isDump);
+  const hasDumpStock = dumpStockItems.length > 0;
+
+  // Urgent items (≤10 days)
+  const urgentExpiryItems = items.filter(item => getExpiryBadge(item.selectedBatch.expiryDate).level === 'URGENT');
+  const hasUrgentExpiry = urgentExpiryItems.length > 0;
 
   const totalPacksCount = items
     .filter(item => (item.unitMode || 'PACK') === 'PACK')
@@ -216,6 +254,71 @@ export const CartTable: React.FC = () => {
         )}
       </div>
 
+      {/* ── 🔴 URGENT EXPIRY BANNER (≤10 days) ──────────────────────────── */}
+      {hasUrgentExpiry && (
+        <div className="mb-2 flex-shrink-0 bg-gradient-to-r from-red-600 via-rose-600 to-red-600 text-white rounded-xl p-2.5 flex items-center justify-between shadow-lg animate-fadeIn border border-red-500">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0 animate-pulse">
+              <AlertOctagon className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <p className="text-[11px] font-extrabold uppercase tracking-wide text-white">
+                🔴 URGENT — Medicines Expiring in &lt;10 Days!
+              </p>
+              <p className="text-[10px] text-red-100 mt-0.5">
+                {urgentExpiryItems.map(i => i.product.name).join(', ')} — Dispense immediately or apply discount!
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              urgentExpiryItems.forEach(item => {
+                dispatch(updateCartItemDiscount({ cartItemId: item.cartItemId, discountPercent: Math.min(100, item.discountPercent + 10) }));
+              });
+            }}
+            className="flex items-center space-x-1.5 bg-white text-red-700 text-[10px] font-extrabold px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors cursor-pointer shadow-sm flex-shrink-0 ml-2"
+            title="Apply 10% urgent clearance discount"
+          >
+            <Tag className="w-3 h-3" />
+            <span>+10% Urgent Disc</span>
+          </button>
+        </div>
+      )}
+
+      {hasDumpStock && (
+        <div className="mb-2.5 flex-shrink-0 bg-gradient-to-r from-orange-600 via-amber-600 to-orange-600 text-white rounded-xl p-2.5 flex items-center justify-between shadow-md animate-fadeIn border border-orange-500">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
+              <PackageOpen className="w-4 h-4 text-white animate-pulse" />
+            </div>
+            <div>
+              <p className="text-[11px] font-extrabold uppercase tracking-wide text-white">
+                ⚠ Dump Stock Alert — Dispense First!
+              </p>
+              <p className="text-[10px] text-orange-100 mt-0.5">
+                <strong>{dumpStockItems.length} item{dumpStockItems.length > 1 ? 's' : ''}</strong> in cart {dumpStockItems.length > 1 ? 'have' : 'has'} near-expiry batches (&lt;60 days).{' '}
+                Dispense these batches first to clear dump stock.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              // Apply 5% clearance discount to all dump stock items
+              dumpStockItems.forEach(item => {
+                const currentDisc = item.discountPercent;
+                const newDisc = Math.min(100, currentDisc + 5);
+                dispatch(updateCartItemDiscount({ cartItemId: item.cartItemId, discountPercent: newDisc }));
+              });
+            }}
+            className="flex items-center space-x-1.5 bg-white text-orange-700 text-[10px] font-extrabold px-3 py-1.5 rounded-lg hover:bg-orange-50 transition-colors cursor-pointer shadow-sm flex-shrink-0 ml-2"
+            title="Apply 5% clearance discount to all dump stock items"
+          >
+            <Tag className="w-3 h-3" />
+            <span>+5% Clear Disc</span>
+          </button>
+        </div>
+      )}
+
       {/* ── INTERACTIVE CART ITEMS TABLE ────────────────────────────── */}
       <div className="flex-1 overflow-auto">
         {items.length === 0 ? (
@@ -244,11 +347,17 @@ export const CartTable: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs font-medium">
               {items.map((item) => {
-                const nearExp = isNearExpiry(item.selectedBatch.expiryDate);
                 const stockExceeded = item.quantity > item.selectedBatch.stockQuantity;
+                const expBadge = getExpiryBadge(item.selectedBatch.expiryDate);
+                // keep legacy compat vars
+                const nearExp = expBadge.level === 'URGENT' || expBadge.level === 'CRITICAL' || expBadge.level === 'WARNING';
+                const dumpInfo = isDumpStock(item.selectedBatch.expiryDate);
 
                 return (
-                  <tr key={item.cartItemId} className="hover:bg-slate-50/80 transition-colors">
+                  <tr
+                    key={item.cartItemId}
+                    className={`transition-colors ${expBadge.rowCls || 'hover:bg-slate-50/80'}`}
+                  >
 
                     {/* Item Name & Salt */}
                     <td className="py-2.5 px-2" style={{ maxWidth: '140px' }}>
@@ -326,20 +435,49 @@ export const CartTable: React.FC = () => {
                       )}
                     </td>
 
-                    {/* Batch & Expiry */}
-                    <td className="py-2.5 px-1 text-center" style={{ width: '90px' }}>
-                      <div className="text-slate-800 font-semibold text-[10px] break-all">
-                        {item.selectedBatch.batchNumber}
-                      </div>
-                      {nearExp ? (
-                        <span className="inline-flex items-center space-x-0.5 text-[9px] font-bold text-amber-800 bg-amber-100 px-1 rounded border border-amber-300">
-                          <AlertTriangle className="w-2.5 h-2.5 text-amber-600" />
-                          <span>Exp: {item.selectedBatch.expiryDate}</span>
-                        </span>
-                      ) : (
-                        <div className="text-[10px] text-slate-400">Exp: {item.selectedBatch.expiryDate}</div>
-                      )}
-                    </td>
+                    {/* ── Batch & Expiry — Unified Color Badge ────────── */}
+                    {(() => {
+                      const expBadge = getExpiryBadge(item.selectedBatch.expiryDate);
+                      const discIncrement = expBadge.level === 'URGENT' ? 10 : expBadge.level === 'CRITICAL' ? 5 : 3;
+                      return (
+                        <td className="py-2.5 px-1 text-center" style={{ width: '90px' }}>
+                          {/* Batch number */}
+                          <div className="text-slate-800 font-semibold text-[10px] break-all">
+                            {item.selectedBatch.batchNumber}
+                          </div>
+
+                          {/* Color-coded Expiry Days Left Badge */}
+                          <div className="mt-0.5 space-y-0.5">
+                            <span className={`inline-flex items-center space-x-0.5 text-[8.5px] font-extrabold px-1.5 py-0.5 rounded-md border w-full justify-center ${expBadge.badgeCls}`}>
+                              <span>{expBadge.label}</span>
+                            </span>
+                            <div className={`text-[8.5px] font-semibold ${expBadge.textCls}`}>
+                              {item.selectedBatch.expiryDate}
+                            </div>
+
+                            {/* Per-item clearance discount button — only for non-safe batches */}
+                            {expBadge.level !== 'SAFE' && (
+                              <button
+                                onClick={() => dispatch(updateCartItemDiscount({
+                                  cartItemId: item.cartItemId,
+                                  discountPercent: Math.min(100, item.discountPercent + discIncrement)
+                                }))}
+                                className={`w-full text-[8px] font-extrabold px-1 py-0.5 rounded cursor-pointer transition-all flex items-center justify-center space-x-0.5 ${
+                                  expBadge.level === 'URGENT'   ? 'bg-red-500 hover:bg-red-600 text-white' :
+                                  expBadge.level === 'CRITICAL' ? 'bg-orange-500 hover:bg-orange-600 text-white' :
+                                  expBadge.level === 'EXPIRED'  ? 'bg-red-700 hover:bg-red-800 text-white' :
+                                  'bg-amber-500 hover:bg-amber-600 text-white'
+                                }`}
+                                title={`Apply +${discIncrement}% clearance discount`}
+                              >
+                                <Tag className="w-2 h-2" />
+                                <span>+{discIncrement}% Clear</span>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      );
+                    })()}
 
                     {/* Quantity Controls, Unit Mode Toggle & Total Tablets Count */}
                     <td className="py-2.5 px-1 text-center" style={{ width: '110px' }}>

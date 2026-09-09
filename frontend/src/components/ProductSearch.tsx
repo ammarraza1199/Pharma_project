@@ -8,7 +8,7 @@ import type { Product, BatchInfo, ScheduleCategory, SellingUnitMode } from '../t
 import {
   Search, ScanBarcode, AlertCircle, Plus, Zap,
   X, ArrowUpDown, PackageX, TrendingUp, ChevronDown,
-  FileText, Repeat, Building2, Volume2
+  FileText, Repeat, Building2, Volume2, PackageOpen, BadgeAlert
 } from 'lucide-react';
 
 // ── Filter & Sort Types ──────────────────────────────────────────────────────
@@ -351,6 +351,16 @@ export const ProductSearch: React.FC = () => {
               const thirtyDays = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
               return exp < thirtyDays && exp > new Date();
             });
+            // Dump stock: any batch expiring within 60 days
+            const dumpBatch = product.batches.find(b => {
+              const exp = new Date(b.expiryDate);
+              const now = new Date();
+              const daysLeft = Math.ceil((exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+              return daysLeft > 0 && daysLeft <= 60;
+            });
+            const dumpDaysLeft = dumpBatch ? Math.ceil((new Date(dumpBatch.expiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
+            const isDumpCard = Boolean(dumpBatch);
+            const isCriticalDump = dumpDaysLeft !== null && dumpDaysLeft <= 30;
             const badge      = SCHEDULE_BADGE[product.scheduleCategory];
             const sortedBatches = getSortedBatchesFEFO(product.batches);
             const fefoBatch  = getEarliestExpiringBatch(product.batches) || sortedBatches[0];
@@ -366,6 +376,10 @@ export const ProductSearch: React.FC = () => {
                     ? 'border-emerald-500 bg-emerald-50 shadow-md scale-[1.01]'
                     : isOut
                     ? 'bg-rose-50/40 border-rose-200 hover:border-rose-300'
+                    : isDumpCard && isCriticalDump
+                    ? 'bg-orange-50/50 border-orange-400 hover:border-orange-500'
+                    : isDumpCard
+                    ? 'bg-amber-50/40 border-amber-400 hover:border-amber-500'
                     : isLow || hasNearExpiry
                     ? 'bg-amber-50/40 border-amber-300 hover:border-amber-400'
                     : 'bg-white border-slate-200 hover:border-emerald-400 hover:shadow-sm'
@@ -404,9 +418,21 @@ export const ProductSearch: React.FC = () => {
                       )}
 
                       {/* Near Expiry Amber Warning Badge */}
-                      {hasNearExpiry && (
+                      {hasNearExpiry && !isDumpCard && (
                         <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-amber-500 text-white border border-amber-600 shadow-2xs animate-pulse">
                           ⚠ Near Expiry (&lt;30d)
+                        </span>
+                      )}
+
+                      {/* 🔥 Dump Stock Badge (overrides near expiry badge) */}
+                      {isDumpCard && (
+                        <span className={`flex items-center space-x-0.5 text-[10px] font-extrabold px-1.5 py-0.5 rounded-full border shadow-2xs ${
+                          isCriticalDump
+                            ? 'bg-orange-500 text-white border-orange-600 animate-pulse'
+                            : 'bg-amber-400 text-amber-950 border-amber-500'
+                        }`}>
+                          <PackageOpen className="w-2.5 h-2.5" />
+                          <span>🔥 DUMP — {dumpDaysLeft}d left</span>
                         </span>
                       )}
 
