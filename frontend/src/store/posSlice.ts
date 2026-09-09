@@ -83,6 +83,7 @@ interface PosState {
     isOpen: boolean;
     originalProduct?: Product;
     alternatives: Product[];
+    originalCartItemId?: string; // set when substituting an item already in cart
   };
   complianceModal: {
     isOpen: boolean;
@@ -765,7 +766,8 @@ const initialState: PosState = {
   transferNotification: null,
   substitutionModal: {
     isOpen: false,
-    alternatives: []
+    alternatives: [],
+    originalCartItemId: undefined
   },
   complianceModal: {
     isOpen: false,
@@ -1832,9 +1834,29 @@ export const posSlice = createSlice({
       state.heldBills = state.heldBills.filter(h => h.id !== action.payload);
     },
 
-    // UI Modals Control
+    openSubstitutionModalForProduct: (state, action: PayloadAction<{ product: Product; cartItemId?: string }>) => {
+      const product = action.payload.product;
+      const cartItemId = action.payload.cartItemId;
+      const targetSalt = product.saltComposition ? product.saltComposition.toLowerCase().trim() : '';
+      const firstSaltPart = targetSalt.split('+')[0]?.trim() || targetSalt;
+
+      const alternatives = state.products.filter(p => {
+        if (p._id === product._id) return false;
+        if (!p.saltComposition) return false;
+        const pSalt = p.saltComposition.toLowerCase().trim();
+        return pSalt === targetSalt || (firstSaltPart.length > 3 && pSalt.includes(firstSaltPart));
+      });
+
+      state.substitutionModal = {
+        isOpen: true,
+        originalProduct: product,
+        alternatives: alternatives.length > 0 ? alternatives : state.products.filter(p => p._id !== product._id).slice(0, 6),
+        originalCartItemId: cartItemId
+      };
+    },
     closeSubstitutionModal: (state) => {
       state.substitutionModal.isOpen = false;
+      state.substitutionModal.originalCartItemId = undefined;
     },
     closeComplianceModal: (state) => {
       state.complianceModal.isOpen = false;
@@ -2336,6 +2358,7 @@ export const {
   holdActiveBill,
   restoreHeldBill,
   discardHeldBill,
+  openSubstitutionModalForProduct,
   closeSubstitutionModal,
   closeComplianceModal,
   closeDrugInteractionModal,

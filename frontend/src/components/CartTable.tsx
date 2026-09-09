@@ -10,13 +10,14 @@ import {
   applyBulkDiscount,
   openScheduleHDetailsPrompt,
   setVoiceConsultationModalOpen,
-  setPatientInstructionModalOpen
+  setPatientInstructionModalOpen,
+  openSubstitutionModalForProduct
 } from '../store/posSlice';
 import { analyzeDrugInteractions } from '../utils/drugInteractionEngine';
 import { getMedicineDetails } from '../utils/medicineDetails';
 import {
   Trash2, Plus, Minus, AlertTriangle, AlertOctagon, UserCheck,
-  Stethoscope, Edit2, Percent, FileText, RefreshCcw, Pill, Mic, Volume2
+  Stethoscope, Edit2, Percent, FileText, RefreshCcw, Pill, Mic, Volume2, Zap
 } from 'lucide-react';
 
 export const CartTable: React.FC = () => {
@@ -291,6 +292,15 @@ export const CartTable: React.FC = () => {
                         ) : null}
 
                         <button
+                          onClick={() => dispatch(openSubstitutionModalForProduct({ product: item.product, cartItemId: item.cartItemId }))}
+                          className="text-[9px] font-bold text-amber-800 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded flex items-center space-x-1 transition-all cursor-pointer shadow-2xs"
+                          title="Find Salt-Matched Substitutes (5 Criteria) — Replace this item"
+                        >
+                          <Zap className="w-2.5 h-2.5 text-amber-600" />
+                          <span>Replace</span>
+                        </button>
+
+                        <button
                           onClick={() => dispatch(setPatientInstructionModalOpen({
                             isOpen: true,
                             product: item.product,
@@ -305,8 +315,13 @@ export const CartTable: React.FC = () => {
                         </button>
                       </div>
                       {item.substitutedFor && (
-                        <div className="text-[9px] text-emerald-700 font-medium italic mt-0.5">
-                          Substituted for: {item.substitutedFor}
+                        <div className="mt-1 bg-emerald-50 border border-emerald-200 rounded p-1 text-[9.5px]">
+                          <span className="text-emerald-800 font-bold block truncate">
+                            Substituted for: {item.substitutedFor}
+                          </span>
+                          <span className="text-emerald-700 font-black">
+                            🎉 You saved ₹{((item.unitPrice * item.quantity * item.discountPercent) / 100).toFixed(2)} on this medicine!
+                          </span>
                         </div>
                       )}
                     </td>

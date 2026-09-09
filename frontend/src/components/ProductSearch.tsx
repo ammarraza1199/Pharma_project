@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { addItemToCart, setPrescriptionUploadModalOpen, setChronicRefillModalOpen, setMultiStoreModalOpen, setPatientInstructionModalOpen } from '../store/posSlice';
+import { addItemToCart, setPrescriptionUploadModalOpen, setChronicRefillModalOpen, setMultiStoreModalOpen, setPatientInstructionModalOpen, openSubstitutionModalForProduct } from '../store/posSlice';
 import { getMedicineDetails } from '../utils/medicineDetails';
 import { getSortedBatchesFEFO, getEarliestExpiringBatch } from '../utils/fefoHelper';
 import type { Product, BatchInfo, ScheduleCategory, SellingUnitMode } from '../types/pos';
@@ -567,21 +567,36 @@ export const ProductSearch: React.FC = () => {
                       )}
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        dispatch(setPatientInstructionModalOpen({
-                          isOpen: true,
-                          product
-                        }));
-                      }}
-                      className="mt-1.5 flex items-center space-x-1 text-[10px] font-bold text-teal-800 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-2 py-0.5 rounded cursor-pointer transition-all shadow-2xs"
-                      title="View Patient Instruction Leaflet & Voice Clips"
-                    >
-                      <Volume2 className="w-2.5 h-2.5 text-teal-600" />
-                      <span>PIL &amp; Audio</span>
-                    </button>
+                    <div className="mt-1.5 flex items-center space-x-1.5 flex-wrap gap-y-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          dispatch(openSubstitutionModalForProduct({ product }));
+                        }}
+                        className="flex items-center space-x-1 text-[10px] font-bold text-amber-900 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-2 py-0.5 rounded cursor-pointer transition-all shadow-2xs"
+                        title="View Salt-Matched Substitutes (5 Criteria)"
+                      >
+                        <Zap className="w-2.5 h-2.5 text-amber-600" />
+                        <span>Substitutes</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          dispatch(setPatientInstructionModalOpen({
+                            isOpen: true,
+                            product
+                          }));
+                        }}
+                        className="flex items-center space-x-1 text-[10px] font-bold text-teal-800 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-2 py-0.5 rounded cursor-pointer transition-all shadow-2xs"
+                        title="View Patient Instruction Leaflet & Voice Clips"
+                      >
+                        <Volume2 className="w-2.5 h-2.5 text-teal-600" />
+                        <span>PIL &amp; Audio</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
