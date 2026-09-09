@@ -31,7 +31,9 @@ import type {
   BorrowedMedicineRecord,
   AgeRecommendationCoupon,
   InterStoreChatMessage,
-  VoiceConsultationRecord
+  VoiceConsultationRecord,
+  PatientInstructionModalState,
+  PILLanguage
 } from '../types/pos';
 import { MOCK_PRODUCTS } from '../mock/products';
 import { calculateItemGST } from '../utils/gstCalculator';
@@ -138,6 +140,7 @@ interface PosState {
     gender?: 'MALE' | 'FEMALE' | 'OTHER';
     sessionId?: string;
   };
+  patientInstructionModal: PatientInstructionModalState;
   consultationRecords: VoiceConsultationRecord[];
 
   // Printing & Finalization
@@ -891,6 +894,14 @@ const initialState: PosState = {
 
   voiceConsultationModal: {
     isOpen: false
+  },
+
+  patientInstructionModal: {
+    isOpen: false,
+    selectedProduct: null,
+    selectedLanguage: 'en',
+    patientName: '',
+    doctorName: ''
   },
 
   consultationRecords: [
@@ -1920,6 +1931,37 @@ export const posSlice = createSlice({
       state.consultationRecords = state.consultationRecords.filter(r => r.id !== action.payload);
     },
 
+    setPatientInstructionModalOpen: (
+      state,
+      action: PayloadAction<{
+        isOpen: boolean;
+        product?: Product | null;
+        patientName?: string;
+        doctorName?: string;
+        language?: PILLanguage;
+      }>
+    ) => {
+      state.patientInstructionModal.isOpen = action.payload.isOpen;
+      if (action.payload.isOpen) {
+        if (action.payload.product !== undefined) {
+          state.patientInstructionModal.selectedProduct = action.payload.product;
+        }
+        if (action.payload.patientName !== undefined) {
+          state.patientInstructionModal.patientName = action.payload.patientName;
+        }
+        if (action.payload.doctorName !== undefined) {
+          state.patientInstructionModal.doctorName = action.payload.doctorName;
+        }
+        if (action.payload.language) {
+          state.patientInstructionModal.selectedLanguage = action.payload.language;
+        }
+      }
+    },
+
+    setPILLanguage: (state, action: PayloadAction<PILLanguage>) => {
+      state.patientInstructionModal.selectedLanguage = action.payload;
+    },
+
     sendInterStoreChatMessage: (state, action: PayloadAction<string>) => {
       const userText = action.payload;
       const userMsg: InterStoreChatMessage = {
@@ -2306,6 +2348,8 @@ export const {
   setMultiStoreModalOpen,
   setInterStoreChatbotModalOpen,
   setVoiceConsultationModalOpen,
+  setPatientInstructionModalOpen,
+  setPILLanguage,
   saveConsultationRecord,
   deleteConsultationRecord,
   sendInterStoreChatMessage,

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { navigateTo, logoutUser, setInvoiceHistoryModalOpen, switchActivePharmacist, setWellnessBrochureModalOpen, setMultiStoreModalOpen, setInterStoreChatbotModalOpen, setVoiceConsultationModalOpen } from '../store/posSlice';
-import { Clock, Store, LogOut, LayoutDashboard, ShoppingCart, Package, Truck, BarChart3, RotateCcw, Users, Building, Settings, History, FileText, Siren, ChevronDown, Check, Bike, AlertTriangle, Sparkles, Building2, Bot, Mic } from 'lucide-react';
+import { navigateTo, logoutUser, setInvoiceHistoryModalOpen, switchActivePharmacist, setWellnessBrochureModalOpen, setMultiStoreModalOpen, setInterStoreChatbotModalOpen, setVoiceConsultationModalOpen, setPatientInstructionModalOpen } from '../store/posSlice';
+import { Clock, Store, LogOut, LayoutDashboard, ShoppingCart, Package, Truck, BarChart3, RotateCcw, Users, Building, Settings, History, FileText, Siren, ChevronDown, Check, Bike, AlertTriangle, Sparkles, Building2, Bot, Mic, Volume2 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const dispatch = useDispatch();
@@ -245,6 +245,15 @@ export const Navbar: React.FC = () => {
           title="Customer Voice Record & Discussion Notes"
         >
           <Mic className="w-4 h-4 text-rose-100 animate-pulse" />
+        </button>
+
+        {/* Patient Instruction Leaflet (PIL) & Voice Clips - Icon Only */}
+        <button
+          onClick={() => dispatch(setPatientInstructionModalOpen({ isOpen: true }))}
+          className="p-1.5 rounded-lg bg-teal-700 hover:bg-teal-800 text-white shadow-xs transition-all cursor-pointer border border-teal-500/30 shrink-0 flex items-center justify-center"
+          title="Patient Instruction Leaflets (PIL) & Multi-Language Voice Clips"
+        >
+          <Volume2 className="w-4 h-4 text-teal-100" />
         </button>
 
         {/* 🏪 Active Shift Counter Badge — or Emergency Desk Badge */}

@@ -410,3 +410,44 @@ export interface VoiceConsultationRecord {
   counterNumber?: number;
   sessionId?: string;
 }
+
+export type PILLanguage = 'en' | 'hi' | 'te' | 'ta' | 'kn';
+
+export interface PILVoiceClip {
+  language: PILLanguage;
+  languageLabel: string;
+  nativeLabel: string;
+  voiceScript: string;
+  keyInstructions: string[];
+}
+
+export interface PatientInstructionLeaflet {
+  id: string;
+  medicineName: string;
+  brand: string;
+  saltComposition: string;
+  therapeuticCategory: string;
+  scheduleCategory: ScheduleCategory;
+  dosageForm: string;
+  indication: string;
+  howToTake: string;
+  timingRecommendation: string;
+  foodInstructions: string;
+  missedDoseAdvice: string;
+  sideEffects: {
+    common: string[];
+    severeAlerts: string[];
+  };
+  contraindications: string[];
+  storageAdvice: string;
+  disposalAdvice: string;
+  voiceClips: Record<PILLanguage, PILVoiceClip>;
+}
+
+export interface PatientInstructionModalState {
+  isOpen: boolean;
+  selectedProduct: Product | null;
+  selectedLanguage: PILLanguage;
+  patientName?: string;
+  doctorName?: string;
+}

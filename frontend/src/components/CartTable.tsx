@@ -9,13 +9,14 @@ import {
   clearActiveCart,
   applyBulkDiscount,
   openScheduleHDetailsPrompt,
-  setVoiceConsultationModalOpen
+  setVoiceConsultationModalOpen,
+  setPatientInstructionModalOpen
 } from '../store/posSlice';
 import { analyzeDrugInteractions } from '../utils/drugInteractionEngine';
 import { getMedicineDetails } from '../utils/medicineDetails';
 import {
   Trash2, Plus, Minus, AlertTriangle, AlertOctagon, UserCheck,
-  Stethoscope, Edit2, Percent, FileText, RefreshCcw, Pill, Mic
+  Stethoscope, Edit2, Percent, FileText, RefreshCcw, Pill, Mic, Volume2
 } from 'lucide-react';
 
 export const CartTable: React.FC = () => {
@@ -119,6 +120,20 @@ export const CartTable: React.FC = () => {
           >
             <Mic className="w-3 h-3 text-rose-600 animate-pulse" />
             <span>Voice Note</span>
+          </button>
+
+          <button
+            onClick={() => dispatch(setPatientInstructionModalOpen({
+              isOpen: true,
+              product: items.length > 0 ? items[0].product : null,
+              patientName: patientDetails?.patientName || '',
+              doctorName: doctorDetails?.doctorName || ''
+            }))}
+            className="text-xs font-bold text-teal-700 hover:text-teal-800 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-2 py-0.5 rounded-lg flex items-center space-x-1 transition-all cursor-pointer"
+            title="Patient Instruction Leaflet (PIL) & Multi-Language Voice Clips"
+          >
+            <Volume2 className="w-3 h-3 text-teal-600" />
+            <span>PIL &amp; Audio</span>
           </button>
 
           <button
@@ -274,6 +289,20 @@ export const CartTable: React.FC = () => {
                             {item.discountPercent}% Off
                           </span>
                         ) : null}
+
+                        <button
+                          onClick={() => dispatch(setPatientInstructionModalOpen({
+                            isOpen: true,
+                            product: item.product,
+                            patientName: patientDetails?.patientName || '',
+                            doctorName: doctorDetails?.doctorName || ''
+                          }))}
+                          className="text-[9px] font-bold text-teal-800 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-1.5 py-0.5 rounded flex items-center space-x-1 transition-all cursor-pointer shadow-2xs"
+                          title="Patient Instruction Leaflet & Spoken Audio Guidance"
+                        >
+                          <Volume2 className="w-2.5 h-2.5 text-teal-600" />
+                          <span>PIL &amp; Audio</span>
+                        </button>
                       </div>
                       {item.substitutedFor && (
                         <div className="text-[9px] text-emerald-700 font-medium italic mt-0.5">

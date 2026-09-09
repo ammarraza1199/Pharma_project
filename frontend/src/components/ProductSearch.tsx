@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { addItemToCart, setPrescriptionUploadModalOpen, setChronicRefillModalOpen, setMultiStoreModalOpen } from '../store/posSlice';
+import { addItemToCart, setPrescriptionUploadModalOpen, setChronicRefillModalOpen, setMultiStoreModalOpen, setPatientInstructionModalOpen } from '../store/posSlice';
 import { getMedicineDetails } from '../utils/medicineDetails';
 import { getSortedBatchesFEFO, getEarliestExpiringBatch } from '../utils/fefoHelper';
 import type { Product, BatchInfo, ScheduleCategory, SellingUnitMode } from '../types/pos';
 import {
   Search, ScanBarcode, AlertCircle, Plus, Zap,
   X, ArrowUpDown, PackageX, TrendingUp, ChevronDown,
-  FileText, Repeat, Building2
+  FileText, Repeat, Building2, Volume2
 } from 'lucide-react';
 
 // ── Filter & Sort Types ──────────────────────────────────────────────────────
@@ -565,6 +565,22 @@ export const ProductSearch: React.FC = () => {
                           <span>Add {qty > 1 ? `×${qty}` : ''} {(unitModeMap[product._id] || 'PACK') === 'LOOSE' ? 'Tab' : ''}</span>
                         </>
                       )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        dispatch(setPatientInstructionModalOpen({
+                          isOpen: true,
+                          product
+                        }));
+                      }}
+                      className="mt-1.5 flex items-center space-x-1 text-[10px] font-bold text-teal-800 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-2 py-0.5 rounded cursor-pointer transition-all shadow-2xs"
+                      title="View Patient Instruction Leaflet & Voice Clips"
+                    >
+                      <Volume2 className="w-2.5 h-2.5 text-teal-600" />
+                      <span>PIL &amp; Audio</span>
                     </button>
                   </div>
                 </div>
