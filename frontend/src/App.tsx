@@ -37,6 +37,7 @@ import { MultiStoreModal } from './components/MultiStoreModal';
 import { InterStoreChatbotModal } from './components/InterStoreChatbotModal';
 import { VoiceConsultationModal } from './components/VoiceConsultationModal';
 import { PatientInstructionModal } from './components/PatientInstructionModal';
+import { ClearanceGiftModal } from './components/ClearanceGiftModal';
 
 export const App: React.FC = () => {
   const currentView = useSelector((state: RootState) => state.pos.currentView);
@@ -160,6 +161,7 @@ export const App: React.FC = () => {
       <InterStoreChatbotModal />
       <VoiceConsultationModal />
       <PatientInstructionModal />
+      <ClearanceGiftModal />
     </div>
   );
 };

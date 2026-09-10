@@ -1,9 +1,16 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { setPaymentModalOpen, openScheduleHDetailsPrompt, addItemToCart } from '../store/posSlice';
+import {
+  setPaymentModalOpen,
+  openScheduleHDetailsPrompt,
+  addItemToCart,
+  setClearanceGiftModalOpen,
+  applyNearExpiryClearanceDiscount,
+  addClearanceGiftToCart
+} from '../store/posSlice';
 import { getMedicineDetails } from '../utils/medicineDetails';
-import { CreditCard, ShieldAlert, Loader2, ArrowRight, Sparkles, Tag, ShieldCheck, Stethoscope, TestTube, CheckCircle2, Plus } from 'lucide-react';
+import { CreditCard, ShieldAlert, Loader2, ArrowRight, Sparkles, Tag, ShieldCheck, Stethoscope, TestTube, CheckCircle2, Plus, Gift, Clock } from 'lucide-react';
 
 export const CartSummary: React.FC = () => {
   const dispatch = useDispatch();
@@ -34,6 +41,21 @@ export const CartSummary: React.FC = () => {
     return sum + ((item.unitPrice * item.quantity * item.discountPercent) / 100);
   }, 0);
   const hasSubstituteSavings = totalSubstituteSavings > 0;
+
+  // Near-expiry clearance items & gift calculations (Task #16)
+  const now = new Date().getTime();
+  const nearExpiryItems = items.filter(item => {
+    if (item.isClearanceGift) return false;
+    const exp = new Date(item.selectedBatch.expiryDate).getTime();
+    const daysLeft = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
+    return daysLeft > 0 && daysLeft <= 90;
+  });
+  const hasNearExpiry = nearExpiryItems.length > 0;
+
+  const clearanceGiftItems = items.filter(item => item.isClearanceGift);
+  const hasClearanceGift = clearanceGiftItems.length > 0;
+  const totalGiftValue = clearanceGiftItems.reduce((sum, item) => sum + (item.giftOriginalPrice || 30) * item.quantity, 0);
+  const totalClearanceDiscounts = items.reduce((sum, item) => sum + ((item.clearanceDiscountApplied || 0) * item.quantity), 0);
   
   const totalPacksCount = items
     .filter(item => (item.unitMode || 'PACK') === 'PACK')
@@ -95,6 +117,83 @@ export const CartSummary: React.FC = () => {
             {` (${totalTabletsCount} Units)`}
           </span>
         </h2>
+
+        {/* ── 🎁 TASK #16: NEAR-EXPIRY CLEARANCE INCENTIVE CARDS ── */}
+        {hasNearExpiry && (
+          <div className="bg-white border border-rose-200 rounded-xl p-3 mb-3 shadow-xs animate-fadeIn">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className="p-1.5 bg-rose-50 border border-rose-200 rounded-lg">
+                  <Gift className="w-4 h-4 text-rose-600" />
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-rose-700">
+                    Clearance Incentive (Task #16)
+                  </div>
+                  <div className="text-xs font-bold leading-tight text-slate-900">
+                    Near-Expiry Batch in Cart
+                  </div>
+                </div>
+              </div>
+              <span className="bg-rose-50 text-rose-700 border border-rose-200 text-[9.5px] font-extrabold px-2 py-0.5 rounded-full">
+                {nearExpiryItems.length} Batch{nearExpiryItems.length > 1 ? 'es' : ''}
+              </span>
+            </div>
+
+            <p className="text-[10.5px] text-slate-500 mt-1.5 leading-snug">
+              Apply extra ₹5–₹10 clearance discount or add free promotional gift item:
+            </p>
+
+            <div className="grid grid-cols-3 gap-1.5 mt-2">
+              <button
+                type="button"
+                onClick={() => dispatch(applyNearExpiryClearanceDiscount({ discountPerUnit: 5 }))}
+                className="py-1 px-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-800 font-bold text-[10px] border border-slate-200 transition-all cursor-pointer text-center shadow-2xs hover:scale-[1.02]"
+                title="Apply flat ₹5 clearance discount per unit"
+              >
+                -₹5 Disc
+              </button>
+
+              <button
+                type="button"
+                onClick={() => dispatch(applyNearExpiryClearanceDiscount({ discountPerUnit: 10 }))}
+                className="py-1 px-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold text-[10px] border border-emerald-200 transition-all cursor-pointer text-center shadow-2xs hover:scale-[1.02]"
+                title="Apply flat ₹10 clearance discount per unit"
+              >
+                -₹10 Disc
+              </button>
+
+              <button
+                type="button"
+                onClick={() => dispatch(setClearanceGiftModalOpen({ isOpen: true }))}
+                className="py-1 px-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-[10px] transition-all cursor-pointer text-center shadow-2xs flex items-center justify-center space-x-1 hover:scale-[1.02]"
+                title="Open Free Promotional Gifts Selection"
+              >
+                <Gift className="w-2.5 h-2.5 text-rose-300" />
+                <span>Free Gift...</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {hasClearanceGift && (
+          <div className="bg-rose-50/70 border border-rose-200 text-slate-900 rounded-xl p-2.5 mb-3 shadow-2xs flex items-center justify-between animate-fadeIn">
+            <div className="flex items-center space-x-2">
+              <div className="p-1 bg-white/20 rounded-lg">
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              </div>
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-rose-700">Clearance Gift Applied</div>
+                <div className="text-[11px] font-bold leading-tight text-slate-900 truncate max-w-[170px]">
+                  🎁 {clearanceGiftItems.map(g => g.product.name.replace('🎁 Free Gift: ', '')).join(', ')}
+                </div>
+              </div>
+            </div>
+            <span className="text-[10px] font-black bg-white text-rose-700 px-2 py-0.5 rounded-full">
+              Worth ₹{totalGiftValue} FREE
+            </span>
+          </div>
+        )}
 
         {/* 🎉 Substitute Savings Banner */}
         {hasSubstituteSavings && (

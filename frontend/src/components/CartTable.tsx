@@ -11,14 +11,17 @@ import {
   openScheduleHDetailsPrompt,
   setVoiceConsultationModalOpen,
   setPatientInstructionModalOpen,
-  openSubstitutionModalForProduct
+  openSubstitutionModalForProduct,
+  setClearanceGiftModalOpen,
+  applyNearExpiryClearanceDiscount,
+  addClearanceGiftToCart
 } from '../store/posSlice';
 import { analyzeDrugInteractions } from '../utils/drugInteractionEngine';
 import { getMedicineDetails } from '../utils/medicineDetails';
 import {
   Trash2, Plus, Minus, AlertTriangle, AlertOctagon, UserCheck,
   Stethoscope, Edit2, Percent, FileText, RefreshCcw, Pill, Mic, Volume2, Zap,
-  PackageOpen, BadgeAlert, Tag
+  PackageOpen, BadgeAlert, Tag, Gift, Sparkles, CheckCircle2, X
 } from 'lucide-react';
 
 export const CartTable: React.FC = () => {
@@ -33,6 +36,7 @@ export const CartTable: React.FC = () => {
 
   const [showBulkDiscount, setShowBulkDiscount] = useState<boolean>(false);
   const [customBulkDiscount, setCustomBulkDiscount] = useState<string>('');
+  const [dismissClearancePrompt, setDismissClearancePrompt] = useState<boolean>(false);
 
   const interactionResult = analyzeDrugInteractions(items);
 
@@ -74,6 +78,14 @@ export const CartTable: React.FC = () => {
   // Check if ANY cart item has dump stock
   const dumpStockItems = items.filter(item => isDumpStock(item.selectedBatch.expiryDate).isDump);
   const hasDumpStock = dumpStockItems.length > 0;
+
+  // Near-expiry clearance items (≤90 days)
+  const nearExpiryClearanceItems = items.filter(item => {
+    if (item.isClearanceGift) return false;
+    const { daysLeft } = getExpiryBadge(item.selectedBatch.expiryDate);
+    return daysLeft > 0 && daysLeft <= 90;
+  });
+  const hasNearExpiryClearance = nearExpiryClearanceItems.length > 0;
 
   // Urgent items (≤10 days)
   const urgentExpiryItems = items.filter(item => getExpiryBadge(item.selectedBatch.expiryDate).level === 'URGENT');
@@ -286,36 +298,121 @@ export const CartTable: React.FC = () => {
       )}
 
       {hasDumpStock && (
-        <div className="mb-2.5 flex-shrink-0 bg-gradient-to-r from-orange-600 via-amber-600 to-orange-600 text-white rounded-xl p-2.5 flex items-center justify-between shadow-md animate-fadeIn border border-orange-500">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
-              <PackageOpen className="w-4 h-4 text-white animate-pulse" />
+        <div className="mb-2 flex-shrink-0 bg-slate-50 border border-slate-200 rounded-xl p-2 flex items-center justify-between shadow-2xs animate-fadeIn">
+          <div className="flex items-center space-x-2">
+            <div className="w-7 h-7 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center flex-shrink-0">
+              <PackageOpen className="w-3.5 h-3.5 text-amber-700" />
             </div>
             <div>
-              <p className="text-[11px] font-extrabold uppercase tracking-wide text-white">
-                ⚠ Dump Stock Alert — Dispense First!
-              </p>
-              <p className="text-[10px] text-orange-100 mt-0.5">
-                <strong>{dumpStockItems.length} item{dumpStockItems.length > 1 ? 's' : ''}</strong> in cart {dumpStockItems.length > 1 ? 'have' : 'has'} near-expiry batches (&lt;60 days).{' '}
-                Dispense these batches first to clear dump stock.
+              <div className="flex items-center space-x-1.5">
+                <span className="text-[11px] font-bold text-slate-900 tracking-wide">
+                  Dump Stock Priority
+                </span>
+                <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                  {dumpStockItems.length} Batch{dumpStockItems.length > 1 ? 'es' : ''} &lt;60d
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-500">
+                Dispense near-expiry batches first to clear dump inventory.
               </p>
             </div>
           </div>
           <button
             onClick={() => {
-              // Apply 5% clearance discount to all dump stock items
               dumpStockItems.forEach(item => {
                 const currentDisc = item.discountPercent;
                 const newDisc = Math.min(100, currentDisc + 5);
                 dispatch(updateCartItemDiscount({ cartItemId: item.cartItemId, discountPercent: newDisc }));
               });
             }}
-            className="flex items-center space-x-1.5 bg-white text-orange-700 text-[10px] font-extrabold px-3 py-1.5 rounded-lg hover:bg-orange-50 transition-colors cursor-pointer shadow-sm flex-shrink-0 ml-2"
+            className="flex items-center space-x-1 bg-white hover:bg-slate-100 text-slate-700 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-slate-200 transition-colors cursor-pointer shadow-2xs flex-shrink-0 ml-2"
             title="Apply 5% clearance discount to all dump stock items"
           >
-            <Tag className="w-3 h-3" />
+            <Tag className="w-3 h-3 text-slate-500" />
             <span>+5% Clear Disc</span>
           </button>
+        </div>
+      )}
+
+      
+      {/* ── 🎁 TASK #16: NEAR-EXPIRY CLEARANCE GIFT & EXTRA ₹5-₹10 DISCOUNT PROMPT ── */}
+      {hasNearExpiryClearance && !dismissClearancePrompt && (
+        <div className="mb-2.5 flex-shrink-0 bg-white border border-rose-200 rounded-xl p-2.5 shadow-xs animate-fadeIn">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-8 h-8 rounded-lg bg-rose-50 border border-rose-200 flex items-center justify-center flex-shrink-0">
+                <Gift className="w-4 h-4 text-rose-600 animate-bounce" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-1.5">
+                  <span className="text-[11px] font-black text-slate-900 tracking-tight">
+                    🎁 Near-Expiry Clearance Incentive Available
+                  </span>
+                  <span className="bg-rose-100 text-rose-800 text-[9px] font-extrabold px-1.5 py-0.2 rounded-full border border-rose-200">
+                    Sheet 1 — Task #16
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-600 mt-0.5">
+                  Near-expiry medicines in cart: <strong className="text-slate-800">{nearExpiryClearanceItems.map(i => `${i.product.name} (${getExpiryBadge(i.selectedBatch.expiryDate).daysLeft}d left)`).join(', ')}</strong>.
+                  Apply extra ₹5–₹10 clearance discount or add free promotional gift item.
+                </p>
+              </div>
+            </div>
+
+            {/* Quick 1-Click Incentive Actions */}
+            <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+              <button
+                onClick={() => dispatch(applyNearExpiryClearanceDiscount({ discountPerUnit: 5 }))}
+                className="flex items-center space-x-1 bg-slate-50 hover:bg-slate-100 text-slate-800 text-[10px] font-bold px-2.5 py-1.5 rounded-lg transition-all cursor-pointer border border-slate-200 shadow-2xs"
+                title="Apply flat ₹5 clearance discount per unit on near-expiry medicines"
+              >
+                <Tag className="w-3 h-3 text-emerald-600" />
+                <span>-₹5 / unit Disc</span>
+              </button>
+
+              <button
+                onClick={() => dispatch(applyNearExpiryClearanceDiscount({ discountPerUnit: 10 }))}
+                className="flex items-center space-x-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 text-[10px] font-bold px-2.5 py-1.5 rounded-lg transition-all cursor-pointer border border-emerald-300 shadow-2xs"
+                title="Apply flat ₹10 clearance discount per unit on near-expiry medicines"
+              >
+                <Tag className="w-3 h-3 text-emerald-600" />
+                <span>-₹10 / unit Disc</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  dispatch(addClearanceGiftToCart({
+                    giftName: 'Dettol Instant Hand Sanitizer (50ml)',
+                    giftValue: 30,
+                    giftCategory: 'Hygiene & Sanitization',
+                    giftIcon: '🧴'
+                  }));
+                }}
+                className="flex items-center space-x-1 bg-rose-50 hover:bg-rose-100 text-rose-800 text-[10px] font-bold px-2.5 py-1.5 rounded-lg transition-all cursor-pointer border border-rose-300 shadow-2xs"
+                title="Add 100% Free Dettol Hand Sanitizer (Worth ₹30) to cart"
+              >
+                <Gift className="w-3 h-3 text-rose-600" />
+                <span>+Free Sanitizer (₹30)</span>
+              </button>
+
+              <button
+                onClick={() => dispatch(setClearanceGiftModalOpen({ isOpen: true }))}
+                className="flex items-center space-x-1 bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold px-2.5 py-1.5 rounded-lg transition-all cursor-pointer shadow-2xs"
+                title="View All 6 Clearance Gifts & Custom Discount Options"
+              >
+                <Sparkles className="w-3 h-3 text-amber-300" />
+                <span>Gifts Catalog...</span>
+              </button>
+
+              <button
+                onClick={() => setDismissClearancePrompt(true)}
+                className="text-slate-400 hover:text-slate-600 p-1 hover:bg-slate-100 rounded-md transition-colors cursor-pointer"
+                title="Dismiss Banner"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -356,7 +453,7 @@ export const CartTable: React.FC = () => {
                 return (
                   <tr
                     key={item.cartItemId}
-                    className={`transition-colors ${expBadge.rowCls || 'hover:bg-slate-50/80'}`}
+                    className={`transition-colors ${item.isClearanceGift ? 'bg-rose-50/70 border-l-4 border-l-rose-500' : expBadge.rowCls || 'hover:bg-slate-50/80'}`}
                   >
 
                     {/* Item Name & Salt */}
@@ -423,6 +520,25 @@ export const CartTable: React.FC = () => {
                           <span>PIL &amp; Audio</span>
                         </button>
                       </div>
+                      {item.isClearanceGift && (
+                        <div className="mt-1 bg-rose-100/90 border border-rose-300 rounded p-1 text-[9.5px]">
+                          <span className="text-rose-800 font-black flex items-center space-x-1">
+                            <Gift className="w-3 h-3 text-rose-600" />
+                            <span>100% FREE PROMOTIONAL GIFT (Near-Expiry Clearance Offer)</span>
+                          </span>
+                          <span className="text-emerald-700 font-extrabold">
+                            Original Retail Value: ₹{item.giftOriginalPrice || 30}.00 (FREE)
+                          </span>
+                        </div>
+                      )}
+                      {item.clearanceDiscountApplied && !item.isClearanceGift && (
+                        <div className="mt-1 bg-amber-50 border border-amber-300 rounded p-1 text-[9.5px]">
+                          <span className="text-amber-900 font-black flex items-center space-x-1">
+                            <Tag className="w-2.5 h-2.5 text-amber-700" />
+                            <span>Extra ₹{item.clearanceDiscountApplied} Clearance Discount Applied / Unit</span>
+                          </span>
+                        </div>
+                      )}
                       {item.substitutedFor && (
                         <div className="mt-1 bg-emerald-50 border border-emerald-200 rounded p-1 text-[9.5px]">
                           <span className="text-emerald-800 font-bold block truncate">
@@ -455,6 +571,17 @@ export const CartTable: React.FC = () => {
                               {item.selectedBatch.expiryDate}
                             </div>
 
+                            {/* Quick Clearance Gift / Discount Trigger */}
+                            {expBadge.level !== 'SAFE' && !item.isClearanceGift && (
+                              <button
+                                onClick={() => dispatch(setClearanceGiftModalOpen({ isOpen: true, targetCartItemId: item.cartItemId }))}
+                                className="w-full text-[8px] font-black px-1 py-0.5 rounded cursor-pointer transition-all flex items-center justify-center space-x-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 mb-0.5"
+                                title="Open Clearance Gift / ₹5-₹10 Discount Manager for this item"
+                              >
+                                <Gift className="w-2 h-2 text-rose-600" />
+                                <span>Clearance Gift</span>
+                              </button>
+                            )}
                             {/* Per-item clearance discount button — only for non-safe batches */}
                             {expBadge.level !== 'SAFE' && (
                               <button

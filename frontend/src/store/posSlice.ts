@@ -33,12 +33,13 @@ import type {
   InterStoreChatMessage,
   VoiceConsultationRecord,
   PatientInstructionModalState,
+  ClearanceGiftModalState,
   PILLanguage
 } from '../types/pos';
 import { MOCK_PRODUCTS } from '../mock/products';
 import { calculateItemGST } from '../utils/gstCalculator';
 import { getMedicineDetails } from '../utils/medicineDetails';
-import { getEarliestExpiringBatch } from '../utils/fefoHelper';
+import { getEarliestExpiringBatch, getSortedBatchesFEFO } from '../utils/fefoHelper';
 import { analyzeDrugInteractions } from '../utils/drugInteractionEngine';
 
 export const DEFAULT_PHARMACISTS: PharmacistCounter[] = [
@@ -142,6 +143,7 @@ interface PosState {
     sessionId?: string;
   };
   patientInstructionModal: PatientInstructionModalState;
+  clearanceGiftModal: ClearanceGiftModalState;
   consultationRecords: VoiceConsultationRecord[];
 
   // Printing & Finalization
@@ -898,6 +900,9 @@ const initialState: PosState = {
     isOpen: false
   },
 
+  clearanceGiftModal: {
+    isOpen: false
+  },
   patientInstructionModal: {
     isOpen: false,
     selectedProduct: null,
@@ -1059,7 +1064,7 @@ export const posSlice = createSlice({
     setAuthMode: (state, action: PayloadAction<AuthMode>) => {
       state.authMode = action.payload;
     },
-    loginUser: (state, action: PayloadAction<{ email: string; password?: string; pharmacistName?: string; pharmacyName?: string; licenseNo?: string }>) => {
+    loginUser: (state, action: PayloadAction<{ email: string; password?: string; pharmacistName?: string; pharmacyName?: string; licenseNo?: string; role?: any }>) => {
       const email = action.payload.email || '';
       const emailPrefixName = email ? email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'User';
       state.currentUser = {
@@ -1067,6 +1072,7 @@ export const posSlice = createSlice({
         pharmacyName: action.payload.pharmacyName || 'GENQUANTAA POS Store',
         licenseNo: action.payload.licenseNo || 'DL-2024/HYD/889201',
         email: email || 'user@genquantaa.com',
+        role: action.payload.role || 'STAFF',
         isLoggedIn: true
       };
       state.currentView = 'DASHBOARD';
@@ -2065,6 +2071,106 @@ export const posSlice = createSlice({
       });
     },
 
+    setClearanceGiftModalOpen: (state, action: PayloadAction<{ isOpen: boolean; targetCartItemId?: string }>) => {
+      state.clearanceGiftModal = {
+        isOpen: action.payload.isOpen,
+        targetCartItemId: action.payload.targetCartItemId
+      };
+    },
+
+    applyNearExpiryClearanceDiscount: (state, action: PayloadAction<{ discountPerUnit: number; targetCartItemId?: string }>) => {
+      const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
+      if (!currentSession) return;
+
+      const itemsToUpdate = action.payload.targetCartItemId
+        ? currentSession.items.filter(i => i.cartItemId === action.payload.targetCartItemId)
+        : currentSession.items.filter(i => {
+          if (i.isClearanceGift) return false;
+          const expTime = new Date(i.selectedBatch.expiryDate).getTime();
+          const now = new Date().getTime();
+          const daysLeft = Math.ceil((expTime - now) / (1000 * 60 * 60 * 24));
+          return daysLeft <= 90;
+        });
+
+      itemsToUpdate.forEach(item => {
+        const currentDiscAmt = (item.unitPrice * item.quantity * item.discountPercent) / 100;
+        const additionalDiscAmt = action.payload.discountPerUnit * item.quantity;
+        const totalDiscAmt = Math.min(item.unitPrice * item.quantity, currentDiscAmt + additionalDiscAmt);
+        const newPercent = Number(((totalDiscAmt / (item.unitPrice * item.quantity)) * 100).toFixed(2));
+
+        item.discountPercent = Math.min(100, Math.max(item.discountPercent, newPercent));
+        item.clearanceDiscountApplied = (item.clearanceDiscountApplied || 0) + action.payload.discountPerUnit;
+
+        const gst = calculateItemGST(item.unitPrice, item.quantity, item.discountPercent, item.product.gstRate);
+        item.taxableAmount = gst.taxableAmount;
+        item.cgstAmount = gst.cgstAmount;
+        item.sgstAmount = gst.sgstAmount;
+        item.totalGst = gst.totalGst;
+        item.lineTotal = gst.lineTotal;
+      });
+    },
+
+    addClearanceGiftToCart: (state, action: PayloadAction<{ giftName: string; giftValue: number; giftCategory?: string; giftIcon?: string }>) => {
+      const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
+      if (!currentSession) return;
+
+      const existing = currentSession.items.find(i => i.isClearanceGift && i.product.name.includes(action.payload.giftName));
+      if (existing) {
+        existing.quantity += 1;
+        return;
+      }
+
+      const giftProduct: Product = {
+        _id: 'gift-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+        name: '🎁 Free Gift: ' + action.payload.giftName,
+        brand: 'Clearance Promo',
+        saltComposition: 'Complimentary Patient Wellness Gift (Near-Expiry Clearance Offer)',
+        barcode: 'GIFT-' + Math.floor(100000 + Math.random() * 900000),
+        hsnCode: '30049099',
+        gstRate: 0,
+        unitMRP: action.payload.giftValue,
+        sellingPrice: 0,
+        grossMarginPercent: 100,
+        scheduleCategory: 'REGULAR',
+        stockStatus: 'IN_STOCK',
+        totalStock: 100,
+        batches: [{
+          batchNumber: 'PROMO-FREE',
+          expiryDate: '2027-12-31',
+          stockQuantity: 100,
+          location: 'Promo Counter',
+          mrp: action.payload.giftValue
+        }]
+      };
+
+      const giftItem: CartItem = {
+        cartItemId: 'cart-gift-' + Date.now(),
+        productId: giftProduct._id,
+        product: giftProduct,
+        selectedBatch: giftProduct.batches[0],
+        quantity: 1,
+        unitMode: 'PACK',
+        unitPrice: 0,
+        discountPercent: 100,
+        taxableAmount: 0,
+        cgstAmount: 0,
+        sgstAmount: 0,
+        totalGst: 0,
+        lineTotal: 0,
+        isClearanceGift: true,
+        giftOriginalPrice: action.payload.giftValue
+      };
+
+      currentSession.items.push(giftItem);
+    },
+
+    removeClearanceGiftFromCart: (state, action: PayloadAction<string>) => {
+      const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
+      if (currentSession) {
+        currentSession.items = currentSession.items.filter(i => i.cartItemId !== action.payload);
+      }
+    },
+
     openScheduleHDetailsPrompt: (state) => {
       state.complianceModal = {
         isOpen: true,
@@ -2122,14 +2228,14 @@ export const posSlice = createSlice({
           const medDetails = getMedicineDetails(prod);
           const unitsPerPack = medDetails.unitsPerPack || prod.unitsPerPack || 10;
           const isLoose = (item.unitMode || 'PACK') === 'LOOSE';
-          
+
           // Calculate reduction in pack units (e.g. 5 loose tabs from 10-tab strip = 0.5 pack)
           const packDeduction = isLoose ? item.quantity / unitsPerPack : item.quantity;
-          
+
           if (batch) {
             batch.stockQuantity = Math.max(0, Number((batch.stockQuantity - packDeduction).toFixed(2)));
           }
-          
+
           // Recalculate total product stock & stock status
           prod.totalStock = Math.max(0, Number(prod.batches.reduce((sum, b) => sum + b.stockQuantity, 0).toFixed(2)));
           prod.stockStatus = prod.totalStock > 20 ? 'IN_STOCK' : prod.totalStock > 0 ? 'LOW_STOCK' : 'OUT_OF_STOCK';
@@ -2270,13 +2376,17 @@ export const posSlice = createSlice({
         billingSession: {
           id: `sess-dlv-${order.orderId}`,
           tabTitle: `Order ${order.orderNumber}`,
+          assignedPharmacistId: 'pharm-1',
           items: cartItems,
           patientDetails: {
             patientName: order.customerName,
             phone: order.customerPhone,
-            gender: 'MALE'
+            gender: 'MALE',
+            age: '30'
           },
           doctorDetails: { doctorName: 'Online Order Rx', regNo: 'ONLINE' },
+          scheduleXVerified: false,
+          pharmacistSignatureAcknowledged: true,
           createdAt: order.createdAt
         },
         subtotal,
@@ -2285,11 +2395,14 @@ export const posSlice = createSlice({
         totalSGST,
         grandTotal,
         payment: {
-          mode: (action.payload.paymentMode || 'UPI') as any,
-          receivedAmount: grandTotal,
+          method: (action.payload.paymentMode || 'UPI') as any,
+          cashAmount: 0,
+          upiAmount: grandTotal,
+          cardAmount: 0,
+          totalPaid: grandTotal,
           changeDue: 0,
           digitalTransactionRef: order.orderNumber,
-          splitAmounts: { cash: 0, card: 0, upi: grandTotal }
+          paymentStatus: 'SUCCESS'
         },
         pharmacistName: state.currentUser?.pharmacistName || 'Lead Pharmacist',
         counterNumber: 1,
@@ -2380,6 +2493,10 @@ export const {
   attachPrescriptionToSession,
   removePrescriptionFromSession,
   refillChronicMedicationsToCart,
+  setClearanceGiftModalOpen,
+  applyNearExpiryClearanceDiscount,
+  addClearanceGiftToCart,
+  removeClearanceGiftFromCart,
   openScheduleHDetailsPrompt,
   startSubmittingBill,
   stopSubmittingBill,

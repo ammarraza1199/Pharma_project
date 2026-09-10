@@ -1,4 +1,4 @@
-export type AppView = 'LANDING' | 'AUTH' | 'POS_TERMINAL' | 'DASHBOARD' | 'INVENTORY' | 'PURCHASE_GRN' | 'REPORTS' | 'RETURNS' | 'EXPIRY_MANAGEMENT' | 'PATIENTS' | 'SUPPLIERS' | 'SETTINGS' | 'EMERGENCY_DELIVERY' | 'INVOICES' | 'ONLINE_DELIVERY';
+export type AppView = 'LANDING' | 'AUTH' | 'POS_TERMINAL' | 'DASHBOARD' | 'INVENTORY' | 'INVENTORY_DASHBOARD' | 'PURCHASE_GRN' | 'REPORTS' | 'RETURNS' | 'EXPIRY_MANAGEMENT' | 'PATIENTS' | 'SUPPLIERS' | 'SETTINGS' | 'EMERGENCY_DELIVERY' | 'INVOICES' | 'ONLINE_DELIVERY';
 export type AuthMode = 'SIGN_IN' | 'SIGN_UP';
 
 export interface UserAccount {
@@ -20,6 +20,9 @@ export interface BatchInfo {
   stockQuantity: number;
   location: string;
   mrp: number;
+  purchaseRate?: number;
+  clearanceDiscountPercent?: number;
+  isDumpStock?: boolean;
 }
 
 export type MedicineType = 'Oral' | 'Injectable' | 'Topical' | 'Inhalation' | 'Ophthalmic' | 'Nasal' | 'Rectal';
@@ -65,6 +68,9 @@ export interface CartItem {
   lineTotal: number;
   isSubstitute?: boolean;
   substitutedFor?: string;
+  isClearanceGift?: boolean;
+  clearanceDiscountApplied?: number;
+  giftOriginalPrice?: number;
 }
 
 export interface DoctorDetails {
@@ -102,6 +108,8 @@ export interface BillingSession {
   scheduleXVerified: boolean;
   scheduleXManagerPin?: string;
   pharmacistSignatureAcknowledged: boolean;
+  uploadedPrescriptionUrl?: string;
+  uploadedPrescriptionName?: string;
   createdAt: string;
 }
 
@@ -208,6 +216,7 @@ export interface ReturnItem {
   refundAmount: number;
   reason: 'EXPIRED' | 'DAMAGED' | 'CUSTOMER_CANCELLED' | 'WRONG_MEDICINE';
   restocked: boolean;
+  shelfStatus?: 'SHELF_RESTOCKED' | 'DISPOSAL_MARKED' | 'PENDING' | 'PENDING_SHELF_CONFIRMATION' | 'MARKED_DAMAGED' | 'RESTOCKED_TO_SHELF';
 }
 
 export interface ReturnCreditNote {
@@ -232,6 +241,23 @@ export interface DisposalRecord {
   approvalManagerPin: string;
 }
 
+export interface ChronicMedication {
+  productId: string;
+  medicineName?: string;
+  productName?: string;
+  dosage?: string;
+  frequency?: string;
+  frequencyDays?: number;
+  category?: 'BP' | 'SUGAR' | 'HEART' | 'THYROID' | 'OTHER' | string;
+  conditionCategory: 'HYPERTENSION' | 'DIABETES' | 'CARDIOLOGY' | 'RESPIRATORY' | 'GENERAL' | string;
+  quantity: number;
+  lastRefillDate?: string;
+  lastRefilledDate?: string;
+  nextRefillDue?: string;
+  doctorName?: string;
+  daysRemaining?: number;
+}
+
 export interface PatientRecord {
   patientId: string;
   name: string;
@@ -242,6 +268,7 @@ export interface PatientRecord {
   totalSpent: number;
   lastVisit: string;
   chronicConditions?: string[];
+  chronicMedications?: ChronicMedication[];
 }
 
 export interface SupplierRecord {
@@ -254,6 +281,15 @@ export interface SupplierRecord {
   dlNumber: string;
   address: string;
   pendingBalance: number;
+  tradeDiscountPercent?: number;
+  rebatePercent?: number;
+  liquidMarginPercent?: number;
+  creditPeriodDays?: number;
+  deliveryLeadTimeHours?: number;
+  topBrandsSupplied?: string[];
+  recommendationTag?: string;
+  performanceScore?: number;
+  returnAcceptanceRate?: number;
 }
 
 export interface StoreSettings {
@@ -271,8 +307,10 @@ export interface StoreSettings {
   defaultTaxType?: 'CGST_SGST' | 'IGST';
   managerName?: string;
   managerEmail?: string;
+  managerPin?: string;
   ownerName?: string;
   ownerEmail?: string;
+  ownerPin?: string;
 }
 
 export type DeliveryStatus = 'PENDING' | 'CONFIRMED' | 'DISPATCHED' | 'ON_TIME' | 'DELAYED' | 'DELIVERED' | 'CANCELLED';
@@ -314,12 +352,12 @@ export interface DeliveryOrder {
   updatedAt: string;
 }
 
-export type WellnessBrochureCategory = 
-  | 'DIABETES' 
-  | 'HYPERTENSION' 
-  | 'ASTHMA' 
-  | 'GERIATRIC' 
-  | 'PEDIATRIC' 
+export type WellnessBrochureCategory =
+  | 'DIABETES'
+  | 'HYPERTENSION'
+  | 'ASTHMA'
+  | 'GERIATRIC'
+  | 'PEDIATRIC'
   | 'MATERNITY';
 
 export interface WellnessBrochurePlan {
@@ -450,4 +488,63 @@ export interface PatientInstructionModalState {
   selectedLanguage: PILLanguage;
   patientName?: string;
   doctorName?: string;
+}
+
+export interface ClearanceGiftModalState {
+  isOpen: boolean;
+  targetCartItemId?: string;
+}
+
+export interface SupplierBill {
+  billId: string;
+  supplierId: string;
+  supplierName: string;
+  invoiceNumber: string;
+  billDate: string;
+  dueDate: string;
+  creditDays?: number;
+  billType: 'CASH' | 'CREDIT';
+  totalAmount: number;
+  paidAmount: number;
+  pendingAmount: number;
+  status: 'PAID' | 'PARTIAL' | 'PENDING' | 'OVERDUE';
+  itemsSummary?: string;
+  notes?: string;
+}
+
+export interface SupplierPaymentLog {
+  paymentId: string;
+  supplierId: string;
+  supplierName: string;
+  amount: number;
+  paymentDate: string;
+  paymentMode: 'NEFT' | 'RTGS' | 'UPI' | 'CHEQUE' | 'CASH' | 'NEFT_RTGS';
+  referenceNo: string;
+  billInvoiceNo?: string;
+  notes?: string;
+}
+
+export interface DistributorScheme {
+  schemeId: string;
+  supplierId: string;
+  supplierName: string;
+  title: string;
+  productName?: string;
+  primaryProduct?: string;
+  saltComposition?: string;
+  schemeType?: 'BUY_X_GET_Y_FREE' | 'PERCENTAGE_DISCOUNT' | 'CASH_REBATE';
+  dealType?: string;
+  buyQuantity?: number;
+  freeQuantity?: number;
+  discountPercent?: number;
+  effectiveMarginPercent?: number;
+  validTill?: string;
+  validUntil?: string;
+  minOrderValue?: number;
+  badgeTag?: string;
+  comboItems?: string[];
+  minOrderQty?: number;
+  substituteOption?: any;
+  description?: string;
+  isActive?: boolean;
 }
