@@ -1,0 +1,528 @@
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="utf-8">
+<title>GenQuantaa POS - Verified Pending Frontend Tasks</title>
+<style>
+body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #1e293b; padding: 24px; }
+h1 { color: #0f172a; border-bottom: 2px solid #059669; padding-bottom: 6px; font-size: 18pt; }
+h2 { color: #0f172a; margin-top: 20px; font-size: 14pt; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; }
+h3 { color: #065f46; font-size: 12pt; margin-top: 16px; }
+h4 { color: #1e293b; font-size: 11pt; margin-top: 12px; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 10pt; }
+th, td { border: 1px solid #cbd5e1; padding: 7px 10px; text-align: left; }
+th { background-color: #f1f5f9; font-weight: bold; color: #334155; }
+tr:nth-child(even) { background-color: #f8fafc; }
+ul { padding-left: 20px; }
+li { margin-bottom: 4px; }
+code { font-family: Consolas, monospace; background: #f1f5f9; padding: 2px 4px; border-radius: 4px; font-size: 9.5pt; }
+</style>
+</head>
+<body>
+<h1>GenQuantaa POS — Verified Pending Frontend Tasks</h1>
+<p><strong>Document Title:</strong> GenQuantaa POS — Verified Pending Frontend Tasks<br />
+<strong>Audit Reference:</strong> Cleaned &amp; Verified from Consolidated 30-Task List<br />
+<strong>Target Codebase:</strong> <code>POS/frontend/src/</code><br />
+<strong>Status:</strong> <strong>5 Completed Tasks Removed</strong> | <strong>25 Pending Tasks Remaining</strong></p>
+<hr />
+<h2>1. Audit Summary: Removed Completed Tasks (4 Tasks)</h2>
+<p>The following 4 tasks from the original 30-item list have already been built, tested, and verified as operational in the POS frontend. They have been <strong>removed</strong> from the active pending list:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">#</th>
+<th style="text-align: left;">Task ID</th>
+<th style="text-align: left;">Feature Name</th>
+<th style="text-align: left;">Codebase Location</th>
+<th style="text-align: center;">Operational Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">1</td>
+<td style="text-align: left;"><strong>Task #13</strong></td>
+<td style="text-align: left;">Dynamic expiry-days-left badges (Red/Amber/Green) in Cart Table</td>
+<td style="text-align: left;"><a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/CartTable.tsx#L43-L63"><code>frontend/src/components/CartTable.tsx</code></a></td>
+<td style="text-align: center;">✅ <strong>Completed</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">2</td>
+<td style="text-align: left;"><strong>Task #16</strong></td>
+<td style="text-align: left;">Near-expiry (5–10 days) clearance discount / free-gift auto-add</td>
+<td style="text-align: left;"><a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/CartTable.tsx#L340-L417"><code>frontend/src/components/CartTable.tsx</code></a><br><a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/ClearanceGiftModal.tsx"><code>frontend/src/components/ClearanceGiftModal.tsx</code></a></td>
+<td style="text-align: center;">✅ <strong>Completed</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">3</td>
+<td style="text-align: left;"><strong>Task #26</strong></td>
+<td style="text-align: left;">One-click "Previously Ordered Meds" reorder tab in Product Search</td>
+<td style="text-align: left;"><a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/ProductSearch.tsx#L20-L28"><code>frontend/src/components/ProductSearch.tsx</code></a></td>
+<td style="text-align: center;">✅ <strong>Completed</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">4</td>
+<td style="text-align: left;"><strong>Task #37</strong></td>
+<td style="text-align: left;">Cart substitution lineage text displaying "Substituted for: [Original Medicine Name]" directly under the item</td>
+<td style="text-align: left;"><a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/CartTable.tsx#L542-L550"><code>frontend/src/components/CartTable.tsx</code></a></td>
+<td style="text-align: center;">✅ <strong>Completed</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">5</td>
+<td style="text-align: left;"><strong>Task #50</strong></td>
+<td style="text-align: left;">Real-time customer sentiment analysis (Price-Sensitive, Anxious, Satisfied) &amp; dynamic counter courtesy discounts</td>
+<td style="text-align: left;"><a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/VoiceConsultationModal.tsx"><code>frontend/src/components/VoiceConsultationModal.tsx</code></a><br><a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/utils/sentimentEngine.ts"><code>frontend/src/utils/sentimentEngine.ts</code></a><br><a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/CartTable.tsx"><code>frontend/src/components/CartTable.tsx</code></a></td>
+<td style="text-align: center;">✅ <strong>Completed</strong></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>2. Verified Active Pending Tasks (26 Tasks)</h2>
+<p>Below is the itemized list containing <strong>only</strong> the 26 truly pending tasks required for the POS frontend, grouped into logical modules.</p>
+<h3>Module 1: Counter Profitability, Cross-Selling &amp; Checkout Bundles (3 Tasks)</h3>
+<h4>1. Task #45: Profit Maker / Margin Maximizer Engine</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/CartTable.tsx"><code>CartTable.tsx</code></a>, <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/ProductSearch.tsx"><code>ProductSearch.tsx</code></a></li>
+<li><strong>Priority:</strong> High</li>
+<li><strong>Requirement:</strong> </li>
+<li>Recommend high-margin companion items (e.g., Dettol antiseptic liquid, sterile cotton rolls, medicated adhesive bandages, multivitamin supplements) based on active cart items.</li>
+<li>Display a dedicated "Margin Maximizer" shelf widget at the counter with an instant 1-click "Add Companion Item" button.</li>
+<li>Highlight expected counter profit bump percentage.</li>
+</ul>
+<h4>2. Task #46: "How to Convince Customer" Key Talking-Points Card</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/SmartSubstitutionModal.tsx"><code>SmartSubstitutionModal.tsx</code></a></li>
+<li><strong>Priority:</strong> High</li>
+<li><strong>Requirement:</strong></li>
+<li>Quick floating / overlapping prompt card overlaying the screen during substitution selection.</li>
+<li>Provides verbal talking points and clinical scripts for counter staff (e.g., <em>"Same active salt, bio-equivalent efficacy, manufactured by USFDA-approved facility, saves ₹45"</em>).</li>
+<li>Helps staff persuade hesitant or price-sensitive patients to accept substitute recommendations.</li>
+</ul>
+<h4>3. Task #47: Smart Clinical Combo Bundle Recommendations at Checkout</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/CartTable.tsx"><code>CartTable.tsx</code></a>, <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/CartSummary.tsx"><code>CartSummary.tsx</code></a></li>
+<li><strong>Priority:</strong> Medium</li>
+<li><strong>Requirement:</strong></li>
+<li>Context-aware clinical care bundle recommendations prompted before finalizing the invoice.</li>
+<li>Pre-configured kits:<ul>
+<li><strong>Fever &amp; Flu Care Kit:</strong> Paracetamol + ORS Hydration Sachets + Digital Thermometer.</li>
+<li><strong>Wound Care Kit:</strong> Povidone Iodine Ointment + Sterile Gauze Pack + Micropore Tape.</li>
+<li><strong>Gastric Comfort Bundle:</strong> Antacid Gel + Pantoprazole + Digestive Enzymes.</li>
+</ul>
+</li>
+<li>Includes a single-click "Add Bundle to Cart" action with automated bundle pricing.</li>
+</ul>
+<hr />
+<h3>Module 2: Procurement, Supplier Pricing &amp; Purchase Orders (4 Tasks)</h3>
+<h4>4. Task #18: Multi-Supplier Price Comparison Matrix</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/SuppliersPage.tsx"><code>SuppliersPage.tsx</code></a>, <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/PurchaseGRNPage.tsx"><code>PurchaseGRNPage.tsx</code></a></li>
+<li><strong>Priority:</strong> High</li>
+<li><strong>Requirement:</strong></li>
+<li>Comparative matrix comparing quotations from multiple authorized pharmaceutical distributors for the exact same medicine.</li>
+<li>Evaluate distributor wholesale rates, active promotional schemes (<em>e.g., Buy 10 Get 2 Free, Buy 20 Get 5 Free</em>), cash discount terms (CD %), and net effective cost per unit.</li>
+<li>Color-code and highlight the lowest net-cost supplier for fast procurement selection.</li>
+</ul>
+<h4>5. Task #19: Supplier Ledger (Cash vs Credit) &amp; 10/15-Day Repayment Countdown</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/SuppliersPage.tsx"><code>SuppliersPage.tsx</code></a></li>
+<li><strong>Priority:</strong> High</li>
+<li><strong>Requirement:</strong></li>
+<li>Segment supplier purchase invoices into <strong>Cash Bills</strong> and <strong>Credit Bills</strong>.</li>
+<li>Structured accounts payable ledger with color-coded countdown badges:<ul>
+<li>🟡 <strong>10-day notice:</strong> Upcoming payment reminder.</li>
+<li>🔴 <strong>15-day alert:</strong> Urgent due date / credit freeze threshold.</li>
+</ul>
+</li>
+<li>One-click payment settlement action logging cheque/NEFT/UPI reference numbers.</li>
+</ul>
+<h4>6. Task #20: Procurement Intelligence Engine</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/SuppliersPage.tsx"><code>SuppliersPage.tsx</code></a>, <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/PurchaseGRNPage.tsx"><code>PurchaseGRNPage.tsx</code></a></li>
+<li><strong>Priority:</strong> High</li>
+<li><strong>Requirement:</strong></li>
+<li>Discovery algorithm scanning distributor catalog data to detect bulk combo deals, volume rebates, and high-liquidation manufacturer margins.</li>
+<li>Generates automated suggestions: <em>"Switch supplier from Distributor A to Distributor B for 8.5% lower purchase cost on Amoxicillin"</em>.</li>
+</ul>
+<h4>7. Task #21: Advance Purchase Order (PO) Drafting &amp; Placement</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/PurchaseGRNPage.tsx"><code>PurchaseGRNPage.tsx</code></a></li>
+<li><strong>Priority:</strong> High</li>
+<li><strong>Requirement:</strong></li>
+<li>Draft, review, approve, and dispatch formal Purchase Orders (POs) to selected pharmaceutical distributors prior to physical stock arrival.</li>
+<li>Specify scheduled delivery dates, itemized quantities, agreed wholesale purchase rates, and delivery terms.</li>
+<li>Export/print official PO document or email PDF to distributor.</li>
+</ul>
+<hr />
+<h3>Module 3: Expiry Actions, Returns &amp; Shelf Management (5 Tasks)</h3>
+<h4>8. Task #22: Return &amp; Refund 15% Restocking / Depreciation Fee Deduction</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/ReturnsPage.tsx"><code>ReturnsPage.tsx</code></a></li>
+<li><strong>Priority:</strong> Medium</li>
+<li><strong>Requirement:</strong></li>
+<li>Configurable toggle/checkbox on customer medicine return processing to apply a statutory <strong>15% restocking / handling fee deduction</strong>.</li>
+<li>Auto-recomputes net refund amount (Cash / UPI / Store Credit Voucher) and reflects the deduction on the printed Credit Note slip.</li>
+</ul>
+<h4>9. Task #23: Physical Restock / Put-Away Shelf Queue</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/ReturnsPage.tsx"><code>ReturnsPage.tsx</code></a></li>
+<li><strong>Priority:</strong> Low</li>
+<li><strong>Requirement:</strong></li>
+<li>Visual operational queue of returned medicines marked as non-damaged / restockable.</li>
+<li>Displays rack and bin locations so idle counter staff can collect items and return them to physical pharmacy shelves.</li>
+<li>Mark as "Returned to Shelf" button once physical put-away is completed.</li>
+</ul>
+<h4>10. Task #42: Expiry Management Rx vs OTC Toggle &amp; "Ask Doctor" Early Dispensing</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/ExpiryManagementPage.tsx"><code>ExpiryManagementPage.tsx</code></a></li>
+<li><strong>Priority:</strong> Medium</li>
+<li><strong>Requirement:</strong></li>
+<li>Segmented filter tab in Expiry Management to separate <strong>Prescription (Rx)</strong> medicines from <strong>Over-the-Counter (OTC)</strong> batches.</li>
+<li>Action button: <strong>"Ask Doctor"</strong> intimation action to generate a quick WhatsApp/SMS list for partner clinics, facilitating priority dispensing of near-expiry Rx stock before it expires.</li>
+</ul>
+<h4>11. Task #43: Automated Return-to-Distributor for Near-Expiry Stock</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/ExpiryManagementPage.tsx"><code>ExpiryManagementPage.tsx</code></a>, <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/ReturnsPage.tsx"><code>ReturnsPage.tsx</code></a></li>
+<li><strong>Priority:</strong> High</li>
+<li><strong>Requirement:</strong></li>
+<li>Automated workflow to identify stock reaching 60–90 days prior to expiry (before distributor credit return cutoffs).</li>
+<li>Generate a distributor <strong>Debit Note / Return Shipment</strong> to recover credit instead of holding medicines until total expiry loss/disposal.</li>
+</ul>
+<h4>12. Task #44: Rack Selection Robo (Interactive 2D Visual Shelf &amp; Bin Locator)</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/ProductSearch.tsx"><code>ProductSearch.tsx</code></a>, <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/CartTable.tsx"><code>CartTable.tsx</code></a></li>
+<li><strong>Priority:</strong> Medium</li>
+<li><strong>Requirement:</strong></li>
+<li>Interactive 2D graphical visual map of pharmacy aisles, racks (A-Z), shelf tiers (1-5), and storage bins.</li>
+<li>Highlight the exact physical shelf cell in green when a medicine is selected in search or cart, speeding up physical item retrieval for counter pickers during peak customer rushes.</li>
+</ul>
+<hr />
+<h3>Module 4: Stock Classification, Reorder EOQ &amp; Real-Time Alerts (4 Tasks)</h3>
+<h4>13. Task #36: "Best Seller" Promotional Badge on Cart Substitutes</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/CartTable.tsx"><code>CartTable.tsx</code></a></li>
+<li><strong>Priority:</strong> Low</li>
+<li><strong>Requirement:</strong></li>
+<li>Visual promotional badge: <strong>"🔥 Best Seller"</strong> displayed next to high-converting substitute products in the cart table to reassure patients and build confidence in the replacement medicine.</li>
+</ul>
+<h4>14. Task #39: 4-Tier Stock Classification Bands</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/InventoryDashboardPage.tsx"><code>InventoryDashboardPage.tsx</code></a></li>
+<li><strong>Priority:</strong> Medium</li>
+<li><strong>Requirement:</strong></li>
+<li>Inventory categorization into 4 distinct velocity and safety bands:<ol>
+<li><strong>Heavy (Overstocked):</strong> &gt;60 days of inventory based on 30-day run rate.</li>
+<li><strong>Optimal:</strong> 15–45 days of buffer stock.</li>
+<li><strong>Reorder Point (Trigger Order):</strong> Stock approaching reorder threshold.</li>
+<li><strong>Critical Low Stock:</strong> &lt;5 days remaining, requires emergency purchase.</li>
+</ol>
+</li>
+<li>Quick filter tabs to drill into each classification band.</li>
+</ul>
+<h4>15. Task #40: Recommended Reorder Quantity (EOQ) on Dashboard</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/Dashboard.tsx"><code>Dashboard.tsx</code></a></li>
+<li><strong>Priority:</strong> Medium</li>
+<li><strong>Requirement:</strong></li>
+<li>In the Low Stock Alerts widget on the Dashboard, compute and display recommended reorder batch quantities (Economic Order Quantity / EOQ).</li>
+<li>Calculated dynamically from historical 30-day daily consumption velocity and supplier lead times.</li>
+</ul>
+<h4>16. Task #41: Pharmacist Real-Time Reorder Push Notification During Billing</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/Navbar.tsx"><code>Navbar.tsx</code></a>, <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/Dashboard.tsx"><code>Dashboard.tsx</code></a>, <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/CartTable.tsx"><code>CartTable.tsx</code></a></li>
+<li><strong>Priority:</strong> High</li>
+<li><strong>Requirement:</strong></li>
+<li>Real-time toast alert and Navbar notification badge triggered immediately when billing an item causes its remaining store inventory to fall below the minimum safety threshold.</li>
+<li>Direct 1-click action: <em>"Add to Reorder List"</em>.</li>
+</ul>
+<hr />
+<h3>Module 5: Audio AI, Speech-to-Text &amp; Customer Sentiment (3 Tasks)</h3>
+<h4>17. Task #48: Link Value-Added Product Discounts to Audio Recordings</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/VoiceConsultationModal.tsx"><code>VoiceConsultationModal.tsx</code></a>, <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/CartSummary.tsx"><code>CartSummary.tsx</code></a></li>
+<li><strong>Priority:</strong> Low</li>
+<li><strong>Requirement:</strong></li>
+<li>Allow special promotional discounts or bundled value services (diagnostic health checks, blood pressure screenings) agreed verbally during audio consultation to link directly to the consultation record ID.</li>
+</ul>
+<h4>18. Task #49: Customer Voice Speech-to-Text (STT) Live Transcription</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/VoiceConsultationModal.tsx"><code>VoiceConsultationModal.tsx</code></a></li>
+<li><strong>Priority:</strong> Medium</li>
+<li><strong>Requirement:</strong></li>
+<li>Real-time Speech-to-Text conversion using Web Speech API during counter audio recording.</li>
+<li>Generates live transcript of patient symptoms and pharmacist instructions.</li>
+<li>Stores text in searchable database for fast recall during subsequent refills.</li>
+</ul>
+<h4>19. Task #50: Real-Time Customer Sentiment Analysis</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/VoiceConsultationModal.tsx"><code>VoiceConsultationModal.tsx</code></a>, <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/CartTable.tsx"><code>CartTable.tsx</code></a></li>
+<li><strong>Priority:</strong> Medium</li>
+<li><strong>Requirement:</strong></li>
+<li>Sentiment evaluation from live transcript keywords and tone:<ul>
+<li><strong>Hesitant / Price-Sensitive:</strong> Suggest affordable branded generics or auto-trigger a 10% discount prompt.</li>
+<li><strong>Anxious / Urgent:</strong> Highlight immediate dosage reassurance and emergency care instructions.</li>
+<li><strong>Satisfied / Receptive:</strong> Suggest chronic refill subscriptions.</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h3>Module 6: Pharmacy Analytics, Patient Compliance &amp; Smart Staff Routing (7 Tasks)</h3>
+<h4>20. Task #52: Substitute Intelligence &amp; Conversion Analytics</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/Dashboard.tsx"><code>Dashboard.tsx</code></a>, <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/ReportsPage.tsx"><code>ReportsPage.tsx</code></a></li>
+<li><strong>Priority:</strong> Medium</li>
+<li><strong>Requirement:</strong></li>
+<li>Analytics panel tracking substitution performance:<ul>
+<li>Total substitutes prompted.</li>
+<li>Count accepted vs rejected by patients.</li>
+<li>Overall conversion <strong>Success Rate %</strong>.</li>
+<li>Incremental margin gained through substitution.</li>
+</ul>
+</li>
+</ul>
+<h4>21. Task #53: Customer Turnaround &amp; Waiting-Time Tracker</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/Dashboard.tsx"><code>Dashboard.tsx</code></a>, <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/ReportsPage.tsx"><code>ReportsPage.tsx</code></a></li>
+<li><strong>Priority:</strong> Medium</li>
+<li><strong>Requirement:</strong></li>
+<li>Customer service lifecycle milestone tracking:<ul>
+<li><strong>Entry &rarr; Billing &rarr; Packing / Verification &rarr; Final Dispatch</strong>.</li>
+</ul>
+</li>
+<li>Displays average counter service duration per customer against store target SLAs (e.g., target &lt; 3 minutes).</li>
+</ul>
+<h4>22. Task #54: Customer Adherence &amp; Partial Tablet Purchase Analysis</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/PatientsPage.tsx"><code>PatientsPage.tsx</code></a>, <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/ReportsPage.tsx"><code>ReportsPage.tsx</code></a></li>
+<li><strong>Priority:</strong> Medium</li>
+<li><strong>Requirement:</strong></li>
+<li>Detect and log when a patient with a chronic prescription purchases partial quantities (e.g., buying 10 loose tablets instead of the full prescribed 30-day course of 30 tablets).</li>
+<li>Display an adherence risk warning to the pharmacist to counsel the patient on course completion.</li>
+</ul>
+<h4>23. Task #55: Doctor &amp; Diagnostic Lab Referral Volume Analytics</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/ReportsPage.tsx"><code>ReportsPage.tsx</code></a></li>
+<li><strong>Priority:</strong> Medium</li>
+<li><strong>Requirement:</strong></li>
+<li>Reporting dashboard measuring prescription referral volume per clinic/physician and partner diagnostic center.</li>
+<li>Track chronic vs acute patient distribution, average basket size per prescriber, and top partner clinics.</li>
+</ul>
+<h4>24. Task #56: Smart Staff Routing — Chronic / Regular VIPs to Senior Pharmacists</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/TabBar.tsx"><code>TabBar.tsx</code></a>, <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/AssignBillModal.tsx"><code>AssignBillModal.tsx</code></a></li>
+<li><strong>Priority:</strong> Medium</li>
+<li><strong>Requirement:</strong></li>
+<li>Automated counter routing rule: When a regular chronic patient or VIP customer enters their phone number, automatically route/assign their active bill to Senior / Chief Pharmacist counters for personalized clinical consultation.</li>
+</ul>
+<h4>25. Task #57: Smart Staff Routing — Maternity &amp; Sensitive Care to Female Pharmacists</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/TabBar.tsx"><code>TabBar.tsx</code></a>, <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/AssignBillModal.tsx"><code>AssignBillModal.tsx</code></a></li>
+<li><strong>Priority:</strong> Medium</li>
+<li><strong>Requirement:</strong></li>
+<li>Automatic suggestion/routing to assign female pharmacists when customers request maternity, women's wellness, or sensitive personal hygiene products.</li>
+</ul>
+<h4>26. Task #57 (Packaging): Discreet Packaging Option</h4>
+<ul>
+<li><strong>Target Component(s):</strong> <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/CartTable.tsx"><code>CartTable.tsx</code></a>, <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/CartSummary.tsx"><code>CartSummary.tsx</code></a>, <a href="file:///c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/components/ReceiptPrintView.tsx"><code>ReceiptPrintView.tsx</code></a></li>
+<li><strong>Priority:</strong> Low</li>
+<li><strong>Requirement:</strong></li>
+<li>Dedicated <strong>"Discreet Packaging Required"</strong> checkbox/tag at the counter for sensitive OTC and maternity items.</li>
+<li>Prints a discrete packaging flag on thermal packing slips and hides sensitive product names on external delivery slips if requested.</li>
+</ul>
+<hr />
+<h2>3. Priority Summary Table of All 26 Pending Tasks</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">#</th>
+<th style="text-align: center;">Task #</th>
+<th style="text-align: left;">Feature Name</th>
+<th style="text-align: left;">Target Component</th>
+<th style="text-align: center;">Priority</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;"><strong>#45</strong></td>
+<td style="text-align: left;">Profit Maker / Margin Maximizer Engine</td>
+<td style="text-align: left;"><code>CartTable.tsx</code>, <code>ProductSearch.tsx</code></td>
+<td style="text-align: center;"><strong>High</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;"><strong>#46</strong></td>
+<td style="text-align: left;">"How to Convince Customer" Talking-Points Card</td>
+<td style="text-align: left;"><code>SmartSubstitutionModal.tsx</code></td>
+<td style="text-align: center;"><strong>High</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;"><strong>#47</strong></td>
+<td style="text-align: left;">Smart Clinical Combo Bundle Recommendations</td>
+<td style="text-align: left;"><code>CartTable.tsx</code>, <code>CartSummary.tsx</code></td>
+<td style="text-align: center;"><strong>Medium</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;"><strong>#18</strong></td>
+<td style="text-align: left;">Multi-Supplier Price Comparison Matrix</td>
+<td style="text-align: left;"><code>SuppliersPage.tsx</code>, <code>PurchaseGRNPage.tsx</code></td>
+<td style="text-align: center;"><strong>High</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;"><strong>#19</strong></td>
+<td style="text-align: left;">Supplier Ledger (Cash vs Credit) &amp; 10/15-Day Alerts</td>
+<td style="text-align: left;"><code>SuppliersPage.tsx</code></td>
+<td style="text-align: center;"><strong>High</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">6</td>
+<td style="text-align: center;"><strong>#20</strong></td>
+<td style="text-align: left;">Procurement Intelligence Engine</td>
+<td style="text-align: left;"><code>SuppliersPage.tsx</code>, <code>PurchaseGRNPage.tsx</code></td>
+<td style="text-align: center;"><strong>High</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">7</td>
+<td style="text-align: center;"><strong>#21</strong></td>
+<td style="text-align: left;">Advance Purchase Order (PO) Drafting &amp; Placement</td>
+<td style="text-align: left;"><code>PurchaseGRNPage.tsx</code></td>
+<td style="text-align: center;"><strong>High</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">8</td>
+<td style="text-align: center;"><strong>#22</strong></td>
+<td style="text-align: left;">Return &amp; Refund 15% Restocking Fee Deduction</td>
+<td style="text-align: left;"><code>ReturnsPage.tsx</code></td>
+<td style="text-align: center;"><strong>Medium</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">9</td>
+<td style="text-align: center;"><strong>#23</strong></td>
+<td style="text-align: left;">Physical Restock / Put-Away Shelf Queue</td>
+<td style="text-align: left;"><code>ReturnsPage.tsx</code></td>
+<td style="text-align: center;"><strong>Low</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">10</td>
+<td style="text-align: center;"><strong>#42</strong></td>
+<td style="text-align: left;">Expiry Rx vs OTC Views &amp; "Ask Doctor" Action</td>
+<td style="text-align: left;"><code>ExpiryManagementPage.tsx</code></td>
+<td style="text-align: center;"><strong>Medium</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">11</td>
+<td style="text-align: center;"><strong>#43</strong></td>
+<td style="text-align: left;">Automated Return-to-Distributor for Near-Expiry Stock</td>
+<td style="text-align: left;"><code>ExpiryManagementPage.tsx</code>, <code>ReturnsPage.tsx</code></td>
+<td style="text-align: center;"><strong>High</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">12</td>
+<td style="text-align: center;"><strong>#44</strong></td>
+<td style="text-align: left;">Rack Selection Robo (Interactive 2D Visual Locator)</td>
+<td style="text-align: left;"><code>ProductSearch.tsx</code>, <code>CartTable.tsx</code></td>
+<td style="text-align: center;"><strong>Medium</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">13</td>
+<td style="text-align: center;"><strong>#36</strong></td>
+<td style="text-align: left;">"Best Seller" Promotional Badge on Substitutes</td>
+<td style="text-align: left;"><code>CartTable.tsx</code></td>
+<td style="text-align: center;"><strong>Low</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">14</td>
+<td style="text-align: center;"><strong>#39</strong></td>
+<td style="text-align: left;">4-Tier Stock Classification Bands</td>
+<td style="text-align: left;"><code>InventoryDashboardPage.tsx</code></td>
+<td style="text-align: center;"><strong>Medium</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">15</td>
+<td style="text-align: center;"><strong>#40</strong></td>
+<td style="text-align: left;">Recommended Reorder Quantity (EOQ) on Dashboard</td>
+<td style="text-align: left;"><code>Dashboard.tsx</code></td>
+<td style="text-align: center;"><strong>Medium</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">16</td>
+<td style="text-align: center;"><strong>#41</strong></td>
+<td style="text-align: left;">Pharmacist Real-Time Reorder Push Alert</td>
+<td style="text-align: left;"><code>Navbar.tsx</code>, <code>Dashboard.tsx</code></td>
+<td style="text-align: center;"><strong>High</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">17</td>
+<td style="text-align: center;"><strong>#48</strong></td>
+<td style="text-align: left;">Link Value-Added Discounts to Audio Recordings</td>
+<td style="text-align: left;"><code>VoiceConsultationModal.tsx</code></td>
+<td style="text-align: center;"><strong>Low</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">18</td>
+<td style="text-align: center;"><strong>#49</strong></td>
+<td style="text-align: left;">Customer Voice Speech-to-Text (STT) Live Transcription</td>
+<td style="text-align: left;"><code>VoiceConsultationModal.tsx</code></td>
+<td style="text-align: center;"><strong>Medium</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">19</td>
+<td style="text-align: center;"><strong>#50</strong></td>
+<td style="text-align: left;">Real-Time Customer Sentiment Analysis</td>
+<td style="text-align: left;"><code>VoiceConsultationModal.tsx</code>, <code>CartTable.tsx</code></td>
+<td style="text-align: center;"><strong>Medium</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">20</td>
+<td style="text-align: center;"><strong>#52</strong></td>
+<td style="text-align: left;">Substitute Intelligence &amp; Conversion Analytics</td>
+<td style="text-align: left;"><code>Dashboard.tsx</code>, <code>ReportsPage.tsx</code></td>
+<td style="text-align: center;"><strong>Medium</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">21</td>
+<td style="text-align: center;"><strong>#53</strong></td>
+<td style="text-align: left;">Customer Turnaround &amp; Waiting-Time Tracker</td>
+<td style="text-align: left;"><code>Dashboard.tsx</code>, <code>ReportsPage.tsx</code></td>
+<td style="text-align: center;"><strong>Medium</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">22</td>
+<td style="text-align: center;"><strong>#54</strong></td>
+<td style="text-align: left;">Customer Adherence &amp; Partial Tablet Purchase Analysis</td>
+<td style="text-align: left;"><code>PatientsPage.tsx</code>, <code>ReportsPage.tsx</code></td>
+<td style="text-align: center;"><strong>Medium</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">23</td>
+<td style="text-align: center;"><strong>#55</strong></td>
+<td style="text-align: left;">Doctor &amp; Diagnostic Lab Referral Volume Analytics</td>
+<td style="text-align: left;"><code>ReportsPage.tsx</code></td>
+<td style="text-align: center;"><strong>Medium</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">24</td>
+<td style="text-align: center;"><strong>#56</strong></td>
+<td style="text-align: left;">Routing Chronic / VIPs to Senior Pharmacists</td>
+<td style="text-align: left;"><code>TabBar.tsx</code>, <code>AssignBillModal.tsx</code></td>
+<td style="text-align: center;"><strong>Medium</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">25</td>
+<td style="text-align: center;"><strong>#57</strong></td>
+<td style="text-align: left;">Routing Maternity / Sensitive Care to Female Pharmacists</td>
+<td style="text-align: left;"><code>TabBar.tsx</code>, <code>AssignBillModal.tsx</code></td>
+<td style="text-align: center;"><strong>Medium</strong></td>
+</tr>
+<tr>
+<td style="text-align: center;">26</td>
+<td style="text-align: center;"><strong>#57 (Pkg)</strong></td>
+<td style="text-align: left;">Discreet Packaging Option for Sensitive Products</td>
+<td style="text-align: left;"><code>CartTable.tsx</code>, <code>ReceiptPrintView.tsx</code></td>
+<td style="text-align: center;"><strong>Low</strong></td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>

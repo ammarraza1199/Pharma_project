@@ -34,7 +34,8 @@ import type {
   VoiceConsultationRecord,
   PatientInstructionModalState,
   ClearanceGiftModalState,
-  PILLanguage
+  PILLanguage,
+  CustomerSentimentResult
 } from '../types/pos';
 import { MOCK_PRODUCTS } from '../mock/products';
 import { calculateItemGST } from '../utils/gstCalculator';
@@ -1703,6 +1704,33 @@ export const posSlice = createSlice({
       }
     },
 
+    applySentimentDiscount: (state, action: PayloadAction<number>) => {
+      const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
+      if (currentSession) {
+        const discountPct = action.payload;
+        currentSession.appliedSentimentDiscount = discountPct;
+        currentSession.items.forEach(item => {
+          if ((item.discountPercent || 0) < discountPct) {
+            item.discountPercent = discountPct;
+            item.sentimentDiscountApplied = discountPct;
+            const gst = calculateItemGST(item.unitPrice, item.quantity, discountPct, item.product.gstRate);
+            item.taxableAmount = gst.taxableAmount;
+            item.cgstAmount = gst.cgstAmount;
+            item.sgstAmount = gst.sgstAmount;
+            item.totalGst = gst.totalGst;
+            item.lineTotal = gst.lineTotal;
+          }
+        });
+      }
+    },
+
+    setSessionSentiment: (state, action: PayloadAction<CustomerSentimentResult>) => {
+      const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
+      if (currentSession) {
+        currentSession.detectedSentiment = action.payload;
+      }
+    },
+
     // Compliance & Patient Details
     setDoctorDetails: (state, action: PayloadAction<DoctorDetails>) => {
       const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
@@ -2462,6 +2490,8 @@ export const {
   removeFromCart,
   clearActiveCart,
   applyBulkDiscount,
+  applySentimentDiscount,
+  setSessionSentiment,
   setDoctorDetails,
   setPatientDetails,
   saveScheduleHCompliance,

@@ -71,6 +71,7 @@ export interface CartItem {
   isClearanceGift?: boolean;
   clearanceDiscountApplied?: number;
   giftOriginalPrice?: number;
+  sentimentDiscountApplied?: number;
 }
 
 export interface DoctorDetails {
@@ -95,6 +96,21 @@ export interface PharmacistCounter {
   avatarInitials: string;
 }
 
+export type SentimentType = 'PRICE_SENSITIVE' | 'ANXIOUS_URGENT' | 'SATISFIED_RECEPTIVE' | 'NEUTRAL';
+
+export interface CustomerSentimentResult {
+  sentiment: SentimentType;
+  confidence: number; // 0 to 100
+  label: string;
+  toneSummary: string;
+  detectedKeywords: string[];
+  recommendedAction: string;
+  discountSuggestionPercent?: number;
+  genericSuggestionPrompt?: string;
+  reassuranceText?: string;
+  refillPrompt?: string;
+}
+
 export interface BillingSession {
   id: string;
   tabTitle: string;
@@ -110,6 +126,8 @@ export interface BillingSession {
   pharmacistSignatureAcknowledged: boolean;
   uploadedPrescriptionUrl?: string;
   uploadedPrescriptionName?: string;
+  detectedSentiment?: CustomerSentimentResult;
+  appliedSentimentDiscount?: number;
   createdAt: string;
 }
 
@@ -447,6 +465,7 @@ export interface VoiceConsultationRecord {
   pharmacistName: string;
   counterNumber?: number;
   sessionId?: string;
+  sentimentResult?: CustomerSentimentResult;
 }
 
 export type PILLanguage = 'en' | 'hi' | 'te' | 'ta' | 'kn';

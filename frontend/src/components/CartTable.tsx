@@ -14,7 +14,8 @@ import {
   openSubstitutionModalForProduct,
   setClearanceGiftModalOpen,
   applyNearExpiryClearanceDiscount,
-  addClearanceGiftToCart
+  addClearanceGiftToCart,
+  applySentimentDiscount
 } from '../store/posSlice';
 import { analyzeDrugInteractions } from '../utils/drugInteractionEngine';
 import { getMedicineDetails } from '../utils/medicineDetails';
@@ -33,6 +34,8 @@ export const CartTable: React.FC = () => {
   const items = currentSession ? currentSession.items : [];
   const doctorDetails = currentSession?.doctorDetails;
   const patientDetails = currentSession?.patientDetails;
+  const appliedSentimentDiscount = currentSession?.appliedSentimentDiscount || 0;
+  const detectedSentiment = currentSession?.detectedSentiment;
 
   const [showBulkDiscount, setShowBulkDiscount] = useState<boolean>(false);
   const [customBulkDiscount, setCustomBulkDiscount] = useState<string>('');
@@ -265,6 +268,38 @@ export const CartTable: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* ── 💜 TASK #50: CUSTOMER SENTIMENT COURTESY CONCESSION BANNER ── */}
+      {appliedSentimentDiscount > 0 && (
+        <div className="mb-2 flex-shrink-0 bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-50 border border-purple-300 rounded-xl p-2.5 flex items-center justify-between shadow-2xs animate-fadeIn">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center flex-shrink-0 shadow-xs">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-1.5">
+                <span className="text-[11px] font-black text-purple-950">
+                  Customer Sentiment Incentive ({appliedSentimentDiscount}% Courtesy Concession Active)
+                </span>
+                <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded-full bg-purple-200 text-purple-900 border border-purple-300">
+                  {detectedSentiment?.label || 'Price-Sensitive Adaptation'}
+                </span>
+              </div>
+              <p className="text-[10px] text-purple-700">
+                Applied from consultation tone analysis to satisfy price hesitation and prevent basket abandonment.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => dispatch(applySentimentDiscount(0))}
+            className="flex items-center space-x-1 bg-white hover:bg-purple-100 text-purple-800 text-[10px] font-bold px-2 py-1 rounded-lg border border-purple-200 transition-colors cursor-pointer shadow-2xs ml-2"
+            title="Dismiss Courtesy Concession"
+          >
+            <X className="w-3 h-3 text-purple-600" />
+            <span>Remove</span>
+          </button>
+        </div>
+      )}
 
       {/* ── 🔴 URGENT EXPIRY BANNER (≤10 days) ──────────────────────────── */}
       {hasUrgentExpiry && (
@@ -546,6 +581,14 @@ export const CartTable: React.FC = () => {
                           </span>
                           <span className="text-emerald-700 font-black">
                             🎉 You saved ₹{((item.unitPrice * item.quantity * item.discountPercent) / 100).toFixed(2)} on this medicine!
+                          </span>
+                        </div>
+                      )}
+                      {item.sentimentDiscountApplied && (
+                        <div className="mt-1 bg-purple-50 border border-purple-200 rounded p-1 text-[9.5px]">
+                          <span className="text-purple-900 font-bold flex items-center space-x-1">
+                            <Sparkles className="w-2.5 h-2.5 text-purple-600 shrink-0" />
+                            <span>{item.sentimentDiscountApplied}% Sentiment Courtesy Discount Applied</span>
                           </span>
                         </div>
                       )}

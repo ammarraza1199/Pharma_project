@@ -1,12 +1,16 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import {
   setVoiceConsultationModalOpen,
   saveConsultationRecord,
-  deleteConsultationRecord
+  deleteConsultationRecord,
+  applySentimentDiscount,
+  setSessionSentiment,
+  setChronicRefillModalOpen
 } from '../store/posSlice';
-import type { VoiceConsultationRecord } from '../types/pos';
+import type { VoiceConsultationRecord, CustomerSentimentResult } from '../types/pos';
+import { analyzeCustomerSentiment } from '../utils/sentimentEngine';
 import {
   Mic,
   Square,
@@ -26,7 +30,14 @@ import {
   Volume2,
   Download,
   AlertCircle,
-  X
+  X,
+  Sparkles,
+  HeartHandshake,
+  ShieldAlert,
+  ArrowRight,
+  Tag,
+  Activity,
+  RefreshCw
 } from 'lucide-react';
 
 const CATEGORY_OPTIONS: { id: VoiceConsultationRecord['category']; label: string; color: string }[] = [
@@ -90,6 +101,37 @@ export const VoiceConsultationModal: React.FC = () => {
   const audioChunksRef = useRef<Blob[]>([]);
   const timerIntervalRef = useRef<any>(null);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const speechRecognitionRef = useRef<any>(null);
+
+  // Sentiment Feedback Banner & Live Sentiment Analysis (Task #50)
+  const [appliedDiscountNotice, setAppliedDiscountNotice] = useState<string | null>(null);
+
+  const sentimentResult: CustomerSentimentResult = useMemo(() => {
+    return analyzeCustomerSentiment(`${chiefDiscussion} ${pharmacistAdvice}`);
+  }, [chiefDiscussion, pharmacistAdvice]);
+
+  const handleApplySentimentDiscount = (discountPct: number) => {
+    dispatch(applySentimentDiscount(discountPct));
+    dispatch(setSessionSentiment(sentimentResult));
+    setAppliedDiscountNotice(`✓ Applied ${discountPct}% price-sensitivity courtesy discount to active billing cart!`);
+    setTimeout(() => setAppliedDiscountNotice(null), 5000);
+  };
+
+  const handleApplyPresetSimulation = (type: 'PRICE_SENSITIVE' | 'ANXIOUS_URGENT' | 'SATISFIED_RECEPTIVE') => {
+    if (type === 'PRICE_SENSITIVE') {
+      setChiefDiscussion('Patient says: "Doctor prescribed this medicine, but it is too expensive and costly for our family budget. Can I get a cheaper generic alternative or any discount?"');
+      setPharmacistAdvice('Advised patient on bio-equivalent generic alternative with same salt composition and efficacy, plus 10% counter courtesy discount.');
+      setCategory('OTC_GUIDANCE');
+    } else if (type === 'ANXIOUS_URGENT') {
+      setChiefDiscussion('Attendant panicked: "My 7-year-old child has severe 103°F high fever, vomiting, and shivering since morning! Please give immediate emergency medication right now!"');
+      setPharmacistAdvice('Calmed parent and instructed immediate Paracetamol syrup dose (5ml with water). Advised cool sponge compresses and provided emergency pediatric clinic helpline.');
+      setCategory('ALLERGY_WARNING');
+    } else if (type === 'SATISFIED_RECEPTIVE') {
+      setChiefDiscussion('Customer stated: "Thank you so much! Your pharmacy always provides excellent service. I come here every month to buy my regular BP and diabetes medicines."');
+      setPharmacistAdvice('Thanked customer for their loyalty and offered free enrollment into our 30-day automated WhatsApp refill service with doorstep delivery.');
+      setCategory('CHRONIC_CARE');
+    }
+  };
 
   // Initialize with session patient info whenever modal opens
   useEffect(() => {
@@ -126,6 +168,12 @@ export const VoiceConsultationModal: React.FC = () => {
         // ignore
       }
     }
+    if (speechRecognitionRef.current) {
+      try {
+        speechRecognitionRef.current.stop();
+      } catch (e) {}
+      speechRecognitionRef.current = null;
+    }
   };
 
   // Start Audio Recording
@@ -155,6 +203,33 @@ export const VoiceConsultationModal: React.FC = () => {
         // Stop all audio tracks to turn off mic indicator
         stream.getTracks().forEach(track => track.stop());
       };
+
+      // Real-time speech recognition if supported
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        try {
+          const recognition = new SpeechRecognition();
+          recognition.continuous = true;
+          recognition.interimResults = true;
+          recognition.lang = 'en-IN';
+          recognition.onresult = (event: any) => {
+            let finalTranscript = '';
+            for (let i = 0; i < event.results.length; i++) {
+              finalTranscript += event.results[i][0].transcript + ' ';
+            }
+            if (finalTranscript.trim()) {
+              setChiefDiscussion(prev => {
+                const combined = prev ? `${prev} ${finalTranscript.trim()}` : finalTranscript.trim();
+                return combined;
+              });
+            }
+          };
+          recognition.start();
+          speechRecognitionRef.current = recognition;
+        } catch (e) {
+          console.warn('SpeechRecognition start failed', e);
+        }
+      }
 
       recorder.start(250); // Slice chunks every 250ms
       setRecordState('RECORDING');
@@ -293,10 +368,12 @@ export const VoiceConsultationModal: React.FC = () => {
       tags: selectedTags,
       pharmacistName: activePharmacist.name,
       counterNumber: activePharmacist.counterNumber,
-      sessionId: activeSessionId
+      sessionId: activeSessionId,
+      sentimentResult
     };
 
     dispatch(saveConsultationRecord(newRecord));
+    dispatch(setSessionSentiment(sentimentResult));
     alert('Consultation record & voice note saved successfully!');
 
     // Reset form and switch to history
@@ -750,6 +827,228 @@ export const VoiceConsultationModal: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* ── TASK #50: REAL-TIME CUSTOMER SENTIMENT ANALYSIS & DYNAMIC ACTIONS ── */}
+                  <div className="p-4 rounded-2xl border bg-gradient-to-br from-slate-50 to-purple-50/30 border-purple-200/80 shadow-xs space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-purple-100 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-purple-600 text-white rounded-lg shadow-xs">
+                          <Activity className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                            <span>Customer Sentiment Intelligence</span>
+                            <span className="text-[10px] font-bold px-1.5 py-0.2 bg-purple-100 text-purple-800 rounded-full border border-purple-200">
+                              Real-Time NLP
+                            </span>
+                          </h4>
+                          <p className="text-[10px] text-slate-500">
+                            Evaluates customer emotion & tone to dynamically adjust counter discounts, reassurance, and refills.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Quick Test Simulation Presets */}
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] font-bold text-slate-400 mr-1 hidden sm:inline">Simulate:</span>
+                        <button
+                          type="button"
+                          onClick={() => handleApplyPresetSimulation('PRICE_SENSITIVE')}
+                          className="px-2 py-1 text-[10px] font-extrabold bg-purple-100 hover:bg-purple-200 text-purple-900 rounded-md border border-purple-300 transition-colors cursor-pointer"
+                          title="Simulate price-sensitive customer asking for discounts/generics"
+                        >
+                          💰 Price-Sensitive
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleApplyPresetSimulation('ANXIOUS_URGENT')}
+                          className="px-2 py-1 text-[10px] font-extrabold bg-rose-100 hover:bg-rose-200 text-rose-900 rounded-md border border-rose-300 transition-colors cursor-pointer"
+                          title="Simulate anxious/urgent patient with severe symptoms"
+                        >
+                          🚨 High Urgency
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleApplyPresetSimulation('SATISFIED_RECEPTIVE')}
+                          className="px-2 py-1 text-[10px] font-extrabold bg-emerald-100 hover:bg-emerald-200 text-emerald-900 rounded-md border border-emerald-300 transition-colors cursor-pointer"
+                          title="Simulate satisfied customer seeking monthly refill"
+                        >
+                          💚 Satisfied / Refill
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Applied Notice Banner */}
+                    {appliedDiscountNotice && (
+                      <div className="p-2.5 bg-emerald-100 border border-emerald-300 text-emerald-900 rounded-xl text-xs font-bold flex items-center justify-between animate-fadeIn">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+                          <span>{appliedDiscountNotice}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setAppliedDiscountNotice(null)}
+                          className="text-emerald-700 hover:text-emerald-950 p-1"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Sentiment Evaluation Display */}
+                    <div className={`p-3.5 rounded-xl border transition-all ${
+                      sentimentResult.sentiment === 'PRICE_SENSITIVE'
+                        ? 'bg-purple-50/90 border-purple-300'
+                        : sentimentResult.sentiment === 'ANXIOUS_URGENT'
+                        ? 'bg-rose-50/90 border-rose-300'
+                        : sentimentResult.sentiment === 'SATISFIED_RECEPTIVE'
+                        ? 'bg-emerald-50/90 border-emerald-300'
+                        : 'bg-white border-slate-200'
+                    }`}>
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-black px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow-2xs ${
+                            sentimentResult.sentiment === 'PRICE_SENSITIVE'
+                              ? 'bg-purple-600 text-white'
+                              : sentimentResult.sentiment === 'ANXIOUS_URGENT'
+                              ? 'bg-rose-600 text-white animate-pulse'
+                              : sentimentResult.sentiment === 'SATISFIED_RECEPTIVE'
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-slate-200 text-slate-700'
+                          }`}>
+                            {sentimentResult.sentiment === 'PRICE_SENSITIVE' && <Tag className="w-3 h-3" />}
+                            {sentimentResult.sentiment === 'ANXIOUS_URGENT' && <ShieldAlert className="w-3 h-3" />}
+                            {sentimentResult.sentiment === 'SATISFIED_RECEPTIVE' && <Sparkles className="w-3 h-3" />}
+                            {sentimentResult.sentiment === 'NEUTRAL' && <Activity className="w-3 h-3" />}
+                            <span>{sentimentResult.label}</span>
+                          </span>
+
+                          <span className="text-[11px] font-bold text-slate-600">
+                            Confidence: <strong className="text-slate-900">{sentimentResult.confidence}%</strong>
+                          </span>
+                        </div>
+
+                        {/* Keyword Chips */}
+                        {sentimentResult.detectedKeywords.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1">
+                            <span className="text-[10px] text-slate-400 font-semibold">Keywords:</span>
+                            {sentimentResult.detectedKeywords.map((kw, i) => (
+                              <span
+                                key={i}
+                                className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${
+                                  sentimentResult.sentiment === 'PRICE_SENSITIVE'
+                                    ? 'bg-purple-100 text-purple-800 border-purple-200'
+                                    : sentimentResult.sentiment === 'ANXIOUS_URGENT'
+                                    ? 'bg-rose-100 text-rose-800 border-rose-200'
+                                    : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                }`}
+                              >
+                                #{kw}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <p className="text-xs text-slate-700 leading-relaxed font-medium mb-3">
+                        {sentimentResult.toneSummary}
+                      </p>
+
+                      {/* DYNAMIC ACTION BUTTONS PER SENTIMENT */}
+                      {sentimentResult.sentiment === 'PRICE_SENSITIVE' && (
+                        <div className="p-3 bg-white rounded-xl border border-purple-200 shadow-2xs space-y-2">
+                          <div className="flex items-center justify-between text-xs text-purple-900 font-bold">
+                            <span className="flex items-center gap-1.5">
+                              <Tag className="w-3.5 h-3.5 text-purple-600" />
+                              Price-Sensitivity Incentive Actions:
+                            </span>
+                            <span className="text-[10px] text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full font-extrabold">
+                              Recommended: 10% Discount
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => handleApplySentimentDiscount(10)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-bold rounded-lg shadow-2xs transition-all cursor-pointer"
+                            >
+                              <Sparkles className="w-3.5 h-3.5" />
+                              <span>⚡ Apply 10% Courtesy Discount to Cart</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                dispatch(setVoiceConsultationModalOpen({ isOpen: false }));
+                                alert('Switched to POS Terminal. Check the Smart Substitution button on cart items to view clinically equivalent generics with 40%–60% savings!');
+                              }}
+                              className="flex items-center gap-1 px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-900 text-xs font-bold rounded-lg border border-purple-300 transition-colors cursor-pointer"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5 text-purple-600" />
+                              <span>🔄 Suggest Generic Alternatives</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {sentimentResult.sentiment === 'ANXIOUS_URGENT' && (
+                        <div className="p-3 bg-white rounded-xl border border-rose-200 shadow-2xs space-y-2">
+                          <div className="flex items-center justify-between text-xs text-rose-900 font-bold">
+                            <span className="flex items-center gap-1.5">
+                              <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
+                              Clinical Reassurance & Emergency Guidance:
+                            </span>
+                            <span className="text-[10px] text-rose-600 bg-rose-100 px-2 py-0.5 rounded-full font-extrabold">
+                              Priority Patient Care
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-800 bg-rose-50/70 p-2.5 rounded-lg border border-rose-100 leading-relaxed font-semibold">
+                            💬 <em>"{sentimentResult.reassuranceText}"</em>
+                          </p>
+                          <div className="flex items-center justify-between text-[11px] text-slate-600 pt-1">
+                            <span>📞 24/7 Physician Emergency Line: <strong>+91 98765 43210</strong></span>
+                            <span className="text-rose-700 font-bold">Red Flag: Check for high fever &gt;103°F / Breathlessness</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {sentimentResult.sentiment === 'SATISFIED_RECEPTIVE' && (
+                        <div className="p-3 bg-white rounded-xl border border-emerald-200 shadow-2xs space-y-2">
+                          <div className="flex items-center justify-between text-xs text-emerald-900 font-bold">
+                            <span className="flex items-center gap-1.5">
+                              <HeartHandshake className="w-3.5 h-3.5 text-emerald-600" />
+                              Customer Retention & Chronic Refill Program:
+                            </span>
+                            <span className="text-[10px] text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full font-extrabold">
+                              VIP Loyalty
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-700 font-medium">
+                            {sentimentResult.refillPrompt}
+                          </p>
+                          <div className="pt-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                dispatch(setVoiceConsultationModalOpen({ isOpen: false }));
+                                dispatch(setChronicRefillModalOpen({ isOpen: true }));
+                              }}
+                              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-2xs transition-all cursor-pointer"
+                            >
+                              <Sparkles className="w-3.5 h-3.5" />
+                              <span>📋 Enroll in 30-Day WhatsApp Refill Subscription</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {sentimentResult.sentiment === 'NEUTRAL' && (
+                        <div className="text-[11px] text-slate-500 italic bg-white p-2 rounded-lg border border-slate-200">
+                          ℹ️ Standard consultation mode. Pharmacist counseling guidance: explain dosage intervals and food instructions.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Action Bar */}
                   <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
                     <button
@@ -855,9 +1154,21 @@ export const VoiceConsultationModal: React.FC = () => {
                               </p>
                             </div>
 
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${catConfig.color}`}>
-                              {catConfig.label}
-                            </span>
+                            <div className="flex flex-col items-end gap-1">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${catConfig.color}`}>
+                                {catConfig.label}
+                              </span>
+                              {rec.sentimentResult && (
+                                <span className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded-md border ${
+                                  rec.sentimentResult.sentiment === 'PRICE_SENSITIVE' ? 'bg-purple-100 text-purple-900 border-purple-300' :
+                                  rec.sentimentResult.sentiment === 'ANXIOUS_URGENT' ? 'bg-rose-100 text-rose-900 border-rose-300' :
+                                  rec.sentimentResult.sentiment === 'SATISFIED_RECEPTIVE' ? 'bg-emerald-100 text-emerald-900 border-emerald-300' :
+                                  'bg-slate-100 text-slate-700 border-slate-300'
+                                }`}>
+                                  {rec.sentimentResult.label} ({rec.sentimentResult.confidence}%)
+                                </span>
+                              )}
+                            </div>
                           </div>
 
                           {/* Audio Clip Bar */}
@@ -872,6 +1183,30 @@ export const VoiceConsultationModal: React.FC = () => {
                                 <audio controls src={rec.audioUrl} className="h-7 max-w-[180px]" />
                               ) : (
                                 <span className="text-[10px] text-slate-400 italic">Saved consultation note</span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Sentiment Insights Box (if present) */}
+                          {rec.sentimentResult && rec.sentimentResult.sentiment !== 'NEUTRAL' && (
+                            <div className={`p-2 rounded-xl border text-[11px] space-y-1 ${
+                              rec.sentimentResult.sentiment === 'PRICE_SENSITIVE'
+                                ? 'bg-purple-50/70 border-purple-200 text-purple-950'
+                                : rec.sentimentResult.sentiment === 'ANXIOUS_URGENT'
+                                ? 'bg-rose-50/70 border-rose-200 text-rose-950'
+                                : 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
+                            }`}>
+                              <div className="flex items-center justify-between font-bold text-[10px]">
+                                <span>🎯 Action: {rec.sentimentResult.recommendedAction}</span>
+                              </div>
+                              {rec.sentimentResult.detectedKeywords.length > 0 && (
+                                <div className="flex flex-wrap gap-1 pt-0.5">
+                                  {rec.sentimentResult.detectedKeywords.map((k, idx) => (
+                                    <span key={idx} className="bg-white/80 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold border border-slate-200">
+                                      #{k}
+                                    </span>
+                                  ))}
+                                </div>
                               )}
                             </div>
                           )}
