@@ -9,6 +9,7 @@ import {
   HeartPulse, X, DollarSign, Activity, Sparkles, MessageCircle, FileText, CheckCircle2, ChevronRight,
   Edit2, Trash2, Loader2
 } from 'lucide-react';
+import { PatientClinicalAnalytics } from './PatientClinicalAnalytics';
 
 export const PatientsPage: React.FC = () => {
   const dispatch = useDispatch();
@@ -16,6 +17,7 @@ export const PatientsPage: React.FC = () => {
 
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
+  const [activePatientsTab, setActivePatientsTab] = useState<'DIRECTORY' | 'CLINICAL_ANALYTICS'>('DIRECTORY');
   const [selectedPatientForCarePlan, setSelectedPatientForCarePlan] = useState<PatientRecord | null>(null);
   const [patientInvoices, setPatientInvoices] = useState<any[]>([]);
   const [invoiceHistoryPatient, setInvoiceHistoryPatient] = useState<PatientRecord | null>(null);
@@ -164,15 +166,52 @@ export const PatientsPage: React.FC = () => {
           </p>
         </div>
 
+        {activePatientsTab === 'DIRECTORY' && (
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center space-x-1.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md cursor-pointer active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Register New Patient</span>
+          </button>
+        )}
+      </div>
+
+      {/* ── SUB-TABS: DIRECTORY VS CLINICAL ADHERENCE & REFERRALS ── */}
+      <div className="flex items-center space-x-2 border-b border-slate-200 pb-2 overflow-x-auto">
         <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center space-x-1.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md cursor-pointer active:scale-95"
+          onClick={() => setActivePatientsTab('DIRECTORY')}
+          className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+            activePatientsTab === 'DIRECTORY'
+              ? 'bg-orange-600 text-white shadow-xs'
+              : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+          }`}
         >
-          <Plus className="w-4 h-4" />
-          <span>Register New Patient</span>
+          <Users className="w-4 h-4" />
+          <span>Patient Directory ({patients.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActivePatientsTab('CLINICAL_ANALYTICS')}
+          className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+            activePatientsTab === 'CLINICAL_ANALYTICS'
+              ? 'bg-rose-600 text-white shadow-xs'
+              : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+          }`}
+        >
+          <Activity className="w-4 h-4 text-rose-500" />
+          <span>Medication Adherence &amp; Referral Analytics</span>
         </button>
       </div>
 
+      {/* ── CLINICAL ADHERENCE & REFERRALS CONTENT ── */}
+      {activePatientsTab === 'CLINICAL_ANALYTICS' && (
+        <PatientClinicalAnalytics />
+      )}
+
+      {/* ── DIRECTORY CONTENT ── */}
+      {activePatientsTab === 'DIRECTORY' && (
+        <>
       {/* ── KPI METRICS CARDS ────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-white rounded-2xl border border-slate-200 p-3.5 shadow-xs flex items-center space-x-3">
@@ -370,6 +409,8 @@ export const PatientsPage: React.FC = () => {
           </table>
         </div>
       </div>
+        </>
+      )}
 
       {/* ── HEALTH INSIGHTS & CARE PLAN MODAL (Requirement #28) ──────────── */}
       {selectedPatientForCarePlan && (

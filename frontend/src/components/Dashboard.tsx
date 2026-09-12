@@ -149,6 +149,114 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* ── ROW: CUSTOMER TURNAROUND & WAITING-TIME TRACKER (TASK #53) ── */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div className="flex items-center space-x-2.5">
+            <div className="p-2 bg-teal-100 text-teal-800 rounded-xl">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-slate-900 font-heading flex items-center space-x-2">
+                <span>Customer Turnaround &amp; Waiting-Time Analytics</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  ⚡ 2m 24s Avg Speed
+                </span>
+              </h3>
+              <p className="text-xs text-slate-500 font-medium">
+                Live counter tracking: customer entry time, queue dwell, checkout duration, and peak-hour clearance
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2 text-xs">
+            <span className="text-slate-400">Target: &lt; 3.5 mins</span>
+            <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 font-bold border border-emerald-200">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>96.4% On-Time Clearance</span>
+            </span>
+          </div>
+        </div>
+
+        {/* 4 Speed Metrics */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Avg Waiting Time</span>
+            <div className="text-xl font-black text-slate-900 font-heading mt-0.5">2m 24s</div>
+            <div className="text-[10px] text-emerald-600 font-semibold mt-0.5">↓ 18s faster than yesterday</div>
+          </div>
+
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Avg Billing Duration</span>
+            <div className="text-xl font-black text-slate-900 font-heading mt-0.5">1m 45s</div>
+            <div className="text-[10px] text-slate-500 mt-0.5">From item scan to invoice print</div>
+          </div>
+
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Peak Rush Windows</span>
+            <div className="text-sm font-black text-amber-900 font-heading mt-1">11:30 AM &amp; 7:00 PM</div>
+            <div className="text-[10px] text-amber-700 font-semibold mt-0.5">Max queue: 5 patients</div>
+          </div>
+
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Top Efficiency Counter</span>
+            <div className="text-sm font-black text-emerald-800 font-heading mt-1">Counter 1 (Ramesh K.)</div>
+            <div className="text-[10px] text-emerald-600 font-bold mt-0.5">1m 32s / invoice</div>
+          </div>
+        </div>
+
+        {/* Counter Speed Breakdown & Queue Bar */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+          {/* Counter 1 */}
+          <div className="p-3 bg-emerald-50/50 border border-emerald-200 rounded-xl">
+            <div className="flex justify-between items-center text-xs">
+              <span className="font-bold text-slate-800">Counter 1: Ramesh Kumar</span>
+              <span className="px-2 py-0.5 text-[9px] font-black bg-emerald-200 text-emerald-900 rounded-md">LEAD PHARMACIST</span>
+            </div>
+            <div className="flex justify-between text-[11px] text-slate-600 mt-2">
+              <span>Avg Speed: <strong>1m 32s</strong></span>
+              <span>Turnaround: <strong>48 Bills</strong></span>
+            </div>
+            <div className="w-full bg-slate-200 rounded-full h-1.5 mt-2">
+              <div className="bg-emerald-600 h-1.5 rounded-full" style={{ width: '92%' }} />
+            </div>
+            <div className="text-[9px] text-slate-400 text-right mt-1">92% throughput efficiency</div>
+          </div>
+
+          {/* Counter 2 */}
+          <div className="p-3 bg-blue-50/50 border border-blue-200 rounded-xl">
+            <div className="flex justify-between items-center text-xs">
+              <span className="font-bold text-slate-800">Counter 2: Priya Sharma</span>
+              <span className="px-2 py-0.5 text-[9px] font-black bg-blue-200 text-blue-900 rounded-md">DISPENSER / MATERNITY</span>
+            </div>
+            <div className="flex justify-between text-[11px] text-slate-600 mt-2">
+              <span>Avg Speed: <strong>1m 48s</strong></span>
+              <span>Turnaround: <strong>42 Bills</strong></span>
+            </div>
+            <div className="w-full bg-slate-200 rounded-full h-1.5 mt-2">
+              <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: '85%' }} />
+            </div>
+            <div className="text-[9px] text-slate-400 text-right mt-1">85% throughput efficiency</div>
+          </div>
+
+          {/* Counter 3 */}
+          <div className="p-3 bg-purple-50/50 border border-purple-200 rounded-xl">
+            <div className="flex justify-between items-center text-xs">
+              <span className="font-bold text-slate-800">Counter 3: Anand Verma</span>
+              <span className="px-2 py-0.5 text-[9px] font-black bg-purple-200 text-purple-900 rounded-md">CLINICAL &amp; CHRONIC</span>
+            </div>
+            <div className="flex justify-between text-[11px] text-slate-600 mt-2">
+              <span>Avg Speed: <strong>2m 10s</strong></span>
+              <span>Turnaround: <strong>28 Bills</strong></span>
+            </div>
+            <div className="w-full bg-slate-200 rounded-full h-1.5 mt-2">
+              <div className="bg-purple-600 h-1.5 rounded-full" style={{ width: '78%' }} />
+            </div>
+            <div className="text-[9px] text-slate-400 text-right mt-1">Detailed dosage &amp; counseling time included</div>
+          </div>
+        </div>
+      </div>
+
       {/* ── ROW 2: REVENUE CHART + PAYMENT BREAKDOWN ─────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
 

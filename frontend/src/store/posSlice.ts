@@ -35,7 +35,9 @@ import type {
   PatientInstructionModalState,
   ClearanceGiftModalState,
   PILLanguage,
-  CustomerSentimentResult
+  CustomerSentimentResult,
+  PurchaseOrder,
+  PurchaseOrderItem
 } from '../types/pos';
 import { MOCK_PRODUCTS } from '../mock/products';
 import { calculateItemGST } from '../utils/gstCalculator';
@@ -63,6 +65,7 @@ interface PosState {
   supplierBills: SupplierBill[];
   supplierPaymentLogs: SupplierPaymentLog[];
   distributorSchemes: DistributorScheme[];
+  purchaseOrders: PurchaseOrder[];
   pharmacists: PharmacistCounter[];
   activePharmacistId: string;
   sessions: BillingSession[];
@@ -756,6 +759,125 @@ const initialState: PosState = {
       }
     }
   ],
+  purchaseOrders: [
+    {
+      poId: 'po-2026-001',
+      poNumber: 'PO-2026-001',
+      supplierId: 'sup-001',
+      supplierName: 'MedLife Distributors Pvt Ltd',
+      supplierGstin: '36AAACM8890A1Z2',
+      supplierPhone: '+91 98490 12345',
+      orderDate: '2026-09-08',
+      expectedDeliveryDate: '2026-09-14',
+      paymentTerms: 'CREDIT_15_DAYS',
+      status: 'PLACED',
+      totalAmount: 18450,
+      schemeNotes: 'Montek-LC Super Rebate (Flat 30% Off) applied',
+      notes: 'Urgent replenishment for respiratory and chronic care counter',
+      createdAt: '2026-09-08 10:30 AM',
+      items: [
+        {
+          productId: 'prod-003',
+          productName: 'Montek-LC Tablet',
+          packType: 'Strip of 10 Tablets',
+          quantity: 20,
+          estimatedRate: 110,
+          gstRate: 12,
+          totalAmount: 2464
+        },
+        {
+          productId: 'prod-001',
+          productName: 'Augmentin 625 Duo Tablet',
+          packType: 'Strip of 10 Tablets',
+          quantity: 50,
+          estimatedRate: 155,
+          gstRate: 12,
+          totalAmount: 8680
+        },
+        {
+          productId: 'prod-002',
+          productName: 'Dolo 650 Tablet',
+          packType: 'Strip of 15 Tablets',
+          quantity: 200,
+          estimatedRate: 24,
+          gstRate: 12,
+          totalAmount: 5376
+        }
+      ]
+    },
+    {
+      poId: 'po-2026-002',
+      poNumber: 'PO-2026-002',
+      supplierId: 'sup-002',
+      supplierName: 'Sun Pharma Wholesale Depot',
+      supplierGstin: '36AAACS5512B1Z5',
+      supplierPhone: '+91 94401 56789',
+      orderDate: '2026-09-10',
+      expectedDeliveryDate: '2026-09-15',
+      paymentTerms: 'CREDIT_10_DAYS',
+      status: 'DRAFT',
+      totalAmount: 7246.4,
+      schemeNotes: 'Pantocid 10+2 Free Scheme eligible',
+      notes: 'Verify batch expiry is > 18 months before dispatch',
+      createdAt: '2026-09-10 03:15 PM',
+      items: [
+        {
+          productId: 'prod-004',
+          productName: 'Pantocid 40mg Tablet',
+          packType: 'Strip of 10 Tablets',
+          quantity: 40,
+          estimatedRate: 98,
+          gstRate: 12,
+          totalAmount: 4390.4
+        },
+        {
+          productId: 'prod-005',
+          productName: 'Azithral 500 Tablet',
+          packType: 'Strip of 5 Tablets',
+          quantity: 30,
+          estimatedRate: 85,
+          gstRate: 12,
+          totalAmount: 2856
+        }
+      ]
+    },
+    {
+      poId: 'po-2026-003',
+      poNumber: 'PO-2026-003',
+      supplierId: 'sup-003',
+      supplierName: 'Cipla Regional Depot',
+      supplierGstin: '36AAACC4412C1Z8',
+      supplierPhone: '+91 98850 99887',
+      orderDate: '2026-08-25',
+      expectedDeliveryDate: '2026-08-29',
+      paymentTerms: 'CREDIT_15_DAYS',
+      status: 'CONVERTED_TO_GRN',
+      totalAmount: 11760,
+      schemeNotes: 'Foracort Inhaler 200 Combo Deal',
+      notes: 'Delivered and checked in via GRN #GRN-2026-0829',
+      createdAt: '2026-08-25 11:00 AM',
+      items: [
+        {
+          productId: 'prod-007',
+          productName: 'Foracort 200 Inhaler',
+          packType: 'Inhaler Canister',
+          quantity: 15,
+          estimatedRate: 380,
+          gstRate: 12,
+          totalAmount: 6384
+        },
+        {
+          productId: 'prod-008',
+          productName: 'Asthalin Inhaler 100mcg',
+          packType: 'Inhaler Canister',
+          quantity: 40,
+          estimatedRate: 120,
+          gstRate: 12,
+          totalAmount: 5376
+        }
+      ]
+    }
+  ],
   pharmacists: DEFAULT_PHARMACISTS,
   activePharmacistId: 'pharm-1',
   sessions: [initialSession],
@@ -1297,6 +1419,21 @@ export const posSlice = createSlice({
       }
     },
 
+    createPurchaseOrder: (state, action: PayloadAction<PurchaseOrder>) => {
+      state.purchaseOrders.unshift(action.payload);
+    },
+
+    updatePurchaseOrderStatus: (state, action: PayloadAction<{ poId: string; status: 'DRAFT' | 'PLACED' | 'CONVERTED_TO_GRN' | 'CANCELLED' }>) => {
+      const po = state.purchaseOrders.find(p => p.poId === action.payload.poId);
+      if (po) {
+        po.status = action.payload.status;
+      }
+    },
+
+    deletePurchaseOrder: (state, action: PayloadAction<string>) => {
+      state.purchaseOrders = state.purchaseOrders.filter(p => p.poId !== action.payload);
+    },
+
     addNewBatchToProduct: (state, action: PayloadAction<{
       productId: string;
       batchNumber: string;
@@ -1742,6 +1879,15 @@ export const posSlice = createSlice({
       const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
       if (currentSession) {
         currentSession.patientDetails = action.payload;
+      }
+    },
+    toggleDiscreetPackaging: (state, action: PayloadAction<{ sessionId?: string; isDiscreet?: boolean } | undefined>) => {
+      const targetSessionId = action?.payload?.sessionId || state.activeSessionId;
+      const session = state.sessions.find(s => s.id === targetSessionId);
+      if (session) {
+        session.isDiscreetPackaging = action?.payload?.isDiscreet !== undefined
+          ? action.payload.isDiscreet
+          : !session.isDiscreetPackaging;
       }
     },
     saveScheduleHCompliance: (state, action: PayloadAction<{ doctorDetails: DoctorDetails; patientDetails: PatientDetails }>) => {
@@ -2548,6 +2694,10 @@ export const {
   applyBulk30DayDumpClearance,
   recordSupplierPayment,
   addSupplierBill,
+  createPurchaseOrder,
+  updatePurchaseOrderStatus,
+  deletePurchaseOrder,
+  toggleDiscreetPackaging,
   addNewBatchToProduct,
   updateBatchDetails,
   quickUpdateProductPriceAndShelf

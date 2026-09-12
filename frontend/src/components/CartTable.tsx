@@ -555,6 +555,36 @@ export const CartTable: React.FC = () => {
                           <span>PIL &amp; Audio</span>
                         </button>
                       </div>
+
+                      {/* ── ⚠️ TASK #54: CUSTOMER ADHERENCE PARTIAL COURSE DETECTION ── */}
+                      {(() => {
+                        const nameLower = (item.product.name + ' ' + (item.product.saltComposition || '')).toLowerCase();
+                        const isAntibioticOrCritical = nameLower.includes('amox') || nameLower.includes('augment') ||
+                          nameLower.includes('azithr') || nameLower.includes('cipro') || nameLower.includes('cifran') ||
+                          nameLower.includes('cefix') || nameLower.includes('levoflox') || nameLower.includes('oflox');
+                        
+                        const standardCourseUnits = nameLower.includes('azithr') ? 3 : 10;
+                        const isPartial = isAntibioticOrCritical && item.quantity < standardCourseUnits;
+
+                        if (!isPartial) return null;
+
+                        return (
+                          <div className="mt-1 p-1 bg-rose-50 border border-rose-300 rounded text-[9.5px] text-rose-900 flex items-center justify-between">
+                            <div className="flex items-center space-x-1">
+                              <span className="text-rose-700 font-black">⚠️ Partial Course:</span>
+                              <span className="text-slate-700">Course is {standardCourseUnits} units. Buying {item.quantity} risks resistance!</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => dispatch(updateCartItemQuantity({ cartItemId: item.cartItemId, quantity: standardCourseUnits }))}
+                              className="px-1.5 py-0.5 bg-rose-600 hover:bg-rose-700 text-white rounded text-[8.5px] font-black shrink-0 ml-1 transition-all cursor-pointer shadow-2xs"
+                              title={`Set quantity to full prescribed course (${standardCourseUnits} tablets)`}
+                            >
+                              +Full ({standardCourseUnits})
+                            </button>
+                          </div>
+                        );
+                      })()}
                       {item.isClearanceGift && (
                         <div className="mt-1 bg-rose-100/90 border border-rose-300 rounded p-1 text-[9.5px]">
                           <span className="text-rose-800 font-black flex items-center space-x-1">

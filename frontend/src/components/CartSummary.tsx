@@ -7,10 +7,11 @@ import {
   addItemToCart,
   setClearanceGiftModalOpen,
   applyNearExpiryClearanceDiscount,
-  addClearanceGiftToCart
+  addClearanceGiftToCart,
+  toggleDiscreetPackaging
 } from '../store/posSlice';
 import { getMedicineDetails } from '../utils/medicineDetails';
-import { CreditCard, ShieldAlert, Loader2, ArrowRight, Sparkles, Tag, ShieldCheck, Stethoscope, TestTube, CheckCircle2, Plus, Gift, Clock } from 'lucide-react';
+import { CreditCard, ShieldAlert, Loader2, ArrowRight, Sparkles, Tag, ShieldCheck, Stethoscope, TestTube, CheckCircle2, Plus, Gift, Clock, Package } from 'lucide-react';
 
 export const CartSummary: React.FC = () => {
   const dispatch = useDispatch();
@@ -285,7 +286,7 @@ export const CartSummary: React.FC = () => {
             </span>
           </div>
 
-          <div className="grid grid-cols-3 gap-1.5 text-[10.5px]">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[10.5px]">
             {/* 1. Insurance */}
             <button
               type="button"
@@ -340,6 +341,26 @@ export const CartSummary: React.FC = () => {
               </div>
               <span className="mt-1 text-[10px] leading-tight">
                 {labTestsAdded.length > 0 ? '🧪 Lab Added' : '🧪 Add Lab Test'}
+              </span>
+            </button>
+
+            {/* 4. Discreet Packaging (Task #57) */}
+            <button
+              type="button"
+              onClick={() => dispatch(toggleDiscreetPackaging({ sessionId: currentSession?.id }))}
+              className={`p-2 rounded-lg border text-left font-bold transition-all cursor-pointer flex flex-col justify-between ${
+                currentSession?.isDiscreetPackaging
+                  ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
+                  : 'bg-white text-slate-700 border-slate-200 hover:border-indigo-400'
+              }`}
+              title="Discreet packaging (opaque sealed brown bag for customer privacy)"
+            >
+              <div className="flex items-center justify-between">
+                <Package className={`w-3.5 h-3.5 ${currentSession?.isDiscreetPackaging ? 'text-white' : 'text-indigo-600'}`} />
+                {currentSession?.isDiscreetPackaging && <CheckCircle2 className="w-3 h-3 text-white" />}
+              </div>
+              <span className="mt-1 text-[10px] leading-tight">
+                {currentSession?.isDiscreetPackaging ? '📦 Discreet ON' : '📦 Discreet Pack'}
               </span>
             </button>
           </div>

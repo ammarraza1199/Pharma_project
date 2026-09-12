@@ -128,6 +128,7 @@ export interface BillingSession {
   uploadedPrescriptionName?: string;
   detectedSentiment?: CustomerSentimentResult;
   appliedSentimentDiscount?: number;
+  isDiscreetPackaging?: boolean;
   createdAt: string;
 }
 
@@ -567,3 +568,70 @@ export interface DistributorScheme {
   description?: string;
   isActive?: boolean;
 }
+
+export interface PurchaseOrderItem {
+  productId: string;
+  productName: string;
+  packType: string;
+  quantity: number;
+  estimatedRate: number;
+  gstRate: number;
+  totalAmount: number;
+}
+
+export interface PurchaseOrder {
+  poId: string;
+  poNumber: string;
+  supplierId: string;
+  supplierName: string;
+  supplierGstin: string;
+  supplierPhone: string;
+  orderDate: string;
+  expectedDeliveryDate: string;
+  paymentTerms: 'COD' | 'CREDIT_10_DAYS' | 'CREDIT_15_DAYS' | 'CREDIT_30_DAYS';
+  status: 'DRAFT' | 'PLACED' | 'CONVERTED_TO_GRN' | 'CANCELLED';
+  items: PurchaseOrderItem[];
+  totalAmount: number;
+  schemeNotes?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface PatientAdherenceRecord {
+  patientId: string;
+  patientName: string;
+  phone: string;
+  medicineName: string;
+  prescribedCourseDays: number;
+  prescribedUnits: number;
+  purchasedUnits: number;
+  isPartialCourse: boolean;
+  adherencePercent: number;
+  conditionCategory: string;
+  lastPurchaseDate: string;
+  clinicalRisk: 'HIGH' | 'MODERATE' | 'LOW';
+  warningNote: string;
+  recommendedIntervention: string;
+}
+
+export interface DoctorReferralStat {
+  doctorId: string;
+  doctorName: string;
+  specialty: string;
+  clinicName: string;
+  phone: string;
+  referralCount: number;
+  chronicPatients: number;
+  acutePatients: number;
+  topPrescribedMedicines: string[];
+}
+
+export interface LabReferralStat {
+  labId: string;
+  labName: string;
+  testsReferred: number;
+  associatedPatients: number;
+  primaryCondition: string;
+  location: string;
+}
+

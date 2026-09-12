@@ -2,15 +2,30 @@ import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import { addSupplier, setSuppliers, updateSupplier, navigateTo } from '../store/posSlice';
+import type { DistributorScheme } from '../types/pos';
 import api from '../utils/api';
 import {
   Building, Search, Plus, Truck,
-  DollarSign, X, ShieldCheck, Edit2, Trash2
+  DollarSign, X, ShieldCheck, Edit2, Trash2,
+  Clock, Sparkles, FileText, AlertTriangle, CheckCircle2
 } from 'lucide-react';
+
+import { SupplierPurchaseLedger } from './SupplierPurchaseLedger';
+import { ProcurementIntelligence } from './ProcurementIntelligence';
+import { AdvancePurchaseOrders } from './AdvancePurchaseOrders';
 
 export const SuppliersPage: React.FC = () => {
   const dispatch = useDispatch();
   const suppliers = useSelector((state: RootState) => state.pos.suppliers);
+  const supplierBills = useSelector((state: RootState) => state.pos.supplierBills);
+  const distributorSchemes = useSelector((state: RootState) => state.pos.distributorSchemes);
+  const purchaseOrders = useSelector((state: RootState) => state.pos.purchaseOrders);
+
+  // Top-level Navigation Tabs
+  const [activeMainTab, setActiveMainTab] = useState<'DIRECTORY' | 'PURCHASE_LEDGER' | 'PROCUREMENT_INTELLIGENCE' | 'ADVANCE_PO'>('DIRECTORY');
+
+  // Scheme selected from Procurement Intelligence to prefill Advance PO
+  const [selectedSchemeForPO, setSelectedSchemeForPO] = useState<DistributorScheme | null>(null);
 
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
@@ -43,6 +58,16 @@ export const SuppliersPage: React.FC = () => {
 
   const totalSuppliers = suppliers.length;
   const totalPendingDues = suppliers.reduce((sum, s) => sum + s.pendingBalance, 0);
+
+  // Overdue count for alert badge
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const overdueBillsCount = supplierBills.filter(b => {
+    if (b.billType !== 'CREDIT' || b.pendingAmount <= 0) return false;
+    const due = new Date(b.dueDate);
+    due.setHours(0, 0, 0, 0);
+    return due < today;
+  }).length;
 
   useEffect(() => {
     const fetchSuppliers = async () => {
@@ -136,158 +161,261 @@ export const SuppliersPage: React.FC = () => {
         <div>
           <h1 className="text-xl font-black text-slate-900 font-heading tracking-tight flex items-center space-x-2">
             <Building className="w-6 h-6 text-emerald-700" />
-            <span>Supplier &amp; Vendor Management Directory</span>
+            <span>Supplier &amp; B2B Procurement Operations</span>
           </h1>
           <p className="text-xs text-slate-500 font-medium mt-0.5">
-            Manage authorized pharmaceutical distributors, Drug Licenses, GSTIN &amp; accounts payable
+            Manage authorized distributors, Cash vs Credit ledgers, 10/15-day repayment alerts, wholesale combo schemes &amp; Advance Purchase Orders (PO)
           </p>
         </div>
 
+        {activeMainTab === 'DIRECTORY' && (
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md cursor-pointer active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Register New Vendor</span>
+          </button>
+        )}
+      </div>
+
+      {/* ── MODULE NAVIGATION TABS ─────────────────────────────────── */}
+      <div className="flex items-center space-x-2 border-b border-slate-200 pb-2 overflow-x-auto">
+        {/* Tab 1: Directory */}
         <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md cursor-pointer active:scale-95"
+          onClick={() => setActiveMainTab('DIRECTORY')}
+          className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+            activeMainTab === 'DIRECTORY'
+              ? 'bg-emerald-600 text-white shadow-xs'
+              : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+          }`}
         >
-          <Plus className="w-4 h-4" />
-          <span>Register New Vendor</span>
+          <Building className="w-4 h-4" />
+          <span>Vendor Directory ({suppliers.length})</span>
+        </button>
+
+        {/* Tab 2: Purchase Ledger (Task #19) */}
+        <button
+          onClick={() => setActiveMainTab('PURCHASE_LEDGER')}
+          className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+            activeMainTab === 'PURCHASE_LEDGER'
+              ? 'bg-amber-600 text-white shadow-xs'
+              : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+          }`}
+        >
+          <Clock className={`w-4 h-4 ${activeMainTab === 'PURCHASE_LEDGER' ? 'text-white' : 'text-amber-600'}`} />
+          <span>Purchase Ledger (Cash vs Credit)</span>
+          {overdueBillsCount > 0 ? (
+            <span className="px-1.5 py-0.2 bg-rose-600 text-white text-[10px] font-black rounded-full animate-pulse">
+              {overdueBillsCount} OVERDUE
+            </span>
+          ) : (
+            <span className="px-1.5 py-0.2 bg-amber-100 text-amber-900 text-[10px] font-bold rounded-full">
+              {supplierBills.length} Bills
+            </span>
+          )}
+        </button>
+
+        {/* Tab 3: Procurement Intelligence (Task #20) */}
+        <button
+          onClick={() => setActiveMainTab('PROCUREMENT_INTELLIGENCE')}
+          className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+            activeMainTab === 'PROCUREMENT_INTELLIGENCE'
+              ? 'bg-teal-700 text-white shadow-xs'
+              : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+          }`}
+        >
+          <Sparkles className={`w-4 h-4 ${activeMainTab === 'PROCUREMENT_INTELLIGENCE' ? 'text-white' : 'text-teal-600'}`} />
+          <span>Procurement Intelligence</span>
+          <span className="px-1.5 py-0.2 bg-teal-100 text-teal-800 text-[10px] font-black rounded-full">
+            {distributorSchemes.length} Schemes
+          </span>
+        </button>
+
+        {/* Tab 4: Advance Purchase Orders (Task #21) */}
+        <button
+          onClick={() => setActiveMainTab('ADVANCE_PO')}
+          className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+            activeMainTab === 'ADVANCE_PO'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          <span>Advance Purchase Orders (PO)</span>
+          <span className="px-1.5 py-0.2 bg-blue-100 text-blue-800 text-[10px] font-black rounded-full">
+            {purchaseOrders.length}
+          </span>
         </button>
       </div>
 
-      {/* ── KPI METRICS CARDS ────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-        <div className="bg-white rounded-2xl border border-slate-200 p-3.5 shadow-xs flex items-center space-x-3">
-          <div className="bg-emerald-100 p-2.5 rounded-xl text-emerald-700">
-            <Building className="w-5 h-5" />
+      {/* ── TAB 1 CONTENT: VENDOR DIRECTORY ────────────────────────── */}
+      {activeMainTab === 'DIRECTORY' && (
+        <>
+          {/* KPI METRICS CARDS */}
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="bg-white rounded-2xl border border-slate-200 p-3.5 shadow-xs flex items-center space-x-3">
+              <div className="bg-emerald-100 p-2.5 rounded-xl text-emerald-700">
+                <Building className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Registered Vendors</p>
+                <h3 className="text-xl font-black text-slate-900 font-heading">{totalSuppliers} Distributors</h3>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-200 p-3.5 shadow-xs flex items-center space-x-3">
+              <div className="bg-amber-100 p-2.5 rounded-xl text-amber-700">
+                <DollarSign className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Pending Dues</p>
+                <h3 className="text-xl font-black text-amber-800 font-heading">₹{totalPendingDues.toLocaleString('en-IN')}</h3>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-200 p-3.5 shadow-xs flex items-center space-x-3">
+              <div className="bg-blue-100 p-2.5 rounded-xl text-blue-700">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">GSTIN &amp; DL Verified</p>
+                <h3 className="text-xl font-black text-slate-900 font-heading">100% Compliant</h3>
+              </div>
+            </div>
           </div>
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Registered Vendors</p>
-            <h3 className="text-xl font-black text-slate-900 font-heading">{totalSuppliers} Distributors</h3>
+
+          {/* SEARCH BAR */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-xs">
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search Supplier Name, Contact Person, GSTIN, or DL Number..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+              />
+            </div>
           </div>
-        </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 p-3.5 shadow-xs flex items-center space-x-3">
-          <div className="bg-amber-100 p-2.5 rounded-xl text-amber-700">
-            <DollarSign className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Pending Dues</p>
-            <h3 className="text-xl font-black text-amber-800 font-heading">₹{totalPendingDues.toLocaleString('en-IN')}</h3>
-          </div>
-        </div>
+          {/* SUPPLIERS DIRECTORY TABLE */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center text-xs font-bold text-slate-700">
+              <span>Supplier Directory ({filteredSuppliers.length})</span>
+              <span className="text-slate-400">Click "+ Purchase" to enter stock GRN for a supplier</span>
+            </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 p-3.5 shadow-xs flex items-center space-x-3">
-          <div className="bg-blue-100 p-2.5 rounded-xl text-blue-700">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">GSTIN &amp; DL Verified</p>
-            <h3 className="text-xl font-black text-slate-900 font-heading">100% Compliant</h3>
-          </div>
-        </div>
-      </div>
-
-      {/* ── SEARCH BAR ──────────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-xs">
-        <div className="relative">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            type="text"
-            placeholder="Search Supplier Name, Contact Person, GSTIN, or DL Number..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-          />
-        </div>
-      </div>
-
-      {/* ── SUPPLIERS DIRECTORY TABLE ────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center text-xs font-bold text-slate-700">
-          <span>Supplier Directory ({filteredSuppliers.length})</span>
-          <span className="text-slate-400">Click "+ Purchase" to enter stock GRN for a supplier</span>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs" style={{ minWidth: '850px' }}>
-            <thead>
-              <tr className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
-                <th className="px-4 py-3">Vendor Name &amp; DL</th>
-                <th className="px-3 py-3">Contact Person &amp; Phone</th>
-                <th className="px-3 py-3">Email &amp; Address</th>
-                <th className="px-3 py-3 text-center">GSTIN</th>
-                <th className="px-4 py-3 text-right">Pending Payable Dues</th>
-                <th className="px-3 py-3 text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredSuppliers.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400">
-                    No suppliers found matching your search.
-                  </td>
-                </tr>
-              ) : (
-                filteredSuppliers.map(sup => (
-                  <tr key={sup.supplierId} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3 font-bold text-slate-900">
-                      <div>{sup.name}</div>
-                      <div className="text-[10px] text-slate-500 font-medium">DL No: {sup.dlNumber}</div>
-                    </td>
-
-                    <td className="px-3 py-3 font-semibold text-slate-800">
-                      <div>{sup.contactPerson}</div>
-                      <div className="text-[10px] text-slate-500">{sup.phone}</div>
-                    </td>
-
-                    <td className="px-3 py-3 text-slate-600">
-                      <div>{sup.email}</div>
-                      <div className="text-[10px] text-slate-400 truncate max-w-[200px]">{sup.address}</div>
-                    </td>
-
-                    <td className="px-3 py-3 text-center font-mono font-bold text-slate-700">
-                      {sup.gstin}
-                    </td>
-
-                    <td className="px-4 py-3 text-right font-black text-amber-800 text-sm">
-                      ₹{sup.pendingBalance.toLocaleString('en-IN')}
-                    </td>
-
-                    <td className="px-3 py-3 text-center">
-                      <div className="flex items-center justify-center space-x-1.5">
-                        <button
-                          onClick={() => handleOpenEdit(sup)}
-                          className="flex items-center space-x-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-300 text-[11px] font-bold px-2 py-1.5 rounded-lg transition-all cursor-pointer"
-                          title="Edit Supplier"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteSupplier(sup)}
-                          className="flex items-center space-x-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-bold px-2 py-1.5 rounded-lg transition-all cursor-pointer"
-                          title="Deactivate Supplier"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => dispatch(navigateTo('PURCHASE_GRN'))}
-                          className="flex items-center space-x-1 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg shadow-2xs transition-all cursor-pointer"
-                        >
-                          <Truck className="w-3.5 h-3.5" />
-                          <span>+ GRN</span>
-                        </button>
-                      </div>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs" style={{ minWidth: '850px' }}>
+                <thead>
+                  <tr className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                    <th className="px-4 py-3">Vendor Name &amp; DL</th>
+                    <th className="px-3 py-3">Contact Person &amp; Phone</th>
+                    <th className="px-3 py-3">Email &amp; Address</th>
+                    <th className="px-3 py-3 text-center">GSTIN</th>
+                    <th className="px-4 py-3 text-right">Pending Payable Dues</th>
+                    <th className="px-3 py-3 text-center">Actions</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredSuppliers.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-slate-400">
+                        No suppliers found matching your search.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredSuppliers.map(sup => (
+                      <tr key={sup.supplierId} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-3 font-bold text-slate-900">
+                          <div>{sup.name}</div>
+                          <div className="text-[10px] text-slate-500 font-medium">DL No: {sup.dlNumber}</div>
+                        </td>
+
+                        <td className="px-3 py-3 font-semibold text-slate-800">
+                          <div>{sup.contactPerson}</div>
+                          <div className="text-[10px] text-slate-500">{sup.phone}</div>
+                        </td>
+
+                        <td className="px-3 py-3 text-slate-600">
+                          <div>{sup.email}</div>
+                          <div className="text-[10px] text-slate-400 truncate max-w-[200px]">{sup.address}</div>
+                        </td>
+
+                        <td className="px-3 py-3 text-center font-mono font-bold text-slate-700">
+                          {sup.gstin}
+                        </td>
+
+                        <td className="px-4 py-3 text-right font-black text-amber-800 text-sm">
+                          ₹{sup.pendingBalance.toLocaleString('en-IN')}
+                        </td>
+
+                        <td className="px-3 py-3 text-center">
+                          <div className="flex items-center justify-center space-x-1.5">
+                            <button
+                              onClick={() => handleOpenEdit(sup)}
+                              className="flex items-center space-x-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-300 text-[11px] font-bold px-2 py-1.5 rounded-lg transition-all cursor-pointer"
+                              title="Edit Supplier"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteSupplier(sup)}
+                              className="flex items-center space-x-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-bold px-2 py-1.5 rounded-lg transition-all cursor-pointer"
+                              title="Deactivate Supplier"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => dispatch(navigateTo('PURCHASE_GRN'))}
+                              className="flex items-center space-x-1 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg shadow-2xs transition-all cursor-pointer"
+                            >
+                              <Truck className="w-3.5 h-3.5" />
+                              <span>+ GRN</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── TAB 2 CONTENT: PURCHASE LEDGER (TASK #19) ──────────────── */}
+      {activeMainTab === 'PURCHASE_LEDGER' && (
+        <SupplierPurchaseLedger onSwitchToPO={() => setActiveMainTab('ADVANCE_PO')} />
+      )}
+
+      {/* ── TAB 3 CONTENT: PROCUREMENT INTELLIGENCE (TASK #20) ──────── */}
+      {activeMainTab === 'PROCUREMENT_INTELLIGENCE' && (
+        <ProcurementIntelligence
+          onSelectDealForPO={(scheme) => {
+            setSelectedSchemeForPO(scheme);
+            setActiveMainTab('ADVANCE_PO');
+          }}
+          onSelectProductForPO={() => {
+            setActiveMainTab('ADVANCE_PO');
+          }}
+        />
+      )}
+
+      {/* ── TAB 4 CONTENT: ADVANCE PURCHASE ORDERS (TASK #21) ────────── */}
+      {activeMainTab === 'ADVANCE_PO' && (
+        <AdvancePurchaseOrders
+          initialDraftScheme={selectedSchemeForPO}
+          onClearInitialScheme={() => setSelectedSchemeForPO(null)}
+        />
+      )}
 
       {/* ── REGISTER NEW SUPPLIER MODAL ───────────────────────────────── */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="glass-modal rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 relative">
+          <div className="glass-modal rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 relative bg-white">
             <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-200">
               <h3 className="text-sm font-extrabold text-slate-900 font-heading flex items-center space-x-2">
                 <Building className="w-4 h-4 text-emerald-700" />
