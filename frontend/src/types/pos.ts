@@ -68,6 +68,7 @@ export interface CartItem {
   lineTotal: number;
   isSubstitute?: boolean;
   substitutedFor?: string;
+  isBestSeller?: boolean;
   isClearanceGift?: boolean;
   clearanceDiscountApplied?: number;
   giftOriginalPrice?: number;
@@ -314,6 +315,7 @@ export interface SupplierRecord {
 export interface StoreSettings {
   storeName: string;
   dlNo: string;
+  dlNumber?: string;
   gstin: string;
   phone: string;
   address: string;
@@ -633,5 +635,37 @@ export interface LabReferralStat {
   associatedPatients: number;
   primaryCondition: string;
   location: string;
+}
+
+// ── PACKAGE 8: STOCK HEALTH, INVENTORY CLASSIFICATION & REORDER ────────────
+export type StockClassificationTier = 'ALL' | 'HEAVY' | 'OPTIMAL' | 'TRIGGER_ORDER' | 'CRITICAL_LOW';
+
+export interface ReorderRecommendation {
+  productId: string;
+  productName: string;
+  brand: string;
+  currentStock: number;
+  minThreshold: number;
+  dailyVelocity: number; // units/day based on sales velocity
+  runoutDays: number;
+  recommendedEOQ: number; // Economic Order Quantity
+  suggestedSupplier: string;
+  unitCost: number;
+  totalEstimatedCost: number;
+  criticality: 'CRITICAL' | 'WARNING' | 'MONITOR';
+}
+
+export interface ReorderPushAlert {
+  id: string;
+  productId: string;
+  productName: string;
+  batchNumber: string;
+  currentStock: number;
+  minThreshold: number;
+  safetyThreshold?: number;
+  saltComposition?: string;
+  runoutDays?: number;
+  timestamp: string;
+  dismissed?: boolean;
 }
 

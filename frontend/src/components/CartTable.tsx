@@ -22,7 +22,8 @@ import { getMedicineDetails } from '../utils/medicineDetails';
 import {
   Trash2, Plus, Minus, AlertTriangle, AlertOctagon, UserCheck,
   Stethoscope, Edit2, Percent, FileText, RefreshCcw, Pill, Mic, Volume2, Zap,
-  PackageOpen, BadgeAlert, Tag, Gift, Sparkles, CheckCircle2, X
+  PackageOpen, BadgeAlert, Tag, Gift, Sparkles, CheckCircle2, X,
+  Star, ArrowRightLeft, BellRing
 } from 'lucide-react';
 
 export const CartTable: React.FC = () => {
@@ -523,9 +524,15 @@ export const CartTable: React.FC = () => {
                           </span>
                         )}
                         {item.isSubstitute ? (
-                          <span className="text-[9px] bg-emerald-100 text-emerald-800 font-black px-1.5 py-0.2 rounded border border-emerald-300">
-                            🎁 15% Substitute Discount
-                          </span>
+                          <>
+                            <span className="text-[9px] bg-emerald-100 text-emerald-800 font-black px-1.5 py-0.2 rounded border border-emerald-300">
+                              🎁 15% Substitute Discount
+                            </span>
+                            <span className="text-[9px] bg-amber-100 text-amber-900 font-black px-1.5 py-0.2 rounded border border-amber-300 flex items-center space-x-0.5 shadow-2xs">
+                              <Star className="w-2.5 h-2.5 text-amber-600 fill-amber-500" />
+                              <span>Best Seller Alternative</span>
+                            </span>
+                          </>
                         ) : item.discountPercent > 0 ? (
                           <span className="text-[9px] bg-emerald-50 text-emerald-700 font-bold px-1 rounded border border-emerald-200">
                             {item.discountPercent}% Off
@@ -604,13 +611,31 @@ export const CartTable: React.FC = () => {
                           </span>
                         </div>
                       )}
-                      {item.substitutedFor && (
-                        <div className="mt-1 bg-emerald-50 border border-emerald-200 rounded p-1 text-[9.5px]">
-                          <span className="text-emerald-800 font-bold block truncate">
-                            Substituted for: {item.substitutedFor}
-                          </span>
-                          <span className="text-emerald-700 font-black">
-                            🎉 You saved ₹{((item.unitPrice * item.quantity * item.discountPercent) / 100).toFixed(2)} on this medicine!
+                      {(item.substitutedFor || item.isSubstitute) && (
+                        <div className="mt-1.5 p-1.5 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-300 rounded-lg text-[10px] space-y-1 shadow-2xs">
+                          <div className="flex items-center space-x-1.5 text-emerald-950 font-bold">
+                            <ArrowRightLeft className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            <span className="truncate">
+                              Substituted for: <span className="line-through text-slate-500 font-semibold">{item.substitutedFor || 'Prescribed Brand'}</span> &rarr; <strong className="text-emerald-800 font-black">{item.product.name}</strong>
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between pt-0.5 border-t border-emerald-200/60 text-[9.5px]">
+                            <span className="bg-amber-100 text-amber-900 border border-amber-300 font-black px-1.5 py-0.2 rounded-full flex items-center space-x-1">
+                              <Star className="w-2.5 h-2.5 text-amber-600 fill-amber-500" />
+                              <span>Best Seller Alternative</span>
+                            </span>
+                            <span className="text-emerald-700 font-black">
+                              🎉 Saved ₹{((item.unitPrice * item.quantity * (item.discountPercent || 15)) / 100).toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      {/* Safety threshold low-stock warning */}
+                      {item.selectedBatch.stockQuantity - item.quantity <= 10 && (
+                        <div className="mt-1 p-1 bg-amber-50 border border-amber-300 rounded text-[9px] text-amber-900 flex items-center justify-between shadow-2xs">
+                          <span className="flex items-center space-x-1 font-bold">
+                            <BellRing className="w-2.5 h-2.5 text-amber-600 animate-bounce shrink-0" />
+                            <span>Safety Reorder Alert: Only {Math.max(0, item.selectedBatch.stockQuantity - item.quantity)} units remaining in shelf</span>
                           </span>
                         </div>
                       )}

@@ -37,7 +37,8 @@ import type {
   PILLanguage,
   CustomerSentimentResult,
   PurchaseOrder,
-  PurchaseOrderItem
+  PurchaseOrderItem,
+  ReorderPushAlert
 } from '../types/pos';
 import { MOCK_PRODUCTS } from '../mock/products';
 import { calculateItemGST } from '../utils/gstCalculator';
@@ -66,6 +67,7 @@ interface PosState {
   supplierPaymentLogs: SupplierPaymentLog[];
   distributorSchemes: DistributorScheme[];
   purchaseOrders: PurchaseOrder[];
+  reorderPushAlerts: ReorderPushAlert[];
   pharmacists: PharmacistCounter[];
   activePharmacistId: string;
   sessions: BillingSession[];
@@ -876,6 +878,38 @@ const initialState: PosState = {
           totalAmount: 5376
         }
       ]
+    }
+  ],
+  reorderPushAlerts: [
+    {
+      id: 'alert-1',
+      productId: '64f1a2b3c4d5e6f7a8b9c003',
+      productName: 'Telma 40mg Tablet (Telmisartan)',
+      batchNumber: 'TLM-4421',
+      currentStock: 4,
+      minThreshold: 10,
+      timestamp: 'Just now',
+      dismissed: false
+    },
+    {
+      id: 'alert-2',
+      productId: '64f1a2b3c4d5e6f7a8b9c007',
+      productName: 'Glycomet GP2 Tablet',
+      batchNumber: 'GLY-9901',
+      currentStock: 6,
+      minThreshold: 10,
+      timestamp: '6 mins ago',
+      dismissed: false
+    },
+    {
+      id: 'alert-3',
+      productId: '64f1a2b3c4d5e6f7a8b9c012',
+      productName: 'Pan 40mg Injection',
+      batchNumber: 'PAN-1082',
+      currentStock: 2,
+      minThreshold: 10,
+      timestamp: '15 mins ago',
+      dismissed: false
     }
   ],
   pharmacists: DEFAULT_PHARMACISTS,
@@ -1890,6 +1924,33 @@ export const posSlice = createSlice({
           : !session.isDiscreetPackaging;
       }
     },
+    addReorderPushAlert: (state, action: PayloadAction<Omit<ReorderPushAlert, 'id' | 'timestamp'> & { id?: string; timestamp?: string }>) => {
+      if (!state.reorderPushAlerts) state.reorderPushAlerts = [];
+      const existing = state.reorderPushAlerts.find(a => a.productId === action.payload.productId && a.batchNumber === action.payload.batchNumber);
+      if (existing) {
+        existing.currentStock = action.payload.currentStock;
+        existing.dismissed = false;
+      } else {
+        state.reorderPushAlerts.unshift({
+          id: action.payload.id || `alert-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          productId: action.payload.productId,
+          productName: action.payload.productName,
+          batchNumber: action.payload.batchNumber,
+          currentStock: action.payload.currentStock,
+          minThreshold: action.payload.minThreshold || 10,
+          timestamp: action.payload.timestamp || 'Just now',
+          dismissed: false
+        });
+      }
+    },
+    dismissReorderPushAlert: (state, action: PayloadAction<string>) => {
+      if (state.reorderPushAlerts) {
+        state.reorderPushAlerts = state.reorderPushAlerts.filter(a => a.id !== action.payload);
+      }
+    },
+    clearAllReorderPushAlerts: (state) => {
+      state.reorderPushAlerts = [];
+    },
     saveScheduleHCompliance: (state, action: PayloadAction<{ doctorDetails: DoctorDetails; patientDetails: PatientDetails }>) => {
       const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
       if (currentSession) {
@@ -2698,6 +2759,9 @@ export const {
   updatePurchaseOrderStatus,
   deletePurchaseOrder,
   toggleDiscreetPackaging,
+  addReorderPushAlert,
+  dismissReorderPushAlert,
+  clearAllReorderPushAlerts,
   addNewBatchToProduct,
   updateBatchDetails,
   quickUpdateProductPriceAndShelf

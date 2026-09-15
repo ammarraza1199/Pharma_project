@@ -24,6 +24,7 @@ interface BatchRowItem {
   batchValue: number;
   estimatedCost: number;
   marginPercent: number;
+  stockTier: 'HEAVY' | 'OPTIMAL' | 'TRIGGER_ORDER' | 'CRITICAL_LOW';
 }
 
 type ExpiryFilterType = 'ALL' | 'DUMP_30' | 'WARNING_90' | 'MEDIUM_180' | 'FRESH' | 'EXPIRED';
@@ -36,6 +37,7 @@ export const InventoryDashboardPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedRackFilter, setSelectedRackFilter] = useState<string>('ALL');
   const [expiryFilter, setExpiryFilter] = useState<ExpiryFilterType>('ALL');
+  const [stockTierFilter, setStockTierFilter] = useState<'ALL' | 'HEAVY' | 'OPTIMAL' | 'TRIGGER_ORDER' | 'CRITICAL_LOW'>('ALL');
   const [scheduleFilter, setScheduleFilter] = useState<'ALL' | ScheduleCategory>('ALL');
   const [sortOption, setSortOption] = useState<SortOption>('expiry_fefo');
 
@@ -91,6 +93,12 @@ export const InventoryDashboardPage: React.FC = () => {
           const cost = b.purchaseRate || Number((b.mrp * 0.70).toFixed(2));
           const margin = product.sellingPrice > 0 ? Number((((product.sellingPrice - cost) / product.sellingPrice) * 100).toFixed(1)) : product.grossMarginPercent;
 
+          let stockTier: BatchRowItem['stockTier'] = 'OPTIMAL';
+          if (b.stockQuantity > 150) stockTier = 'HEAVY';
+          else if (b.stockQuantity >= 30) stockTier = 'OPTIMAL';
+          else if (b.stockQuantity >= 10) stockTier = 'TRIGGER_ORDER';
+          else stockTier = 'CRITICAL_LOW';
+
           list.push({
             product,
             batch: b,
@@ -98,7 +106,8 @@ export const InventoryDashboardPage: React.FC = () => {
             expiryCategory,
             batchValue: b.stockQuantity * product.sellingPrice,
             estimatedCost: b.stockQuantity * cost,
-            marginPercent: margin
+            marginPercent: margin,
+            stockTier
           });
         });
       } else {
@@ -116,7 +125,8 @@ export const InventoryDashboardPage: React.FC = () => {
           expiryCategory: 'FRESH',
           batchValue: 0,
           estimatedCost: 0,
-          marginPercent: product.grossMarginPercent
+          marginPercent: product.grossMarginPercent,
+          stockTier: 'CRITICAL_LOW'
         });
       }
     });
@@ -145,6 +155,11 @@ export const InventoryDashboardPage: React.FC = () => {
   const warning90Count = allBatchRows.filter(b => b.expiryCategory === 'WARNING_90').length;
   const freshCount = allBatchRows.filter(b => b.expiryCategory === 'FRESH').length;
 
+  const heavyStockCount = allBatchRows.filter(b => b.stockTier === 'HEAVY').length;
+  const optimalStockCount = allBatchRows.filter(b => b.stockTier === 'OPTIMAL').length;
+  const triggerStockCount = allBatchRows.filter(b => b.stockTier === 'TRIGGER_ORDER').length;
+  const criticalLowCount = allBatchRows.filter(b => b.stockTier === 'CRITICAL_LOW').length;
+
   // Filtered & Sorted Rows
   const filteredBatchRows = useMemo(() => {
     let result = allBatchRows.filter(row => {
@@ -165,6 +180,10 @@ export const InventoryDashboardPage: React.FC = () => {
       }
 
       if (expiryFilter !== 'ALL' && row.expiryCategory !== expiryFilter) {
+        return false;
+      }
+
+      if (stockTierFilter !== 'ALL' && row.stockTier !== stockTierFilter) {
         return false;
       }
 
@@ -195,7 +214,7 @@ export const InventoryDashboardPage: React.FC = () => {
     });
 
     return result;
-  }, [allBatchRows, searchTerm, selectedRackFilter, expiryFilter, scheduleFilter, sortOption]);
+  }, [allBatchRows, searchTerm, selectedRackFilter, expiryFilter, stockTierFilter, scheduleFilter, sortOption]);
 
   // Handlers
   const handleOpenAddBatch = (prod?: Product) => {
@@ -488,6 +507,39 @@ export const InventoryDashboardPage: React.FC = () => {
             </button>
           ))}
         </div>
+
+        {/* 4-Tier Stock Classification Filter Bar (Task #39) */}
+        <div className="flex items-center space-x-1.5 flex-wrap gap-y-1 pt-2 border-t border-slate-100 text-xs">
+          <span className="text-[11px] font-bold text-slate-500 mr-1 flex items-center space-x-1">
+            <Layers className="w-3.5 h-3.5 text-teal-600" />
+            <span>Stock Health Tier:</span>
+          </span>
+          {[
+            { key: 'ALL',           label: `All Stock (${allBatchRows.length})` },
+            { key: 'HEAVY',         label: `📦 Heavy (>150) (${heavyStockCount})` },
+            { key: 'OPTIMAL',       label: `🟢 Optimal (30-150) (${optimalStockCount})` },
+            { key: 'TRIGGER_ORDER', label: `⚡ Trigger Order (10-29) (${triggerStockCount})` },
+            { key: 'CRITICAL_LOW',  label: `🚨 Critical Low (<10) (${criticalLowCount})` }
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setStockTierFilter(tab.key as any)}
+              className={`px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                stockTierFilter === tab.key
+                  ? tab.key === 'CRITICAL_LOW'
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : tab.key === 'TRIGGER_ORDER'
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : tab.key === 'HEAVY'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'bg-teal-700 text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── COMPREHENSIVE BATCH, SHELF & PRICING TABLE ─────────────────── */}
@@ -594,13 +646,34 @@ export const InventoryDashboardPage: React.FC = () => {
                         </div>
                       </td>
 
-                      {/* Batch Stock Quantity */}
+                      {/* Batch Stock Quantity & 4-Tier Health */}
                       <td className="px-3 py-3 text-center">
-                        <div className={`font-black text-xs ${isOut ? 'text-rose-600' : isLow ? 'text-amber-600' : 'text-slate-900'}`}>
+                        <div className={`font-black text-xs ${
+                          row.stockTier === 'CRITICAL_LOW' ? 'text-rose-600' :
+                          row.stockTier === 'TRIGGER_ORDER' ? 'text-amber-600' :
+                          row.stockTier === 'HEAVY' ? 'text-purple-700' :
+                          'text-slate-900'
+                        }`}>
                           {row.batch.stockQuantity} Units
                         </div>
-                        <div className="text-[9.5px] text-slate-400">
-                          {isOut ? 'Out of Stock' : isLow ? 'Low Stock' : 'Available'}
+                        <div className="mt-1">
+                          {row.stockTier === 'HEAVY' ? (
+                            <span className="text-[9px] font-black bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded-full inline-block">
+                              📦 Heavy Stock
+                            </span>
+                          ) : row.stockTier === 'OPTIMAL' ? (
+                            <span className="text-[9px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-1.5 py-0.5 rounded-full inline-block">
+                              🟢 Optimal
+                            </span>
+                          ) : row.stockTier === 'TRIGGER_ORDER' ? (
+                            <span className="text-[9px] font-black bg-amber-50 text-amber-800 border border-amber-300 px-1.5 py-0.5 rounded-full inline-block">
+                              ⚡ Trigger Order
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-black bg-rose-50 text-rose-800 border border-rose-300 px-1.5 py-0.5 rounded-full inline-block animate-pulse">
+                              🚨 Critical Low
+                            </span>
+                          )}
                         </div>
                       </td>
 
@@ -655,6 +728,18 @@ export const InventoryDashboardPage: React.FC = () => {
                               title="Set Flash Clearance Discount"
                             >
                               <Tag className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+
+                          {/* 1-Click PO Reorder if Trigger Order or Critical Low */}
+                          {(row.stockTier === 'TRIGGER_ORDER' || row.stockTier === 'CRITICAL_LOW') && (
+                            <button
+                              onClick={() => dispatch(navigateTo('PURCHASE_GRN'))}
+                              className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] rounded-lg shadow-2xs transition-all flex items-center space-x-0.5 cursor-pointer active:scale-95"
+                              title="Draft Advance Purchase Order"
+                            >
+                              <Truck className="w-3 h-3" />
+                              <span>PO</span>
                             </button>
                           )}
                         </div>

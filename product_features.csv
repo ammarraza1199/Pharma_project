@@ -76,8 +76,8 @@ Fulfillment & Delivery,Store Network Chatbot,Inter-store chatbot connecting phar
 Inventory & Expiry,Out of Stock Branch Redirect,Auto-recommend neighboring store branches when local stock is exhausted.,,MultiStoreModal.tsx,"GET /api/stores, POST /api/stores/borrow-stock",Not Created
 Procurement & Vendor,Inter-Pharmacy Price & Qty Query,Inquire price and quantity availability across partner pharmacies.,,MultiStoreModal.tsx,GET /api/stores,Not Created
 Inventory & Expiry,Borrowed Medicine Tracking,Track borrowed/lent medicines from wholesale or godown with display adjustment.,,MultiStoreModal.tsx & posSlice.ts,"GET /api/stores, POST /api/stores/borrow-stock",Not Created
-Billing & Invoicing,Substitute UI & Savings Badge,"Show substitute options, discount amount, and 'Best Seller' tags on billing screen.",,SmartSubstitutionModal.tsx,POST /api/billing/check-substitutes,Created not connected
-Billing & Invoicing,One-Click Substitute Swap,'Substitute with this' button to instantly swap item on active invoice.,,SmartSubstitutionModal.tsx,Pending Review,Pending
+Billing & Invoicing,Substitute UI & Savings Badge,"Show substitute options, discount amount, and 'Best Seller' tags on billing screen.",,SmartSubstitutionModal.tsx & CartTable.tsx,POST /api/billing/check-substitutes,Connected
+Billing & Invoicing,One-Click Substitute Swap,'Substitute with this' button to instantly swap item on active invoice.,,SmartSubstitutionModal.tsx & CartTable.tsx,Redux Swap Logic,Connected
 Billing & Invoicing,Loose Tablet Billing Unit Calculation,Accurately compute fractional pricing when adding loose tablets into billing page.,,CartTable.tsx,Local Redux Logic,Connected
 Inventory & Expiry,Low Stock Reorder Trigger,Automated low stock trigger (heavy/optimal threshold) creating auto-orders.,,InventoryPage.tsx,GET /api/products/stock/low,Connected
 Inventory & Expiry,Low Stock Dashboard Alert,Dashboard display of low stock items with one-click reorder recommendation.,,InventoryDashboardPage.tsx,GET /api/products/stock/low,Connected
