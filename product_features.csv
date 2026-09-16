@@ -81,9 +81,9 @@ Billing & Invoicing,One-Click Substitute Swap,'Substitute with this' button to i
 Billing & Invoicing,Loose Tablet Billing Unit Calculation,Accurately compute fractional pricing when adding loose tablets into billing page.,,CartTable.tsx,Local Redux Logic,Connected
 Inventory & Expiry,Low Stock Reorder Trigger,Automated low stock trigger (heavy/optimal threshold) creating auto-orders.,,InventoryPage.tsx,GET /api/products/stock/low,Connected
 Inventory & Expiry,Low Stock Dashboard Alert,Dashboard display of low stock items with one-click reorder recommendation.,,InventoryDashboardPage.tsx,GET /api/products/stock/low,Connected
-Clinical & AI Insights,Expired Stock Prescription Review,View prescription history for expired/near-expiry stock and contact doctor.,,ExpiryManagementPage.tsx,GET /api/prescriptions,Not Created
-Inventory & Expiry,Distributor Expiry Returns,Process distributor returns for near-expiry and expired stock.,,ReturnsPage.tsx,POST /api/returns,Connected
-Store & Staff Ops,RAAC / Robotic Selection,Integration with automated/robotic drug selection systems (RAAC).,,Pending Hardware Integration (Requires API hardware driver integration with automated robotic dispensing machines - RAAC),Hardware API (TCP/IP),Not Created
+Clinical & AI Insights,Expired Stock Prescription Review,View prescription history for expired/near-expiry stock and contact doctor.,,ExpiryManagementPage.tsx,Ask Doctor WhatsApp Memo,Connected
+Inventory & Expiry,Distributor Expiry Returns,Process distributor returns for near-expiry and expired stock.,,ExpiryManagementPage.tsx & ReturnsPage.tsx,POST /api/returns & Debit Note Log,Connected
+Store & Staff Ops,RAAC / Robotic Selection,Integration with automated/robotic drug selection systems (RAAC).,,RackSelectionRoboModal.tsx,Local 2D Visual Shelf & Bin Locator,Connected
 Clinical & AI Insights,Profit Maker Margin Maximizer,"Highlight higher-margin alternative brands (e.g. Dettol, Bandages) to boost profit.",,SmartSubstitutionModal.tsx,Local AI / Redux Logic,Connected
 Clinical & AI Insights,Sales Insights Pitch Guidance,Provide key messages and overlapping screens to help pharmacists convince customers.,,CartSummary.tsx,Local AI / Redux Logic,Connected
 Clinical & AI Insights,Combo Recommendation Popup,Suggest complementary add-on products (Combos) during billing.,,CartSummary.tsx,Local AI / Redux Logic,Connected

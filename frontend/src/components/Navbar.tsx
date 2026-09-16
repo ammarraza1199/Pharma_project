@@ -12,13 +12,14 @@ import {
   setVoiceConsultationModalOpen,
   setPatientInstructionModalOpen,
   dismissReorderPushAlert,
-  clearAllReorderPushAlerts
+  clearAllReorderPushAlerts,
+  setRackRoboModalOpen
 } from '../store/posSlice';
 import {
   Clock, Store, LogOut, LayoutDashboard, ShoppingCart, Package, Truck, BarChart3,
   RotateCcw, Users, Building, Settings, History, FileText, Siren, ChevronDown,
   Check, Bike, AlertTriangle, Sparkles, Building2, Bot, Mic, Volume2,
-  Bell, BellRing, X, AlertCircle
+  Bell, BellRing, X, AlertCircle, Compass
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -273,6 +274,15 @@ export const Navbar: React.FC = () => {
           title="Patient Instruction Leaflets (PIL) & Multi-Language Voice Clips"
         >
           <Volume2 className="w-4 h-4 text-teal-100" />
+        </button>
+
+        {/* Rack Selection Robo (Task #44) - Icon Only */}
+        <button
+          onClick={() => dispatch(setRackRoboModalOpen({ isOpen: true }))}
+          className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-cyan-300 shadow-xs transition-all cursor-pointer border border-cyan-400/40 shrink-0 flex items-center justify-center"
+          title="Rack Selection Robo (Interactive 2D Pharmacy Shelf Map)"
+        >
+          <Compass className="w-4 h-4 text-cyan-400 animate-spin-slow" />
         </button>
 
         {/* Safety Reorder Push Alert Bell (Task #41) */}

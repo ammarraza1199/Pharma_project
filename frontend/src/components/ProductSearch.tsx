@@ -1,14 +1,23 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { addItemToCart, setPrescriptionUploadModalOpen, setChronicRefillModalOpen, setMultiStoreModalOpen, setPatientInstructionModalOpen, openSubstitutionModalForProduct } from '../store/posSlice';
+import {
+  addItemToCart,
+  setPrescriptionUploadModalOpen,
+  setChronicRefillModalOpen,
+  setMultiStoreModalOpen,
+  setPatientInstructionModalOpen,
+  openSubstitutionModalForProduct,
+  setRackRoboModalOpen
+} from '../store/posSlice';
 import { getMedicineDetails } from '../utils/medicineDetails';
 import { getSortedBatchesFEFO, getEarliestExpiringBatch } from '../utils/fefoHelper';
 import type { Product, BatchInfo, ScheduleCategory, SellingUnitMode } from '../types/pos';
 import {
   Search, ScanBarcode, AlertCircle, Plus, Zap,
   X, ArrowUpDown, PackageX, TrendingUp, ChevronDown,
-  FileText, Repeat, Building2, Volume2, PackageOpen, BadgeAlert
+  FileText, Repeat, Building2, Volume2, PackageOpen, BadgeAlert,
+  Compass, MapPin
 } from 'lucide-react';
 
 // ── Filter & Sort Types ──────────────────────────────────────────────────────
@@ -229,6 +238,16 @@ export const ProductSearch: React.FC = () => {
         >
           <Building2 className="w-3.5 h-3.5 text-sky-700" />
           <span>Branch Stock</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => dispatch(setRackRoboModalOpen({ isOpen: true }))}
+          className="flex-1 flex items-center justify-center space-x-1.5 bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-cyan-500/40 px-2 py-1.5 rounded-xl text-[11px] font-extrabold transition-all shadow-2xs cursor-pointer active:scale-98"
+          title="Open 2D Pharmacy Shelf & Bin Picking Map"
+        >
+          <Compass className="w-3.5 h-3.5 text-cyan-400" />
+          <span>Shelf Robo 📍</span>
         </button>
       </div>
 
@@ -537,6 +556,21 @@ export const ProductSearch: React.FC = () => {
                             className="px-1.5 py-0.5 text-slate-500 hover:bg-slate-100 text-xs font-bold cursor-pointer"
                           >+</button>
                         </div>
+
+                        {/* Task #44: Rack Robo Locator Button */}
+                        <button
+                          type="button"
+                          onClick={() => dispatch(setRackRoboModalOpen({
+                            isOpen: true,
+                            targetProductName: product.name,
+                            targetLocation: selBatch?.location || 'Rack B-01'
+                          }))}
+                          className="text-[10px] font-bold text-cyan-800 hover:text-cyan-950 bg-cyan-50 hover:bg-cyan-100 border border-cyan-300 px-2 py-0.5 rounded-lg flex items-center space-x-1 cursor-pointer shadow-2xs transition-all"
+                          title="Locate shelf position on 2D Pharmacy Floor Plan"
+                        >
+                          <MapPin className="w-2.5 h-2.5 text-cyan-600" />
+                          <span>{selBatch?.location || 'Rack'}</span>
+                        </button>
                       </div>
                     )}
                   </div>

@@ -38,7 +38,10 @@ import type {
   CustomerSentimentResult,
   PurchaseOrder,
   PurchaseOrderItem,
-  ReorderPushAlert
+  ReorderPushAlert,
+  PutAwayTask,
+  SupplierDebitNote,
+  RackRoboModalState
 } from '../types/pos';
 import { MOCK_PRODUCTS } from '../mock/products';
 import { calculateItemGST } from '../utils/gstCalculator';
@@ -68,6 +71,9 @@ interface PosState {
   distributorSchemes: DistributorScheme[];
   purchaseOrders: PurchaseOrder[];
   reorderPushAlerts: ReorderPushAlert[];
+  putAwayTasks: PutAwayTask[];
+  supplierDebitNotes: SupplierDebitNote[];
+  rackRoboModal: RackRoboModalState;
   pharmacists: PharmacistCounter[];
   activePharmacistId: string;
   sessions: BillingSession[];
@@ -912,6 +918,115 @@ const initialState: PosState = {
       dismissed: false
     }
   ],
+  putAwayTasks: [
+    {
+      id: 'putaway-001',
+      creditNoteNo: 'CN-2026-0042',
+      originalInvoiceNo: 'INV-2026-841201',
+      productId: '64f1a2b3c4d5e6f7a8b9c002',
+      productName: 'Augmentin 625 Duo Tablet',
+      batchNumber: 'AUG-2024-88',
+      quantity: 2,
+      rackLocation: 'Rack B-14',
+      shelfTier: 'Tier 3 (Eye Level)',
+      binNumber: 'Bin 12',
+      status: 'PENDING',
+      returnedAt: '12 mins ago'
+    },
+    {
+      id: 'putaway-002',
+      creditNoteNo: 'CN-2026-0041',
+      originalInvoiceNo: 'INV-2026-841198',
+      productId: '64f1a2b3c4d5e6f7a8b9c003',
+      productName: 'Telma 40mg Tablet (Telmisartan)',
+      batchNumber: 'TLM-4421',
+      quantity: 1,
+      rackLocation: 'Rack A-04',
+      shelfTier: 'Tier 2 (Mid)',
+      binNumber: 'Bin 05',
+      status: 'PENDING',
+      returnedAt: '45 mins ago'
+    },
+    {
+      id: 'putaway-003',
+      creditNoteNo: 'CN-2026-0038',
+      originalInvoiceNo: 'INV-2026-841142',
+      productId: '64f1a2b3c4d5e6f7a8b9c008',
+      productName: 'Pan 40mg Tablet',
+      batchNumber: 'PAN-1082',
+      quantity: 3,
+      rackLocation: 'Rack C-02',
+      shelfTier: 'Tier 1 (Top)',
+      binNumber: 'Bin 08',
+      status: 'COMPLETED',
+      returnedAt: 'Yesterday 4:15 PM',
+      completedAt: 'Yesterday 4:45 PM',
+      restockedBy: 'Priya Sharma'
+    }
+  ],
+  supplierDebitNotes: [
+    {
+      id: 's-dn-001',
+      debitNoteNumber: 'DN-2026-0089',
+      supplierId: 'sup-001',
+      supplierName: 'MedPlus Wholesale Distributors',
+      supplierContact: '+91 98480 12345',
+      gstin: '36AAACM8891P1Z4',
+      createdDate: '2026-09-02',
+      cutoffWindowDays: 60,
+      status: 'DISPATCHED',
+      items: [
+        {
+          productId: '64f1a2b3c4d5e6f7a8b9c003',
+          productName: 'Telma 40mg Tablet',
+          batchNumber: 'TLM-4421',
+          expiryDate: '2026-10-15',
+          quantity: 15,
+          purchaseRate: 110.00,
+          totalAmount: 1650.00
+        },
+        {
+          productId: '64f1a2b3c4d5e6f7a8b9c007',
+          productName: 'Glycomet GP2 Tablet',
+          batchNumber: 'GLY-9901',
+          expiryDate: '2026-10-20',
+          quantity: 20,
+          purchaseRate: 135.00,
+          totalAmount: 2700.00
+        }
+      ],
+      totalAmount: 4350.00,
+      creditNoteRef: 'CRN-MED-9921',
+      remarks: 'Returned 45 days prior to expiry under distributor 60-day replacement policy'
+    },
+    {
+      id: 's-dn-002',
+      debitNoteNumber: 'DN-2026-0090',
+      supplierId: 'sup-002',
+      supplierName: 'Apex Healthcare Logistics',
+      supplierContact: '+91 98480 54321',
+      gstin: '36AAACA1122Q1Z9',
+      createdDate: '2026-09-08',
+      cutoffWindowDays: 90,
+      status: 'ACKNOWLEDGED',
+      items: [
+        {
+          productId: '64f1a2b3c4d5e6f7a8b9c010',
+          productName: 'Pantocid DSR Capsule',
+          batchNumber: 'PNT-3301',
+          expiryDate: '2026-11-10',
+          quantity: 12,
+          purchaseRate: 140.00,
+          totalAmount: 1680.00
+        }
+      ],
+      totalAmount: 1680.00,
+      remarks: 'Near expiry batch return shipment via dispatch van #AP-09-BX-2210'
+    }
+  ],
+  rackRoboModal: {
+    isOpen: false
+  },
   pharmacists: DEFAULT_PHARMACISTS,
   activePharmacistId: 'pharm-1',
   sessions: [initialSession],
@@ -1297,12 +1412,82 @@ export const posSlice = createSlice({
 
     processReturnCreditNote: (state, action: PayloadAction<ReturnCreditNote>) => {
       const note = action.payload;
-      // Set initial shelf status
-      note.items = note.items.map(item => ({
-        ...item,
-        shelfStatus: item.restocked ? 'PENDING_SHELF_CONFIRMATION' : 'MARKED_DAMAGED'
-      }));
+      note.items = note.items.map(item => {
+        const prod = state.products.find(p => p._id === item.productId);
+        const batch = prod?.batches.find(b => b.batchNumber === item.batchNumber) || prod?.batches[0];
+        const rackLocation = item.rackLocation || batch?.location || 'Rack B-01';
+
+        // If item is restocked, auto-create a PutAwayTask for shelf put-away queue
+        if (item.restocked) {
+          if (!state.putAwayTasks) state.putAwayTasks = [];
+          state.putAwayTasks.unshift({
+            id: `putaway-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            creditNoteNo: note.creditNoteNo,
+            originalInvoiceNo: note.originalInvoiceNo,
+            productId: item.productId,
+            productName: item.productName,
+            batchNumber: item.batchNumber,
+            quantity: item.quantityReturned,
+            rackLocation: rackLocation,
+            shelfTier: item.shelfTier || 'Tier 2 (Eye Level)',
+            binNumber: item.binNumber || 'Bin 04',
+            status: 'PENDING',
+            returnedAt: 'Just now'
+          });
+
+          // Also increment product stock
+          if (prod && batch) {
+            batch.stockQuantity += item.quantityReturned;
+            prod.totalStock = prod.batches.reduce((sum, b) => sum + b.stockQuantity, 0);
+            prod.stockStatus = prod.totalStock > 20 ? 'IN_STOCK' : prod.totalStock > 0 ? 'LOW_STOCK' : 'OUT_OF_STOCK';
+          }
+        }
+
+        return {
+          ...item,
+          rackLocation,
+          shelfStatus: item.restocked ? 'PENDING_SHELF_CONFIRMATION' : 'MARKED_DAMAGED'
+        };
+      });
       state.returnNotes.unshift(note);
+    },
+
+    completePutAwayTask: (state, action: PayloadAction<{ taskId: string; restockedBy?: string }>) => {
+      if (!state.putAwayTasks) state.putAwayTasks = [];
+      const task = state.putAwayTasks.find(t => t.id === action.payload.taskId);
+      if (task) {
+        task.status = 'COMPLETED';
+        task.completedAt = 'Just now';
+        task.restockedBy = action.payload.restockedBy || state.currentUser?.pharmacistName || 'Active Pharmacist';
+      }
+    },
+
+    createSupplierDebitNote: (state, action: PayloadAction<SupplierDebitNote>) => {
+      if (!state.supplierDebitNotes) state.supplierDebitNotes = [];
+      const debitNote = action.payload;
+      state.supplierDebitNotes.unshift(debitNote);
+
+      // Deduct returned near-expiry quantities from active batches
+      debitNote.items.forEach(item => {
+        const prod = state.products.find(p => p._id === item.productId || p.name.toLowerCase() === item.productName.toLowerCase());
+        if (prod) {
+          const batch = prod.batches.find(b => b.batchNumber === item.batchNumber) || prod.batches[0];
+          if (batch) {
+            batch.stockQuantity = Math.max(0, batch.stockQuantity - item.quantity);
+            prod.totalStock = prod.batches.reduce((sum, b) => sum + b.stockQuantity, 0);
+            prod.stockStatus = prod.totalStock > 20 ? 'IN_STOCK' : prod.totalStock > 0 ? 'LOW_STOCK' : 'OUT_OF_STOCK';
+          }
+        }
+      });
+    },
+
+    setRackRoboModalOpen: (state, action: PayloadAction<{
+      isOpen: boolean;
+      targetProductName?: string;
+      targetLocation?: string;
+      highlightCoordinates?: { aisle: number; rack: string; tier: number; bin: number };
+    }>) => {
+      state.rackRoboModal = action.payload;
     },
 
     confirmRestockToShelf: (state, action: PayloadAction<{ creditNoteNo: string; itemIndex: number }>) => {
@@ -2764,7 +2949,10 @@ export const {
   clearAllReorderPushAlerts,
   addNewBatchToProduct,
   updateBatchDetails,
-  quickUpdateProductPriceAndShelf
+  quickUpdateProductPriceAndShelf,
+  completePutAwayTask,
+  createSupplierDebitNote,
+  setRackRoboModalOpen
 } = posSlice.actions;
 
 export default posSlice.reducer;

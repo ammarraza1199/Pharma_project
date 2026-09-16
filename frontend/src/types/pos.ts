@@ -237,6 +237,9 @@ export interface ReturnItem {
   reason: 'EXPIRED' | 'DAMAGED' | 'CUSTOMER_CANCELLED' | 'WRONG_MEDICINE';
   restocked: boolean;
   shelfStatus?: 'SHELF_RESTOCKED' | 'DISPOSAL_MARKED' | 'PENDING' | 'PENDING_SHELF_CONFIRMATION' | 'MARKED_DAMAGED' | 'RESTOCKED_TO_SHELF';
+  rackLocation?: string;
+  shelfTier?: string;
+  binNumber?: string;
 }
 
 export interface ReturnCreditNote {
@@ -245,6 +248,10 @@ export interface ReturnCreditNote {
   patientName: string;
   returnDate: string;
   items: ReturnItem[];
+  grossRefundAmount?: number;
+  restockingFeePercent?: number;
+  restockingFeeDeducted?: number;
+  netRefundAmount?: number;
   totalRefundAmount: number;
   refundMethod: 'CASH' | 'UPI' | 'STORE_CREDIT';
 }
@@ -667,5 +674,61 @@ export interface ReorderPushAlert {
   runoutDays?: number;
   timestamp: string;
   dismissed?: boolean;
+}
+
+// ── GROUP 2: EXPIRY ACTIONS, RETURNS & SHELF MANAGEMENT (Tasks #22, #23, #42, #43, #44) ───────────
+export interface PutAwayTask {
+  id: string;
+  creditNoteNo: string;
+  originalInvoiceNo: string;
+  productId: string;
+  productName: string;
+  batchNumber: string;
+  quantity: number;
+  rackLocation: string;
+  shelfTier?: string;
+  binNumber?: string;
+  status: 'PENDING' | 'COMPLETED';
+  returnedAt: string;
+  completedAt?: string;
+  restockedBy?: string;
+}
+
+export interface SupplierDebitNoteItem {
+  productId: string;
+  productName: string;
+  batchNumber: string;
+  expiryDate: string;
+  quantity: number;
+  purchaseRate: number;
+  totalAmount: number;
+}
+
+export interface SupplierDebitNote {
+  id: string;
+  debitNoteNumber: string;
+  supplierId: string;
+  supplierName: string;
+  supplierContact?: string;
+  gstin?: string;
+  createdDate: string;
+  cutoffWindowDays: number; // 60 or 90 days before expiry cutoff
+  status: 'DISPATCHED' | 'ACKNOWLEDGED' | 'CREDIT_RECEIVED';
+  items: SupplierDebitNoteItem[];
+  totalAmount: number;
+  creditNoteRef?: string;
+  remarks?: string;
+}
+
+export interface RackRoboModalState {
+  isOpen: boolean;
+  targetProductName?: string;
+  targetLocation?: string;
+  highlightCoordinates?: {
+    aisle: number;
+    rack: string;
+    tier: number;
+    bin: number;
+  };
 }
 

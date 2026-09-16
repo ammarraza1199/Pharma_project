@@ -129,7 +129,7 @@ export const CartSummary: React.FC = () => {
                 </div>
                 <div>
                   <div className="text-[10px] font-bold uppercase tracking-wider text-rose-700">
-                    Clearance Incentive (Task #16)
+                    Clearance Incentive
                   </div>
                   <div className="text-xs font-bold leading-tight text-slate-900">
                     Near-Expiry Batch in Cart

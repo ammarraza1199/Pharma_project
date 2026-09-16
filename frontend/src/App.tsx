@@ -38,6 +38,7 @@ import { InterStoreChatbotModal } from './components/InterStoreChatbotModal';
 import { VoiceConsultationModal } from './components/VoiceConsultationModal';
 import { PatientInstructionModal } from './components/PatientInstructionModal';
 import { ClearanceGiftModal } from './components/ClearanceGiftModal';
+import { RackSelectionRoboModal } from './components/RackSelectionRoboModal';
 
 export const App: React.FC = () => {
   const currentView = useSelector((state: RootState) => state.pos.currentView);
@@ -162,6 +163,7 @@ export const App: React.FC = () => {
       <VoiceConsultationModal />
       <PatientInstructionModal />
       <ClearanceGiftModal />
+      <RackSelectionRoboModal />
     </div>
   );
 };

@@ -15,7 +15,8 @@ import {
   setClearanceGiftModalOpen,
   applyNearExpiryClearanceDiscount,
   addClearanceGiftToCart,
-  applySentimentDiscount
+  applySentimentDiscount,
+  setRackRoboModalOpen
 } from '../store/posSlice';
 import { analyzeDrugInteractions } from '../utils/drugInteractionEngine';
 import { getMedicineDetails } from '../utils/medicineDetails';
@@ -23,7 +24,7 @@ import {
   Trash2, Plus, Minus, AlertTriangle, AlertOctagon, UserCheck,
   Stethoscope, Edit2, Percent, FileText, RefreshCcw, Pill, Mic, Volume2, Zap,
   PackageOpen, BadgeAlert, Tag, Gift, Sparkles, CheckCircle2, X,
-  Star, ArrowRightLeft, BellRing
+  Star, ArrowRightLeft, BellRing, MapPin
 } from 'lucide-react';
 
 export const CartTable: React.FC = () => {
@@ -385,7 +386,7 @@ export const CartTable: React.FC = () => {
                     🎁 Near-Expiry Clearance Incentive Available
                   </span>
                   <span className="bg-rose-100 text-rose-800 text-[9px] font-extrabold px-1.5 py-0.2 rounded-full border border-rose-200">
-                    Sheet 1 — Task #16
+                    Clearance Deal
                   </span>
                 </div>
                 <p className="text-[10px] text-slate-600 mt-0.5">
@@ -560,6 +561,21 @@ export const CartTable: React.FC = () => {
                         >
                           <Volume2 className="w-2.5 h-2.5 text-teal-600" />
                           <span>PIL &amp; Audio</span>
+                        </button>
+
+                        {/* Task #44: Rack Robo Shelf Picker */}
+                        <button
+                          type="button"
+                          onClick={() => dispatch(setRackRoboModalOpen({
+                            isOpen: true,
+                            targetProductName: item.product.name,
+                            targetLocation: item.selectedBatch?.location || 'Rack B-01'
+                          }))}
+                          className="text-[9px] font-bold text-cyan-800 hover:text-cyan-950 bg-cyan-50 hover:bg-cyan-100 border border-cyan-300 px-1.5 py-0.5 rounded flex items-center space-x-1 transition-all cursor-pointer shadow-2xs"
+                          title="Locate shelf position on 2D Pharmacy Floor Plan"
+                        >
+                          <MapPin className="w-2.5 h-2.5 text-cyan-600" />
+                          <span>{item.selectedBatch?.location || 'Rack'}</span>
                         </button>
                       </div>
 

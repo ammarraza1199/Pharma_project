@@ -161,7 +161,7 @@ export const ClearanceGiftModal: React.FC = () => {
                   Near-Expiry Clearance Incentives &amp; Free Gift
                 </h3>
                 <span className="bg-rose-50 text-rose-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-rose-200">
-                  Sheet 1 — Task #16
+                  Clearance Deals
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
