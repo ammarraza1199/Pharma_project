@@ -39,9 +39,13 @@ import type {
   PurchaseOrder,
   PurchaseOrderItem,
   ReorderPushAlert,
+  DoctorIntimationRecord,
   PutAwayTask,
   SupplierDebitNote,
-  RackRoboModalState
+  RackRoboModalState,
+  ValueAddedServiceLink,
+  SubstituteEvent,
+  SubstituteDailyInsight
 } from '../types/pos';
 import { MOCK_PRODUCTS } from '../mock/products';
 import { calculateItemGST } from '../utils/gstCalculator';
@@ -71,6 +75,8 @@ interface PosState {
   distributorSchemes: DistributorScheme[];
   purchaseOrders: PurchaseOrder[];
   reorderPushAlerts: ReorderPushAlert[];
+  doctorIntimations: DoctorIntimationRecord[];
+  activeReorderToast: ReorderPushAlert | null;
   putAwayTasks: PutAwayTask[];
   supplierDebitNotes: SupplierDebitNote[];
   rackRoboModal: RackRoboModalState;
@@ -162,6 +168,9 @@ interface PosState {
   invoices: FinalizedInvoice[];
   latestFinalizedInvoice: FinalizedInvoice | null;
   isSubmittingBill: boolean;
+
+  // Substitute Intelligence & Conversion Analytics (Task #52)
+  substituteEvents: SubstituteEvent[];
 }
 
 const createInitialSession = (index: number, pharmacistId: string = 'pharm-1'): BillingSession => ({
@@ -895,7 +904,10 @@ const initialState: PosState = {
       currentStock: 4,
       minThreshold: 10,
       timestamp: 'Just now',
-      dismissed: false
+      dismissed: false,
+      status: 'PENDING',
+      suggestedReorderQty: 50,
+      supplierName: 'MedLife Distributors Pvt Ltd'
     },
     {
       id: 'alert-2',
@@ -905,7 +917,10 @@ const initialState: PosState = {
       currentStock: 6,
       minThreshold: 10,
       timestamp: '6 mins ago',
-      dismissed: false
+      dismissed: false,
+      status: 'PENDING',
+      suggestedReorderQty: 40,
+      supplierName: 'Sun Pharma Wholesale Depot'
     },
     {
       id: 'alert-3',
@@ -915,9 +930,31 @@ const initialState: PosState = {
       currentStock: 2,
       minThreshold: 10,
       timestamp: '15 mins ago',
-      dismissed: false
+      dismissed: false,
+      status: 'PENDING',
+      suggestedReorderQty: 30,
+      supplierName: 'Cipla Regional Depot'
     }
   ],
+  doctorIntimations: [
+    {
+      id: 'doc-int-001',
+      productId: '64f1a2b3c4d5e6f7a8b9c003',
+      productName: 'Telma 40mg Tablet (Telmisartan)',
+      batchNumber: 'TLM-4421',
+      expiryDate: '2026-10-15',
+      daysLeft: 29,
+      stockQuantity: 15,
+      doctorId: 'doc-1',
+      doctorName: 'Dr. Rajesh Sharma',
+      clinicName: 'Apollo Health Clinic',
+      doctorPhone: '9848011223',
+      memoText: 'Prioritize Telma 40mg for eligible hypertensive patients before batch expiry.',
+      intimatedAt: '2026-09-14 10:30 AM',
+      channel: 'WHATSAPP'
+    }
+  ],
+  activeReorderToast: null,
   putAwayTasks: [
     {
       id: 'putaway-001',
@@ -1220,7 +1257,211 @@ const initialState: PosState = {
 
   invoices: getInitialInvoices(),
   latestFinalizedInvoice: null,
-  isSubmittingBill: false
+  isSubmittingBill: false,
+
+  // Task #52: Substitute Intelligence & Conversion Analytics State
+  substituteEvents: [
+    {
+      id: 'sub-evt-001',
+      timestamp: '2026-09-16T10:14:22.000Z',
+      date: '2026-09-16',
+      originalProductId: 'prod-001',
+      originalProductName: 'Augmentin 625 Duo Tablet',
+      originalBrand: 'GSK Pharmaceuticals',
+      saltComposition: 'Amoxicillin (500mg) + Clavulanic Acid (125mg)',
+      substitutedProductId: 'prod-002',
+      substitutedProductName: 'Moxikind-CV 625 Tablet',
+      substitutedBrand: 'Mankind Pharma',
+      status: 'ACCEPTED',
+      marginGain: 42.50,
+      customerSavings: 38.00,
+      originalPrice: 223.50,
+      substitutedPrice: 185.50,
+      pharmacistName: 'Ramesh Kumar',
+      counterNumber: 1,
+      patientResponseNote: 'Patient accepted immediately when 15% out-of-stock discount and identical CDSCO bioequivalence were explained.'
+    },
+    {
+      id: 'sub-evt-002',
+      timestamp: '2026-09-16T11:32:05.000Z',
+      date: '2026-09-16',
+      originalProductId: 'prod-003',
+      originalProductName: 'Crocin 650 Advance Tablet',
+      originalBrand: 'Haleon / GSK',
+      saltComposition: 'Paracetamol (650mg)',
+      substitutedProductId: 'prod-004',
+      substitutedProductName: 'Dolo 650 Tablet',
+      substitutedBrand: 'Micro Labs',
+      status: 'ACCEPTED',
+      marginGain: 8.20,
+      customerSavings: 6.50,
+      originalPrice: 34.00,
+      substitutedPrice: 27.50,
+      pharmacistName: 'Priya Sharma',
+      counterNumber: 2,
+      patientResponseNote: 'Customer familiar with Dolo 650 brand, happily accepted substitute.'
+    },
+    {
+      id: 'sub-evt-003',
+      timestamp: '2026-09-16T13:05:40.000Z',
+      date: '2026-09-16',
+      originalProductId: 'prod-005',
+      originalProductName: 'Azithral 500 Tablet',
+      originalBrand: 'Alembic',
+      saltComposition: 'Azithromycin (500mg)',
+      substitutedProductId: 'prod-006',
+      substitutedProductName: 'Zady 500 Tablet',
+      substitutedBrand: 'Mankind Pharma',
+      status: 'REJECTED',
+      marginGain: 0,
+      customerSavings: 0,
+      originalPrice: 128.00,
+      substitutedPrice: 104.00,
+      pharmacistName: 'Anand Verma',
+      counterNumber: 3,
+      patientResponseNote: 'Patient insisted strictly on doctor written Azithral brand, opted to wait.'
+    },
+    {
+      id: 'sub-evt-004',
+      timestamp: '2026-09-15T15:20:10.000Z',
+      date: '2026-09-15',
+      originalProductId: 'prod-007',
+      originalProductName: 'Pan-D Capsule',
+      originalBrand: 'Alkem Laboratories',
+      saltComposition: 'Pantoprazole (40mg) + Domperidone (30mg)',
+      substitutedProductId: 'prod-008',
+      substitutedProductName: 'Pantocid DSR Capsule',
+      substitutedBrand: 'Sun Pharma',
+      status: 'ACCEPTED',
+      marginGain: 31.40,
+      customerSavings: 24.00,
+      originalPrice: 198.00,
+      substitutedPrice: 174.00,
+      pharmacistName: 'Ramesh Kumar',
+      counterNumber: 1,
+      patientResponseNote: 'Sun Pharma trusted quality recognized by chronic patient.'
+    },
+    {
+      id: 'sub-evt-005',
+      timestamp: '2026-09-15T16:45:00.000Z',
+      date: '2026-09-15',
+      originalProductId: 'prod-009',
+      originalProductName: 'Montair-LC Tablet',
+      originalBrand: 'Cipla Ltd',
+      saltComposition: 'Montelukast (10mg) + Levocetirizine (5mg)',
+      substitutedProductId: 'prod-010',
+      substitutedProductName: 'Telekast-L Tablet',
+      substitutedBrand: 'Lupin Ltd',
+      status: 'ACCEPTED',
+      marginGain: 36.80,
+      customerSavings: 29.50,
+      originalPrice: 215.00,
+      substitutedPrice: 185.50,
+      pharmacistName: 'Priya Sharma',
+      counterNumber: 2,
+      patientResponseNote: 'Regular seasonal allergy customer, satisfied with Lupin formulation.'
+    },
+    {
+      id: 'sub-evt-006',
+      timestamp: '2026-09-15T18:10:22.000Z',
+      date: '2026-09-15',
+      originalProductId: 'prod-011',
+      originalProductName: 'Lipitor 20mg Tablet',
+      originalBrand: 'Pfizer',
+      saltComposition: 'Atorvastatin (20mg)',
+      substitutedProductId: 'prod-012',
+      substitutedProductName: 'Atorva 20 Tablet',
+      substitutedBrand: 'Zydus Cadila',
+      status: 'ACCEPTED',
+      marginGain: 54.00,
+      customerSavings: 86.00,
+      originalPrice: 310.00,
+      substitutedPrice: 224.00,
+      pharmacistName: 'Ramesh Kumar',
+      counterNumber: 1,
+      patientResponseNote: 'Substantial cost savings on monthly maintenance pack convinced patient.'
+    },
+    {
+      id: 'sub-evt-007',
+      timestamp: '2026-09-14T11:00:30.000Z',
+      date: '2026-09-14',
+      originalProductId: 'prod-013',
+      originalProductName: 'Concor 5mg Tablet',
+      originalBrand: 'Merck Ltd',
+      saltComposition: 'Bisoprolol Fumarate (5mg)',
+      substitutedProductId: 'prod-014',
+      substitutedProductName: 'Bisoheart 5 Tablet',
+      substitutedBrand: 'Mankind Pharma',
+      status: 'REJECTED',
+      marginGain: 0,
+      customerSavings: 0,
+      originalPrice: 145.00,
+      substitutedPrice: 92.00,
+      pharmacistName: 'Anand Verma',
+      counterNumber: 3,
+      patientResponseNote: 'Cardiac patient stated cardiologist specifically cautioned against switching beta-blocker brands.'
+    },
+    {
+      id: 'sub-evt-008',
+      timestamp: '2026-09-14T14:40:12.000Z',
+      date: '2026-09-14',
+      originalProductId: 'prod-015',
+      originalProductName: 'Glucophage 500mg',
+      originalBrand: 'Sanofi',
+      saltComposition: 'Metformin Hydrochloride (500mg)',
+      substitutedProductId: 'prod-016',
+      substitutedProductName: 'Glycomet 500 Tablet',
+      substitutedBrand: 'USV Ltd',
+      status: 'ACCEPTED',
+      marginGain: 12.50,
+      customerSavings: 9.00,
+      originalPrice: 42.00,
+      substitutedPrice: 33.00,
+      pharmacistName: 'Ramesh Kumar',
+      counterNumber: 1,
+      patientResponseNote: 'USV is gold standard for Metformin in India, accepted without hesitation.'
+    },
+    {
+      id: 'sub-evt-009',
+      timestamp: '2026-09-13T12:20:45.000Z',
+      date: '2026-09-13',
+      originalProductId: 'prod-017',
+      originalProductName: 'Telma 40 Tablet',
+      originalBrand: 'Glenmark',
+      saltComposition: 'Telmisartan (40mg)',
+      substitutedProductId: 'prod-018',
+      substitutedProductName: 'Telmikind 40 Tablet',
+      substitutedBrand: 'Mankind Pharma',
+      status: 'ACCEPTED',
+      marginGain: 28.00,
+      customerSavings: 31.00,
+      originalPrice: 132.00,
+      substitutedPrice: 101.00,
+      pharmacistName: 'Priya Sharma',
+      counterNumber: 2,
+      patientResponseNote: 'Appreciated 3-month supply savings.'
+    },
+    {
+      id: 'sub-evt-010',
+      timestamp: '2026-09-12T16:15:00.000Z',
+      date: '2026-09-12',
+      originalProductId: 'prod-019',
+      originalProductName: 'Allegra 120mg Tablet',
+      originalBrand: 'Sanofi India',
+      saltComposition: 'Fexofenadine (120mg)',
+      substitutedProductId: 'prod-020',
+      substitutedProductName: 'Fexova 120 Tablet',
+      substitutedBrand: 'Lupin Ltd',
+      status: 'ACCEPTED',
+      marginGain: 34.20,
+      customerSavings: 36.00,
+      originalPrice: 188.00,
+      substitutedPrice: 152.00,
+      pharmacistName: 'Ramesh Kumar',
+      counterNumber: 1,
+      patientResponseNote: 'Customer accepted 15% discount benefit on Lupin Fexova.'
+    }
+  ]
 };
 
 export const checkIsScheduleXOrNarcotic = (product: Product): boolean => {
@@ -1479,6 +1720,81 @@ export const posSlice = createSlice({
           }
         }
       });
+    },
+
+    updateSupplierDebitNoteStatus: (state, action: PayloadAction<{
+      id: string;
+      status: 'DISPATCHED' | 'ACKNOWLEDGED' | 'CREDIT_RECEIVED';
+      creditReceivedAmount?: number;
+      settlementDate?: string;
+    }>) => {
+      if (!state.supplierDebitNotes) return;
+      const note = state.supplierDebitNotes.find(n => n.id === action.payload.id);
+      if (note) {
+        note.status = action.payload.status;
+        if (action.payload.creditReceivedAmount !== undefined) {
+          note.creditReceivedAmount = action.payload.creditReceivedAmount;
+        }
+        if (action.payload.settlementDate) {
+          note.settlementDate = action.payload.settlementDate;
+        }
+        if (action.payload.status === 'CREDIT_RECEIVED') {
+          note.settlementDate = note.settlementDate || new Date().toISOString().split('T')[0];
+          note.creditReceivedAmount = note.creditReceivedAmount || note.totalAmount;
+        }
+      }
+    },
+
+    batchCreateSupplierDebitNotes: (state, action: PayloadAction<SupplierDebitNote[]>) => {
+      if (!state.supplierDebitNotes) state.supplierDebitNotes = [];
+      action.payload.forEach(debitNote => {
+        state.supplierDebitNotes.unshift(debitNote);
+        debitNote.items.forEach(item => {
+          const prod = state.products.find(p => p._id === item.productId || p.name.toLowerCase() === item.productName.toLowerCase());
+          if (prod) {
+            const batch = prod.batches.find(b => b.batchNumber === item.batchNumber) || prod.batches[0];
+            if (batch) {
+              batch.stockQuantity = Math.max(0, batch.stockQuantity - item.quantity);
+              prod.totalStock = prod.batches.reduce((sum, b) => sum + b.stockQuantity, 0);
+              prod.stockStatus = prod.totalStock > 20 ? 'IN_STOCK' : prod.totalStock > 0 ? 'LOW_STOCK' : 'OUT_OF_STOCK';
+            }
+          }
+        });
+      });
+    },
+
+    linkValueAddedServiceToSession: (state, action: PayloadAction<{
+      sessionId?: string;
+      service: ValueAddedServiceLink;
+      consultationId: string;
+    }>) => {
+      const targetSessionId = action.payload.sessionId || state.activeSessionId;
+      const session = state.sessions.find(s => s.id === targetSessionId);
+      if (session) {
+        session.linkedVoiceConsultationId = action.payload.consultationId;
+        session.appliedValueAddedService = action.payload.service;
+        if (action.payload.service.discountPercent && action.payload.service.discountPercent > 0) {
+          const disc = action.payload.service.discountPercent;
+          session.items.forEach(item => {
+            item.discountPercent = Math.max(item.discountPercent, disc);
+            const gst = calculateItemGST(item.unitPrice, item.quantity, item.discountPercent, item.product.gstRate);
+            item.taxableAmount = gst.taxableAmount;
+            item.cgstAmount = gst.cgstAmount;
+            item.sgstAmount = gst.sgstAmount;
+            item.totalGst = gst.totalGst;
+            item.lineTotal = gst.lineTotal;
+          });
+        }
+      }
+    },
+
+    unlinkValueAddedServiceFromSession: (state, action: PayloadAction<{ sessionId?: string } | undefined>) => {
+      const targetSessionId = action?.payload?.sessionId || state.activeSessionId;
+      const session = state.sessions.find(s => s.id === targetSessionId);
+      if (session) {
+        session.appliedValueAddedService = undefined;
+        session.linkedVoiceConsultationId = undefined;
+      }
     },
 
     setRackRoboModalOpen: (state, action: PayloadAction<{
@@ -2115,26 +2431,137 @@ export const posSlice = createSlice({
       if (existing) {
         existing.currentStock = action.payload.currentStock;
         existing.dismissed = false;
+        existing.status = existing.status || 'PENDING';
       } else {
-        state.reorderPushAlerts.unshift({
+        const newAlert: ReorderPushAlert = {
           id: action.payload.id || `alert-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
           productId: action.payload.productId,
           productName: action.payload.productName,
           batchNumber: action.payload.batchNumber,
           currentStock: action.payload.currentStock,
           minThreshold: action.payload.minThreshold || 10,
+          safetyThreshold: action.payload.safetyThreshold || action.payload.minThreshold || 10,
+          saltComposition: action.payload.saltComposition,
           timestamp: action.payload.timestamp || 'Just now',
-          dismissed: false
-        });
+          dismissed: false,
+          status: 'PENDING',
+          suggestedReorderQty: action.payload.suggestedReorderQty || 50,
+          supplierName: action.payload.supplierName
+        };
+        state.reorderPushAlerts.unshift(newAlert);
+        state.activeReorderToast = newAlert;
       }
     },
     dismissReorderPushAlert: (state, action: PayloadAction<string>) => {
       if (state.reorderPushAlerts) {
         state.reorderPushAlerts = state.reorderPushAlerts.filter(a => a.id !== action.payload);
       }
+      if (state.activeReorderToast?.id === action.payload) {
+        state.activeReorderToast = null;
+      }
+    },
+    dismissReorderToast: (state) => {
+      state.activeReorderToast = null;
     },
     clearAllReorderPushAlerts: (state) => {
       state.reorderPushAlerts = [];
+      state.activeReorderToast = null;
+    },
+    convertReorderAlertToPO: (state, action: PayloadAction<{ alertId: string; reorderQty?: number }>) => {
+      if (!state.reorderPushAlerts) return;
+      const alert = state.reorderPushAlerts.find(a => a.id === action.payload.alertId);
+      if (!alert) return;
+      alert.status = 'ADDED_TO_PO';
+
+      const qty = action.payload.reorderQty || alert.suggestedReorderQty || 50;
+      let draftPo = state.purchaseOrders.find(p => p.status === 'DRAFT');
+      const supplier = state.suppliers[0] || {
+        supplierId: 'sup-001',
+        name: 'MedLife Distributors Pvt Ltd',
+        gstin: '36AABCM4411D1ZP',
+        phone: '+91 98490 12345'
+      };
+
+      if (!draftPo) {
+        draftPo = {
+          poId: `po-${Date.now()}`,
+          poNumber: `PO-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
+          supplierId: supplier.supplierId,
+          supplierName: supplier.name,
+          supplierGstin: supplier.gstin,
+          supplierPhone: supplier.phone,
+          orderDate: new Date().toISOString().split('T')[0],
+          expectedDeliveryDate: new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0],
+          paymentTerms: 'CREDIT_15_DAYS',
+          status: 'DRAFT',
+          totalAmount: 0,
+          notes: 'Auto-generated from Pharmacist Safety Reorder Intimations',
+          createdAt: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+          items: []
+        };
+        state.purchaseOrders.unshift(draftPo);
+      }
+
+      const existingItem = draftPo.items.find(i => i.productId === alert.productId);
+      if (existingItem) {
+        existingItem.quantity += qty;
+        existingItem.totalAmount = existingItem.quantity * existingItem.estimatedRate;
+      } else {
+        const prod = state.products.find(p => p._id === alert.productId);
+        const estRate = prod ? Number((prod.sellingPrice * 0.75).toFixed(2)) : 50;
+        draftPo.items.push({
+          productId: alert.productId,
+          productName: alert.productName,
+          packType: prod?.packType || 'Strip',
+          quantity: qty,
+          estimatedRate: estRate,
+          gstRate: prod?.gstRate || 12,
+          totalAmount: Number((qty * estRate).toFixed(2))
+        });
+      }
+      draftPo.totalAmount = draftPo.items.reduce((sum, item) => sum + item.totalAmount, 0);
+    },
+    triggerLowStockIntimation: (state, action: PayloadAction<{
+      productId: string;
+      productName: string;
+      batchNumber: string;
+      remainingStock: number;
+      minThreshold?: number;
+      saltComposition?: string;
+    }>) => {
+      if (!state.reorderPushAlerts) state.reorderPushAlerts = [];
+      const { productId, productName, batchNumber, remainingStock, minThreshold = 10, saltComposition } = action.payload;
+
+      let alertObj = state.reorderPushAlerts.find(a => a.productId === productId && a.batchNumber === batchNumber);
+      if (alertObj) {
+        alertObj.currentStock = remainingStock;
+        alertObj.dismissed = false;
+        alertObj.timestamp = 'Just now';
+      } else {
+        alertObj = {
+          id: `alert-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          productId,
+          productName,
+          batchNumber,
+          currentStock: remainingStock,
+          minThreshold,
+          safetyThreshold: minThreshold,
+          saltComposition,
+          timestamp: 'Just now',
+          dismissed: false,
+          status: 'PENDING',
+          suggestedReorderQty: 50
+        };
+        state.reorderPushAlerts.unshift(alertObj);
+      }
+      state.activeReorderToast = alertObj;
+    },
+    recordDoctorIntimation: (state, action: PayloadAction<DoctorIntimationRecord>) => {
+      if (!state.doctorIntimations) state.doctorIntimations = [];
+      state.doctorIntimations = state.doctorIntimations.filter(
+        d => !(d.productId === action.payload.productId && d.batchNumber === action.payload.batchNumber)
+      );
+      state.doctorIntimations.unshift(action.payload);
     },
     saveScheduleHCompliance: (state, action: PayloadAction<{ doctorDetails: DoctorDetails; patientDetails: PatientDetails }>) => {
       const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
@@ -2628,6 +3055,7 @@ export const posSlice = createSlice({
         payment: action.payload,
         pharmacistName: currentPharm?.name || 'Ramesh Kumar',
         counterNumber: currentPharm?.counterNumber || 1,
+        isDiscreetPackaging: Boolean(currentSession.isDiscreetPackaging),
         storeInfo: {
           name: 'GENQUANTAA MEDPLUS PHARMACY',
           dlNo: 'DL-2024/HYD/889201',
@@ -2826,6 +3254,7 @@ export const posSlice = createSlice({
         },
         pharmacistName: state.currentUser?.pharmacistName || 'Lead Pharmacist',
         counterNumber: 1,
+        isDiscreetPackaging: Boolean(order.isDiscreetPackaging),
         storeInfo: {
           name: 'GENQUANTAA MEDPLUS PHARMACY',
           dlNo: 'DL-2024/HYD/889201',
@@ -2844,6 +3273,21 @@ export const posSlice = createSlice({
       order.status = 'DELIVERED';
       order.actualDeliveryTime = new Date().toISOString();
       order.updatedAt = new Date().toISOString();
+    },
+
+    // Task #52: Record live substitute prompt & conversion acceptance/rejection
+    recordSubstituteEvent: (
+      state,
+      action: PayloadAction<Omit<SubstituteEvent, 'id' | 'timestamp' | 'date'>>
+    ) => {
+      const now = new Date();
+      const newEvent: SubstituteEvent = {
+        id: `sub-evt-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        timestamp: now.toISOString(),
+        date: now.toISOString().split('T')[0],
+        ...action.payload
+      };
+      state.substituteEvents.unshift(newEvent);
     }
   }
 });
@@ -2946,13 +3390,22 @@ export const {
   toggleDiscreetPackaging,
   addReorderPushAlert,
   dismissReorderPushAlert,
+  dismissReorderToast,
   clearAllReorderPushAlerts,
+  convertReorderAlertToPO,
+  triggerLowStockIntimation,
+  recordDoctorIntimation,
   addNewBatchToProduct,
   updateBatchDetails,
   quickUpdateProductPriceAndShelf,
   completePutAwayTask,
   createSupplierDebitNote,
-  setRackRoboModalOpen
+  updateSupplierDebitNoteStatus,
+  batchCreateSupplierDebitNotes,
+  linkValueAddedServiceToSession,
+  unlinkValueAddedServiceFromSession,
+  setRackRoboModalOpen,
+  recordSubstituteEvent
 } = posSlice.actions;
 
 export default posSlice.reducer;

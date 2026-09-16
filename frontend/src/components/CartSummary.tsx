@@ -8,13 +8,15 @@ import {
   setClearanceGiftModalOpen,
   applyNearExpiryClearanceDiscount,
   addClearanceGiftToCart,
-  toggleDiscreetPackaging
+  toggleDiscreetPackaging,
+  unlinkValueAddedServiceFromSession,
+  setVoiceConsultationModalOpen
 } from '../store/posSlice';
 import { getMedicineDetails } from '../utils/medicineDetails';
 import {
   CreditCard, ShieldAlert, Loader2, ArrowRight, Sparkles, Tag,
   ShieldCheck, Stethoscope, TestTube, CheckCircle2, Plus, Gift,
-  Clock, Package, PackageCheck, Layers
+  Clock, Package, PackageCheck, Layers, Mic, Volume2, X
 } from 'lucide-react';
 import {
   detectRelevantClinicalBundles,
@@ -29,10 +31,13 @@ export const CartSummary: React.FC = () => {
   const dispatch = useDispatch();
   const sessions = useSelector((state: RootState) => state.pos.sessions);
   const products = useSelector((state: RootState) => state.pos.products);
+  const consultationRecords = useSelector((state: RootState) => state.pos.consultationRecords || []);
   const activeSessionId = useSelector((state: RootState) => state.pos.activeSessionId);
   const isSubmittingBill = useSelector((state: RootState) => state.pos.isSubmittingBill);
 
   const currentSession = sessions.find(s => s.id === activeSessionId);
+  const linkedConsultation = consultationRecords.find(c => c.id === currentSession?.linkedVoiceConsultationId);
+  const appliedVAS = currentSession?.appliedValueAddedService;
   const items = currentSession ? currentSession.items : [];
   const doctorDetails = currentSession?.doctorDetails;
 
@@ -266,6 +271,67 @@ export const CartSummary: React.FC = () => {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {/* ── 🎙️ LINKED VOICE CONSULTATION & VALUE BENEFIT BANNER (Task #48) ── */}
+        {(appliedVAS || linkedConsultation) && (
+          <div className="bg-gradient-to-r from-indigo-900 to-purple-900 text-white rounded-xl p-3 mb-3 shadow-sm space-y-2 border border-indigo-700/60 animate-fadeIn">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center space-x-2">
+                <div className="p-1.5 bg-rose-500/30 text-rose-300 rounded-lg border border-rose-400/40">
+                  <Mic className="w-4 h-4 animate-pulse" />
+                </div>
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-wider text-indigo-200 flex items-center space-x-1.5">
+                    <span>Voice Consultation Linked</span>
+                    {linkedConsultation?.durationSeconds && (
+                      <span className="font-mono text-[9px] bg-white/20 px-1.5 py-0.2 rounded text-white">
+                        {linkedConsultation.durationSeconds}s Audio
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs font-bold text-white leading-tight">
+                    {appliedVAS?.name || linkedConsultation?.chiefDiscussion?.slice(0, 45) || 'Audio Consultation Note'}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => dispatch(unlinkValueAddedServiceFromSession({ sessionId: currentSession?.id }))}
+                className="text-slate-400 hover:text-rose-300 p-0.5 rounded cursor-pointer"
+                title="Unlink consultation service from this bill"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {appliedVAS && (
+              <div className="flex items-center justify-between bg-white/10 px-2.5 py-1.5 rounded-lg border border-white/10 text-[10.5px]">
+                <span className="text-indigo-100 flex items-center space-x-1 font-medium">
+                  <Gift className="w-3 h-3 text-amber-300" />
+                  <span>Benefit: <strong>{appliedVAS.type.replace(/_/g, ' ')}</strong></span>
+                </span>
+                <span className="font-black px-1.5 py-0.2 rounded bg-amber-300 text-indigo-950 text-[10px]">
+                  {appliedVAS.discountPercent ? `${appliedVAS.discountPercent}% OFF APPLIED` : 'FREE SERVICE TOKEN'}
+                </span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-1 border-t border-indigo-800 text-[10.5px]">
+              <span className="text-indigo-300 text-[10px] truncate max-w-[150px]">
+                Patient: {linkedConsultation?.patientName || currentSession?.patientDetails?.patientName || 'Customer'}
+              </span>
+              <button
+                type="button"
+                onClick={() => dispatch(setVoiceConsultationModalOpen({ isOpen: true }))}
+                className="text-amber-300 hover:text-amber-200 font-bold underline cursor-pointer flex items-center space-x-1"
+              >
+                <Volume2 className="w-3 h-3" />
+                <span>Play Voice Note</span>
+              </button>
             </div>
           </div>
         )}

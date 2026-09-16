@@ -13,13 +13,14 @@ import {
   setPatientInstructionModalOpen,
   dismissReorderPushAlert,
   clearAllReorderPushAlerts,
+  convertReorderAlertToPO,
   setRackRoboModalOpen
 } from '../store/posSlice';
 import {
   Clock, Store, LogOut, LayoutDashboard, ShoppingCart, Package, Truck, BarChart3,
   RotateCcw, Users, Building, Settings, History, FileText, Siren, ChevronDown,
   Check, Bike, AlertTriangle, Sparkles, Building2, Bot, Mic, Volume2,
-  Bell, BellRing, X, AlertCircle, Compass
+  Bell, BellRing, X, AlertCircle, Compass, Zap
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -323,14 +324,31 @@ export const Navbar: React.FC = () => {
                       Safety Reorder Alerts ({reorderPushAlerts.length})
                     </span>
                   </div>
-                  {reorderPushAlerts.length > 0 && (
-                    <button
-                      onClick={() => dispatch(clearAllReorderPushAlerts())}
-                      className="text-[10px] font-bold text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-                    >
-                      Clear All
-                    </button>
-                  )}
+                  <div className="flex items-center space-x-1.5">
+                    {reorderPushAlerts.some(a => a.status !== 'ADDED_TO_PO') && (
+                      <button
+                        onClick={() => {
+                          reorderPushAlerts.forEach(a => {
+                            if (a.status !== 'ADDED_TO_PO') {
+                              dispatch(convertReorderAlertToPO({ alertId: a.id, reorderQty: a.suggestedReorderQty || 50 }));
+                            }
+                          });
+                        }}
+                        className="text-[9.5px] font-bold text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-md cursor-pointer transition-colors"
+                        title="Add all pending depleted items to draft Purchase Order"
+                      >
+                        + All to PO
+                      </button>
+                    )}
+                    {reorderPushAlerts.length > 0 && (
+                      <button
+                        onClick={() => dispatch(clearAllReorderPushAlerts())}
+                        className="text-[10px] font-bold text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {reorderPushAlerts.length === 0 ? (
@@ -339,62 +357,100 @@ export const Navbar: React.FC = () => {
                     <p className="text-[10px] mt-0.5">All batch safety thresholds are satisfied.</p>
                   </div>
                 ) : (
-                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                    {reorderPushAlerts.map((alert) => (
-                      <div
-                        key={alert.id}
-                        className="bg-rose-50/70 border border-rose-200 rounded-xl p-2.5 relative group"
-                      >
-                        <div className="flex items-start justify-between pr-4">
-                          <div>
-                            <p className="text-xs font-bold text-slate-900 leading-tight">
-                              {alert.productName}
-                            </p>
-                            {alert.saltComposition && (
-                              <p className="text-[10px] text-slate-500 truncate max-w-[200px]">
-                                {alert.saltComposition}
+                  <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                    {reorderPushAlerts.map((alert) => {
+                      const isQueued = alert.status === 'ADDED_TO_PO';
+                      return (
+                        <div
+                          key={alert.id}
+                          className={`rounded-xl p-2.5 relative border transition-all ${
+                            isQueued
+                              ? 'bg-emerald-50/70 border-emerald-200'
+                              : 'bg-rose-50/70 border-rose-200'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between pr-4">
+                            <div>
+                              <p className="text-xs font-bold text-slate-900 leading-tight">
+                                {alert.productName}
                               </p>
-                            )}
-                            <div className="flex items-center space-x-2 mt-1 text-[10px]">
-                              <span className="font-black text-rose-700 bg-rose-100/80 px-1.5 py-0.2 rounded">
-                                Stock: {alert.currentStock} units
-                              </span>
-                              <span className="text-slate-500 font-medium">
-                                Threshold: {alert.safetyThreshold || alert.minThreshold}
-                              </span>
+                              {alert.saltComposition && (
+                                <p className="text-[10px] text-slate-500 truncate max-w-[200px]">
+                                  {alert.saltComposition}
+                                </p>
+                              )}
+                              <div className="flex items-center space-x-2 mt-1 text-[10px]">
+                                <span className={`font-black px-1.5 py-0.2 rounded ${
+                                  isQueued ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100/80 text-rose-700'
+                                }`}>
+                                  Stock: {alert.currentStock} units
+                                </span>
+                                <span className="text-slate-500 font-medium">
+                                  Threshold: {alert.safetyThreshold || alert.minThreshold}
+                                </span>
+                              </div>
+                              {alert.runoutDays !== undefined && (
+                                <p className="text-[9.5px] font-bold text-amber-800 mt-0.5">
+                                  ⏳ Runout: ~{alert.runoutDays} {alert.runoutDays === 1 ? 'day' : 'days'} left
+                                </p>
+                              )}
                             </div>
-                            {alert.runoutDays !== undefined && (
-                              <p className="text-[9.5px] font-bold text-amber-800 mt-0.5">
-                                ⏳ Runout: ~{alert.runoutDays} {alert.runoutDays === 1 ? 'day' : 'days'} left
-                              </p>
-                            )}
+                            <button
+                              onClick={() => dispatch(dismissReorderPushAlert(alert.id))}
+                              className="text-slate-400 hover:text-rose-600 transition-colors cursor-pointer absolute top-2 right-2 p-1"
+                              title="Dismiss Alert"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
                           </div>
-                          <button
-                            onClick={() => dispatch(dismissReorderPushAlert(alert.id))}
-                            className="text-slate-400 hover:text-rose-600 transition-colors cursor-pointer absolute top-2 right-2 p-1"
-                            title="Dismiss Alert"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
 
-                        <div className="mt-2 pt-2 border-t border-rose-200/60 flex items-center justify-between">
-                          <span className="text-[9px] text-slate-400 font-mono">
-                            {alert.timestamp}
-                          </span>
-                          <button
-                            onClick={() => {
-                              setShowReorderAlertsDropdown(false);
-                              dispatch(navigateTo('PURCHASE_GRN'));
-                            }}
-                            className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] rounded-lg shadow-2xs flex items-center space-x-1 cursor-pointer active:scale-95"
-                          >
-                            <Truck className="w-3 h-3" />
-                            <span>Draft PO</span>
-                          </button>
+                          <div className="mt-2 pt-2 border-t border-slate-200/60 flex items-center justify-between gap-1">
+                            <span className="text-[9px] text-slate-400 font-mono">
+                              {alert.timestamp}
+                            </span>
+                            
+                            <div className="flex items-center space-x-1.5">
+                              {/* Quick Supplier WhatsApp Intimation */}
+                              <a
+                                href={`https://wa.me/919849012345?text=${encodeURIComponent(`Urgent Reorder Intimation: ${alert.productName} has dropped to ${alert.currentStock} units (Batch: ${alert.batchNumber}). Please prepare supply dispatch.`)}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-1.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg text-[10px] font-bold border border-emerald-300 transition-colors inline-flex items-center"
+                                title="Send Reorder Alert via WhatsApp to Supplier"
+                              >
+                                💬 WhatsApp
+                              </a>
+
+                              {/* 1-Click PO Action Button */}
+                              {isQueued ? (
+                                <button
+                                  onClick={() => {
+                                    setShowReorderAlertsDropdown(false);
+                                    dispatch(navigateTo('PURCHASE_GRN'));
+                                  }}
+                                  className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg shadow-2xs flex items-center space-x-1 cursor-pointer active:scale-95"
+                                  title="View in Purchase Orders Draft"
+                                >
+                                  <Check className="w-3 h-3" />
+                                  <span>In Draft PO →</span>
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    dispatch(convertReorderAlertToPO({ alertId: alert.id, reorderQty: alert.suggestedReorderQty || 50 }));
+                                  }}
+                                  className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] rounded-lg shadow-2xs flex items-center space-x-1 cursor-pointer active:scale-95"
+                                  title="1-Click: Add 50 units to Draft Purchase Order"
+                                >
+                                  <Zap className="w-3 h-3 text-amber-200" />
+                                  <span>+ Add to PO</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
 

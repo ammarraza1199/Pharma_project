@@ -6,16 +6,20 @@ import {
   updateProduct,
   navigateTo,
   createSupplierDebitNote,
-  setRackRoboModalOpen
+  updateSupplierDebitNoteStatus,
+  batchCreateSupplierDebitNotes,
+  setRackRoboModalOpen,
+  recordDoctorIntimation
 } from '../store/posSlice';
 import api from '../utils/api';
-import type { Product, BatchInfo, DisposalRecord, SupplierDebitNote } from '../types/pos';
+import type { Product, BatchInfo, DisposalRecord, SupplierDebitNote, DoctorIntimationRecord } from '../types/pos';
 import {
   AlertCircle, Clock, Trash2, ShieldAlert,
   Calendar, Layers, X, PackageX, Loader2,
   Stethoscope, Truck, Send, Copy, Check,
   FileText, ShoppingBag, MapPin, Building,
-  Printer, ChevronRight, MessageSquare, Percent
+  Printer, ChevronRight, MessageSquare, Percent,
+  Smartphone, CheckCircle2, FileCheck
 } from 'lucide-react';
 
 type ExpiryFilterTab = 'EXPIRED' | 'NEAR_3' | 'NEAR_7' | 'NEAR_20' | 'NEAR_30' | 'NEAR_60';
@@ -41,6 +45,7 @@ export const ExpiryManagementPage: React.FC = () => {
   const suppliers = useSelector((state: RootState) => state.pos.suppliers || []);
   const supplierDebitNotes = useSelector((state: RootState) => state.pos.supplierDebitNotes || []);
   const storeSettings = useSelector((state: RootState) => state.pos.settings);
+  const doctorIntimations = useSelector((state: RootState) => state.pos.doctorIntimations || []);
 
   // View Mode: Expiry Batches vs Distributor Debit Notes
   const [viewMode, setViewMode] = useState<'BATCHES' | 'DEBIT_NOTES'>('BATCHES');
@@ -58,11 +63,12 @@ export const ExpiryManagementPage: React.FC = () => {
   const [managerPin, setManagerPin] = useState<string>('');
   const [disposalQty, setDisposalQty] = useState<number>(1);
 
-  // Task #42: Ask Doctor Modal State
+  // Task #42: Ask Doctor Modal & Doctor Circular State
   const [askDoctorBatch, setAskDoctorBatch] = useState<BatchRow | null>(null);
   const [selectedDoctorId, setSelectedDoctorId] = useState<string>(PARTNER_DOCTORS[0].id);
   const [customDoctorNote, setCustomDoctorNote] = useState<string>('');
   const [memoCopied, setMemoCopied] = useState<boolean>(false);
+  const [isCircularModalOpen, setIsCircularModalOpen] = useState<boolean>(false);
 
   // Task #43: Return to Distributor (Debit Note) Modal State
   const [debitNoteBatch, setDebitNoteBatch] = useState<BatchRow | null>(null);
@@ -71,6 +77,8 @@ export const ExpiryManagementPage: React.FC = () => {
   const [debitPurchaseRate, setDebitPurchaseRate] = useState<number>(100);
   const [debitCutoffDays, setDebitCutoffDays] = useState<number>(60);
   const [debitRemarks, setDebitRemarks] = useState<string>('');
+  const [selectedDebitNoteForSlip, setSelectedDebitNoteForSlip] = useState<SupplierDebitNote | null>(null);
+  const [slipCopied, setSlipCopied] = useState<boolean>(false);
 
   // Fetch live expiry data from API on mount
   useEffect(() => {
@@ -125,6 +133,9 @@ export const ExpiryManagementPage: React.FC = () => {
   // Filter by Rx / OTC (Task #42)
   const isRxCategory = (p: Product) => p.scheduleCategory && p.scheduleCategory !== 'REGULAR';
 
+  const totalRxCount = allBatchRows.filter(r => isRxCategory(r.product)).length;
+  const totalOtcCount = allBatchRows.filter(r => !isRxCategory(r.product)).length;
+
   const rxFilteredRows = allBatchRows.filter(r => {
     if (rxOtcFilter === 'RX_ONLY') return isRxCategory(r.product);
     if (rxOtcFilter === 'OTC_ONLY') return !isRxCategory(r.product);
@@ -150,6 +161,13 @@ export const ExpiryManagementPage: React.FC = () => {
   // Financial impact calculation
   const totalExpiredLoss = expiredBatches.reduce((sum, r) => sum + (r.batch.stockQuantity * r.product.sellingPrice), 0);
   const totalNear30Loss  = near30Batches.reduce((sum, r) => sum + (r.batch.stockQuantity * r.product.sellingPrice), 0);
+
+  // Pre-expiry distributor return (60-90 days window) batches eligible for automated debit notes
+  const rtvEligibleBatches = allBatchRows.filter(r => !r.isExpired && r.daysLeft > 0 && r.daysLeft <= 90);
+  const totalRtvPotentialValue = rtvEligibleBatches.reduce(
+    (sum, r) => sum + (r.batch.stockQuantity * Number((r.product.sellingPrice * 0.75).toFixed(2))),
+    0
+  );
 
   // ── Handlers: Disposal ─────────────────────────────────────────────
   const handleOpenDisposal = (row: BatchRow) => {
@@ -212,13 +230,15 @@ export const ExpiryManagementPage: React.FC = () => {
   const handleOpenAskDoctor = (row: BatchRow) => {
     setAskDoctorBatch(row);
     setMemoCopied(false);
+    setCustomDoctorNote('Kindly consider prioritizing this formulation in upcoming prescriptions for eligible patients to support medication rotation.');
   };
 
   const selectedDoctor = PARTNER_DOCTORS.find(d => d.id === selectedDoctorId) || PARTNER_DOCTORS[0];
 
   const getClinicalMemoText = () => {
     if (!askDoctorBatch) return '';
-    return `Dear ${selectedDoctor.name} (${selectedDoctor.clinic}),\n\nGreetings from ${storeSettings.storeName || 'GENQUANTAA Pharmacy'}.\n\nWe currently have in-stock ${askDoctorBatch.batch.stockQuantity} units of ${askDoctorBatch.product.name} (Batch: ${askDoctorBatch.batch.batchNumber}, Expiry: ${askDoctorBatch.batch.expiryDate}, ~${askDoctorBatch.daysLeft} days remaining).\nActive Salt: ${askDoctorBatch.product.saltComposition || 'Standard formulation'}.\n\nKindly consider prioritizing this formulation in upcoming prescriptions for eligible patients to support medication rotation and prevent total stock write-off.\n\nThank you,\nChief Pharmacist | ${storeSettings.phone || '+91 98765 43210'}`;
+    const noteLine = customDoctorNote ? `\n\nDoctor Note: ${customDoctorNote}` : '';
+    return `Dear ${selectedDoctor.name} (${selectedDoctor.clinic}),\n\nGreetings from ${storeSettings.storeName || 'GENQUANTAA Pharmacy'}.\n\nWe currently have in-stock ${askDoctorBatch.batch.stockQuantity} units of ${askDoctorBatch.product.name} (Batch: ${askDoctorBatch.batch.batchNumber}, Expiry: ${askDoctorBatch.batch.expiryDate}, ~${askDoctorBatch.daysLeft} days remaining).\nActive Salt: ${askDoctorBatch.product.saltComposition || 'Standard formulation'}.${noteLine}\n\nKindly consider prioritizing this formulation in upcoming prescriptions for eligible patients to support medication rotation and prevent total stock write-off.\n\nThank you,\nChief Pharmacist | ${storeSettings.phone || '+91 98765 43210'}`;
   };
 
   const handleCopyMemo = () => {
@@ -228,8 +248,70 @@ export const ExpiryManagementPage: React.FC = () => {
   };
 
   const handleSendWhatsApp = () => {
-    const text = encodeURIComponent(getClinicalMemoText());
+    if (!askDoctorBatch) return;
+    const memo = getClinicalMemoText();
+    dispatch(recordDoctorIntimation({
+      id: `doc-int-${Date.now()}`,
+      productId: askDoctorBatch.product._id,
+      productName: askDoctorBatch.product.name,
+      batchNumber: askDoctorBatch.batch.batchNumber,
+      expiryDate: askDoctorBatch.batch.expiryDate,
+      daysLeft: askDoctorBatch.daysLeft,
+      stockQuantity: askDoctorBatch.batch.stockQuantity,
+      doctorId: selectedDoctor.id,
+      doctorName: selectedDoctor.name,
+      clinicName: selectedDoctor.clinic,
+      doctorPhone: selectedDoctor.phone,
+      memoText: memo,
+      intimatedAt: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+      channel: 'WHATSAPP'
+    }));
+    const text = encodeURIComponent(memo);
     window.open(`https://wa.me/91${selectedDoctor.phone}?text=${text}`, '_blank');
+  };
+
+  const handleSendSMS = () => {
+    if (!askDoctorBatch) return;
+    const memo = getClinicalMemoText();
+    dispatch(recordDoctorIntimation({
+      id: `doc-int-${Date.now()}`,
+      productId: askDoctorBatch.product._id,
+      productName: askDoctorBatch.product.name,
+      batchNumber: askDoctorBatch.batch.batchNumber,
+      expiryDate: askDoctorBatch.batch.expiryDate,
+      daysLeft: askDoctorBatch.daysLeft,
+      stockQuantity: askDoctorBatch.batch.stockQuantity,
+      doctorId: selectedDoctor.id,
+      doctorName: selectedDoctor.name,
+      clinicName: selectedDoctor.clinic,
+      doctorPhone: selectedDoctor.phone,
+      memoText: memo,
+      intimatedAt: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+      channel: 'SMS'
+    }));
+    window.open(`sms:+91${selectedDoctor.phone}?body=${encodeURIComponent(memo)}`, '_blank');
+  };
+
+  const handleRecordIntimationOnly = () => {
+    if (!askDoctorBatch) return;
+    const memo = getClinicalMemoText();
+    dispatch(recordDoctorIntimation({
+      id: `doc-int-${Date.now()}`,
+      productId: askDoctorBatch.product._id,
+      productName: askDoctorBatch.product.name,
+      batchNumber: askDoctorBatch.batch.batchNumber,
+      expiryDate: askDoctorBatch.batch.expiryDate,
+      daysLeft: askDoctorBatch.daysLeft,
+      stockQuantity: askDoctorBatch.batch.stockQuantity,
+      doctorId: selectedDoctor.id,
+      doctorName: selectedDoctor.name,
+      clinicName: selectedDoctor.clinic,
+      doctorPhone: selectedDoctor.phone,
+      memoText: memo,
+      intimatedAt: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+      channel: 'COPIED'
+    }));
+    setAskDoctorBatch(null);
   };
 
   // ── Handlers: Task #43 Return to Distributor (Debit Note) ─────────
@@ -246,11 +328,13 @@ export const ExpiryManagementPage: React.FC = () => {
     const selectedSupplier = suppliers.find(s => s.supplierId === selectedSupplierId) || suppliers[0];
 
     const debitNoteNumber = `DN-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`;
+    const dispatchSlipNumber = `SLIP-RTV-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`;
     const totalCreditAmount = Number((debitReturnQty * debitPurchaseRate).toFixed(2));
 
     const newDebitNote: SupplierDebitNote = {
       id: `s-dn-${Date.now()}`,
       debitNoteNumber,
+      dispatchSlipNumber,
       supplierId: selectedSupplier?.supplierId || 'sup-002',
       supplierName: selectedSupplier?.name || 'Authorized Distributor Depot',
       supplierContact: selectedSupplier?.phone,
@@ -278,6 +362,73 @@ export const ExpiryManagementPage: React.FC = () => {
     setViewMode('DEBIT_NOTES');
   };
 
+  const handleAutomateAllRTVDebitNotes = () => {
+    if (rtvEligibleBatches.length === 0) {
+      alert('No near-expiry batches within 60–90 days cutoff eligible for distributor return.');
+      return;
+    }
+
+    const defaultSupplier = suppliers[0] || {
+      supplierId: 'sup-002',
+      name: 'MedLife Distributors Pvt Ltd',
+      phone: '+91 98490 12345',
+      gstin: '36AABCM4411D1ZP'
+    };
+
+    const newNotes: SupplierDebitNote[] = rtvEligibleBatches.map((r, idx) => {
+      const estPurchaseRate = Number((r.product.sellingPrice * 0.75).toFixed(2));
+      const totalCredit = Number((r.batch.stockQuantity * estPurchaseRate).toFixed(2));
+      const dnNum = `DN-${new Date().getFullYear()}-${(Date.now() + idx).toString().slice(-4)}`;
+      const slipNum = `SLIP-RTV-${new Date().getFullYear()}-${1001 + idx}`;
+
+      return {
+        id: `s-dn-auto-${Date.now()}-${idx}`,
+        debitNoteNumber: dnNum,
+        dispatchSlipNumber: slipNum,
+        supplierId: defaultSupplier.supplierId,
+        supplierName: defaultSupplier.name,
+        supplierContact: defaultSupplier.phone,
+        gstin: defaultSupplier.gstin,
+        createdDate: new Date().toISOString().split('T')[0],
+        cutoffWindowDays: r.daysLeft <= 60 ? 60 : 90,
+        status: 'DISPATCHED',
+        items: [
+          {
+            productId: r.product._id,
+            productName: r.product.name,
+            batchNumber: r.batch.batchNumber,
+            expiryDate: r.batch.expiryDate,
+            quantity: r.batch.stockQuantity,
+            purchaseRate: estPurchaseRate,
+            totalAmount: totalCredit
+          }
+        ],
+        totalAmount: totalCredit,
+        remarks: `Automated 60–90 day RTV debit note generated for ${r.daysLeft}d near-expiry stock rotation.`
+      };
+    });
+
+    dispatch(batchCreateSupplierDebitNotes(newNotes));
+    alert(`Successfully generated ${newNotes.length} automated distributor debit notes worth ₹${totalRtvPotentialValue.toFixed(2)}!`);
+    setViewMode('DEBIT_NOTES');
+  };
+
+  const handleUpdateDNStatus = (id: string, newStatus: 'DISPATCHED' | 'ACKNOWLEDGED' | 'CREDIT_RECEIVED') => {
+    const dn = supplierDebitNotes.find(d => d.id === id);
+    if (!dn) return;
+
+    if (newStatus === 'CREDIT_RECEIVED') {
+      dispatch(updateSupplierDebitNoteStatus({
+        id,
+        status: newStatus,
+        creditReceivedAmount: dn.totalAmount,
+        settlementDate: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+      }));
+    } else {
+      dispatch(updateSupplierDebitNoteStatus({ id, status: newStatus }));
+    }
+  };
+
   return (
     <div className="flex-1 overflow-y-auto bg-slate-100 p-4 space-y-4 font-sans select-none">
 
@@ -294,6 +445,16 @@ export const ExpiryManagementPage: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-2">
+          {/* Clinic Priority Circular Trigger (Task #42) */}
+          <button
+            onClick={() => setIsCircularModalOpen(true)}
+            className="flex items-center space-x-1.5 bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-xs transition-all cursor-pointer"
+            title="Generate & Print Partner Clinic Prescription Priority Circular"
+          >
+            <Stethoscope className="w-4 h-4 text-indigo-200" />
+            <span>Clinic Circular 📋</span>
+          </button>
+
           {/* Shelf Robo Trigger */}
           <button
             onClick={() => dispatch(setRackRoboModalOpen({ isOpen: true }))}
@@ -380,6 +541,43 @@ export const ExpiryManagementPage: React.FC = () => {
             </div>
           </div>
 
+          {/* ── 60–90 DAY PRE-EXPIRY DISTRIBUTOR RETURN-TO-VENDOR (RTV) BANNER ── */}
+          <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 rounded-2xl p-4 text-white shadow-md flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-start space-x-3 max-w-2xl">
+              <div className="p-2.5 bg-white/20 rounded-xl backdrop-blur-xs shrink-0 mt-0.5">
+                <Truck className="w-6 h-6 text-white" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs font-black uppercase tracking-wider bg-white/25 px-2 py-0.5 rounded-md">
+                    Return-to-Vendor (RTV) Pre-Expiry Policy
+                  </span>
+                  <span className="text-[11px] font-bold text-amber-100">
+                    60–90 Day Statutory Window
+                  </span>
+                </div>
+                <h3 className="text-sm font-extrabold text-white leading-tight">
+                  {rtvEligibleBatches.length} batch(es) nearing manufacturer return deadline · ₹{totalRtvPotentialValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })} recoverable credit
+                </h3>
+                <p className="text-[11px] text-amber-100 font-medium leading-relaxed">
+                  Wholesale distributors accept near-expiry returns with 100% credit adjustment if debited 60–90 days prior to expiry. Avoid total inventory write-off by issuing batch debit notes today.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={handleAutomateAllRTVDebitNotes}
+                disabled={rtvEligibleBatches.length === 0}
+                className="px-4 py-2.5 bg-white hover:bg-amber-50 text-amber-900 text-xs font-black rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center space-x-2 active:scale-95"
+              >
+                <Truck className="w-4 h-4 text-amber-700" />
+                <span>Auto-Return All 60–90d Batches</span>
+              </button>
+            </div>
+          </div>
+
           {/* Task #42: Dual Filter Bar (Timeline Tabs + Rx vs OTC Pills) */}
           <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-xs space-y-2.5">
             {/* Row 1: Rx vs. OTC Segmented Filter (Task #42) */}
@@ -391,9 +589,9 @@ export const ExpiryManagementPage: React.FC = () => {
 
               <div className="flex items-center space-x-1.5 text-xs font-bold">
                 {[
-                  { key: 'ALL',      label: '💊 All Medicines' },
-                  { key: 'RX_ONLY',  label: '🩺 Prescription (Rx) Only' },
-                  { key: 'OTC_ONLY', label: '🍬 Over-the-Counter (OTC)' }
+                  { key: 'ALL',      label: `💊 All Medicines (${allBatchRows.length})` },
+                  { key: 'RX_ONLY',  label: `🩺 Prescription (Rx) (${totalRxCount})` },
+                  { key: 'OTC_ONLY', label: `🍬 Over-the-Counter (${totalOtcCount})` }
                 ].map(pill => (
                   <button
                     key={pill.key}
@@ -532,6 +730,9 @@ export const ExpiryManagementPage: React.FC = () => {
                     displayedRows.map((row, idx) => {
                       const lossVal = row.batch.stockQuantity * row.product.sellingPrice;
                       const isRx = isRxCategory(row.product);
+                      const intimation = doctorIntimations.find(
+                        d => d.productId === row.product._id && d.batchNumber === row.batch.batchNumber
+                      );
 
                       return (
                         <tr key={idx} className="hover:bg-slate-50 transition-colors">
@@ -549,6 +750,12 @@ export const ExpiryManagementPage: React.FC = () => {
                               )}
                             </div>
                             <div className="text-[10px] text-slate-500">{row.product.saltComposition}</div>
+                            {intimation && (
+                              <div className="mt-1 inline-flex items-center space-x-1 text-[9px] bg-indigo-50 border border-indigo-200 text-indigo-900 px-1.5 py-0.5 rounded-md font-bold">
+                                <Stethoscope className="w-2.5 h-2.5 text-indigo-600 shrink-0" />
+                                <span>Intimated to {intimation.doctorName} ({intimation.intimatedAt})</span>
+                              </div>
+                            )}
                           </td>
 
                           <td className="px-3 py-3 text-center font-mono font-bold text-slate-800">
@@ -610,11 +817,15 @@ export const ExpiryManagementPage: React.FC = () => {
                               {!row.isExpired && isRx && (
                                 <button
                                   onClick={() => handleOpenAskDoctor(row)}
-                                  className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-[10.5px] font-bold rounded-lg shadow-2xs transition-all cursor-pointer inline-flex items-center space-x-1 active:scale-95"
-                                  title="Intimate partner clinic doctors to prioritize dispensing this batch"
+                                  className={`px-2.5 py-1 text-[10.5px] font-bold rounded-lg shadow-2xs transition-all cursor-pointer inline-flex items-center space-x-1 active:scale-95 ${
+                                    intimation
+                                      ? 'bg-indigo-100 hover:bg-indigo-200 text-indigo-800 border border-indigo-300'
+                                      : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                                  }`}
+                                  title={intimation ? `Already intimated to ${intimation.doctorName}. Click to re-notify or send update` : "Intimate partner clinic doctors to prioritize dispensing this batch"}
                                 >
                                   <Stethoscope className="w-3 h-3" />
-                                  <span>Ask Doctor</span>
+                                  <span>{intimation ? 'Re-Ask Doctor' : 'Ask Doctor'}</span>
                                 </button>
                               )}
 
@@ -715,19 +926,20 @@ export const ExpiryManagementPage: React.FC = () => {
               <table className="w-full text-left border-collapse text-xs" style={{ minWidth: '800px' }}>
                 <thead>
                   <tr className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
-                    <th className="px-4 py-2.5">Debit Note No</th>
+                    <th className="px-4 py-2.5">Debit Note &amp; Slip No</th>
                     <th className="px-3 py-2.5">Wholesale Distributor</th>
                     <th className="px-3 py-2.5 text-center">Dispatch Date</th>
                     <th className="px-3 py-2.5">Batches Returned</th>
                     <th className="px-3 py-2.5 text-center">Cutoff Rule</th>
-                    <th className="px-3 py-2.5 text-center">Status</th>
+                    <th className="px-3 py-2.5 text-center">Settlement Status</th>
                     <th className="px-4 py-2.5 text-right">Debit Credit Value</th>
+                    <th className="px-4 py-2.5 text-center">Actions &amp; Slip</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {supplierDebitNotes.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-slate-400">
+                      <td colSpan={8} className="py-12 text-center text-slate-400">
                         No supplier debit notes recorded yet.
                       </td>
                     </tr>
@@ -735,16 +947,25 @@ export const ExpiryManagementPage: React.FC = () => {
                     supplierDebitNotes.map(dn => (
                       <tr key={dn.id} className="hover:bg-slate-50 transition-colors">
                         <td className="px-4 py-3 font-mono font-bold text-indigo-900">
-                          {dn.debitNoteNumber}
+                          <div>{dn.debitNoteNumber}</div>
+                          <div className="text-[10px] text-slate-400 font-normal">
+                            {dn.dispatchSlipNumber || 'SLIP-RTV-PENDING'}
+                          </div>
                         </td>
                         <td className="px-3 py-3">
                           <div className="font-bold text-slate-900">{dn.supplierName}</div>
+                          {dn.gstin && (
+                            <div className="text-[10px] text-slate-500 font-mono">GSTIN: {dn.gstin}</div>
+                          )}
                           {dn.supplierContact && (
                             <div className="text-[10px] text-slate-400">{dn.supplierContact}</div>
                           )}
                         </td>
                         <td className="px-3 py-3 text-center text-slate-600 font-medium">
-                          {dn.createdDate}
+                          <div>{dn.createdDate}</div>
+                          {dn.settlementDate && (
+                            <div className="text-[9px] text-emerald-700 font-bold">Settled: {dn.settlementDate}</div>
+                          )}
                         </td>
                         <td className="px-3 py-3">
                           <div className="space-y-1">
@@ -762,18 +983,43 @@ export const ExpiryManagementPage: React.FC = () => {
                           </span>
                         </td>
                         <td className="px-3 py-3 text-center">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            dn.status === 'CREDIT_RECEIVED'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : dn.status === 'ACKNOWLEDGED'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-amber-100 text-amber-800'
-                          }`}>
-                            {dn.status.replace(/_/g, ' ')}
-                          </span>
+                          <div className="flex flex-col items-center space-y-1">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              dn.status === 'CREDIT_RECEIVED'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : dn.status === 'ACKNOWLEDGED'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-amber-100 text-amber-800'
+                            }`}>
+                              {dn.status.replace(/_/g, ' ')}
+                            </span>
+
+                            {/* Status Quick Cycle Selector */}
+                            <select
+                              value={dn.status}
+                              onChange={e => handleUpdateDNStatus(dn.id, e.target.value as any)}
+                              className="text-[9.5px] p-0.5 border border-slate-200 rounded-md bg-white font-semibold text-slate-700 cursor-pointer"
+                              title="Update distributor debit settlement lifecycle"
+                            >
+                              <option value="DISPATCHED">Dispatched</option>
+                              <option value="ACKNOWLEDGED">Acknowledged</option>
+                              <option value="CREDIT_RECEIVED">Credit Received</option>
+                            </select>
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-right font-black text-indigo-900 text-sm">
                           ₹{dn.totalAmount.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedDebitNoteForSlip(dn)}
+                            className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold rounded-lg shadow-2xs transition-all cursor-pointer inline-flex items-center space-x-1 active:scale-95"
+                            title="View and print official commercial debit note slip"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            <span>Print Slip</span>
+                          </button>
                         </td>
                       </tr>
                     ))
@@ -858,10 +1104,24 @@ export const ExpiryManagementPage: React.FC = () => {
               </select>
             </div>
 
+            {/* Custom Doctor Instruction Note */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">
+                Custom Instruction / Prescribing Request:
+              </label>
+              <textarea
+                value={customDoctorNote}
+                onChange={e => setCustomDoctorNote(e.target.value)}
+                rows={2}
+                className="w-full p-2.5 border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-hidden focus:border-indigo-500"
+                placeholder="e.g. Kindly consider for routine review patients this week..."
+              />
+            </div>
+
             {/* Clinical Memo Message Preview */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
-                <label className="font-bold text-slate-700">Pre-Composed Clinical Memo:</label>
+                <label className="font-bold text-slate-700">Pre-Composed Clinical Memo Preview:</label>
                 {memoCopied && (
                   <span className="text-[10px] font-bold text-emerald-700 flex items-center space-x-1">
                     <Check className="w-3 h-3" />
@@ -869,26 +1129,45 @@ export const ExpiryManagementPage: React.FC = () => {
                   </span>
                 )}
               </div>
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-mono text-slate-800 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-mono text-slate-800 whitespace-pre-wrap leading-relaxed max-h-36 overflow-y-auto">
                 {getClinicalMemoText()}
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="pt-2 flex items-center justify-between gap-2">
+            <div className="pt-2 flex items-center justify-between gap-2 flex-wrap">
               <button
                 type="button"
                 onClick={handleCopyMemo}
-                className="flex-1 py-2 px-3 border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl flex items-center justify-center space-x-1.5 cursor-pointer transition-all"
+                className="py-2 px-3 border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl flex items-center justify-center space-x-1.5 cursor-pointer transition-all"
               >
                 <Copy className="w-3.5 h-3.5" />
-                <span>{memoCopied ? 'Copied!' : 'Copy Memo'}</span>
+                <span>{memoCopied ? 'Copied!' : 'Copy'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleRecordIntimationOnly}
+                className="py-2 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 font-bold text-xs rounded-xl flex items-center justify-center space-x-1.5 cursor-pointer transition-all"
+                title="Mark batch as intimated without opening messaging apps"
+              >
+                <Check className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Mark Intimated</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSendSMS}
+                className="py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center justify-center space-x-1.5 shadow-md cursor-pointer transition-all active:scale-95"
+              >
+                <Smartphone className="w-3.5 h-3.5" />
+                <span>Send SMS</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleSendWhatsApp}
-                className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center justify-center space-x-1.5 shadow-md cursor-pointer transition-all active:scale-95"
+                className="py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center justify-center space-x-1.5 shadow-md cursor-pointer transition-all active:scale-95"
               >
                 <MessageSquare className="w-3.5 h-3.5" />
                 <span>Send WhatsApp</span>
@@ -1118,6 +1397,337 @@ export const ExpiryManagementPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {/* MODAL 4: PARTNER CLINIC NEAR-EXPIRY RX CIRCULAR (Task #42)        */}
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {isCircularModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] flex flex-col">
+            <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center space-x-3">
+                <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-700">
+                  <Stethoscope className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 font-heading">
+                    Partner Clinics — Near-Expiry Prescription Priority Circular
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Official clinical intimation circular for affiliated doctors to prioritize early medication rotation
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsCircularModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-700 space-y-1">
+                <div className="font-bold text-slate-900 flex justify-between">
+                  <span>Issued By: {storeSettings.storeName || 'GENQUANTAA Pharmacy'}</span>
+                  <span>Date: {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Target Clinics: Apollo Health Clinic, Care Family Clinic, Diabetes Care Center, Chest &amp; Allergy Care
+                </p>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">
+                  Prescription (Rx) Batches Requiring Priority Dispensing ({allBatchRows.filter(r => !r.isExpired && r.daysLeft <= 60 && isRxCategory(r.product)).length} Batches)
+                </h4>
+
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-100 text-[10px] font-bold text-slate-600 uppercase border-b border-slate-200">
+                      <tr>
+                        <th className="px-3 py-2">Medicine &amp; Salt</th>
+                        <th className="px-2 py-2 text-center">Batch</th>
+                        <th className="px-2 py-2 text-center">Expiry</th>
+                        <th className="px-2 py-2 text-center">Days Left</th>
+                        <th className="px-2 py-2 text-center">In-Stock</th>
+                        <th className="px-3 py-2 text-right">Price</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-800">
+                      {allBatchRows
+                        .filter(r => !r.isExpired && r.daysLeft <= 60 && isRxCategory(r.product))
+                        .map((r, i) => (
+                          <tr key={i} className="hover:bg-slate-50">
+                            <td className="px-3 py-2">
+                              <span className="font-bold text-slate-900">{r.product.name}</span>
+                              <div className="text-[10px] text-slate-500">{r.product.saltComposition}</div>
+                            </td>
+                            <td className="px-2 py-2 text-center font-mono text-[11px]">{r.batch.batchNumber}</td>
+                            <td className="px-2 py-2 text-center font-semibold text-[11px]">{r.batch.expiryDate}</td>
+                            <td className="px-2 py-2 text-center">
+                              <span className="text-[10px] font-bold bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded">
+                                {r.daysLeft}d
+                              </span>
+                            </td>
+                            <td className="px-2 py-2 text-center font-bold">{r.batch.stockQuantity}</td>
+                            <td className="px-3 py-2 text-right font-semibold">₹{r.product.sellingPrice.toFixed(2)}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-100 pt-3 flex items-center justify-between">
+              <button
+                onClick={() => {
+                  const circularText = allBatchRows
+                    .filter(r => !r.isExpired && r.daysLeft <= 60 && isRxCategory(r.product))
+                    .map(r => `• ${r.product.name} (${r.batch.batchNumber}) - Exp: ${r.batch.expiryDate} (${r.daysLeft}d) - Qty: ${r.batch.stockQuantity}`)
+                    .join('\n');
+                  navigator.clipboard.writeText(`CLINICAL CIRCULAR: PRIORITY PRESCRIPTION ROTATION\nFrom: ${storeSettings.storeName}\n\n${circularText}`);
+                  alert('Clinical Circular text copied to clipboard!');
+                }}
+                className="px-4 py-2 border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl flex items-center space-x-1.5 cursor-pointer"
+              >
+                <Copy className="w-4 h-4" />
+                <span>Copy Text Summary</span>
+              </button>
+
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setIsCircularModalOpen(false)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-2 bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-bold rounded-xl shadow-md flex items-center space-x-1.5 cursor-pointer active:scale-95"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Print Circular</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {/* MODAL 5: PRINTABLE SUPPLIER DEBIT NOTE & DISPATCH SLIP (Task #43)  */}
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {selectedDebitNoteForSlip && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[92vh] flex flex-col">
+            <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center space-x-3">
+                <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-700">
+                  <FileCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 font-heading">
+                    Distributor Debit Note &amp; RTV Dispatch Slip
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Official return-to-vendor credit claim under wholesale pharmaceutical distribution guidelines
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedDebitNoteForSlip(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Printable Memo Container */}
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1 border border-slate-200 rounded-xl p-5 bg-slate-50/50 text-xs">
+              
+              {/* Pharmacy Letterhead */}
+              <div className="flex justify-between items-start border-b border-slate-200 pb-3">
+                <div>
+                  <h2 className="text-base font-black text-slate-900 font-heading">
+                    {storeSettings.storeName || 'GENQUANTAA PHARMACY & HEALTHCARE'}
+                  </h2>
+                  <p className="text-[11px] text-slate-600">{storeSettings.address || 'Door No: 12-4-88, Medical Center Road, Jubilee Hills, Hyderabad - 500033'}</p>
+                  <p className="text-[11px] text-slate-500">DL: {storeSettings.dlNumber || 'DL-20B/TG/10492, DL-21B/TG/10493'} · Phone: {storeSettings.phone || '+91 98765 43210'}</p>
+                  <p className="text-[11px] text-slate-500 font-mono font-bold">GSTIN: {storeSettings.gstin || '36AABCG9102K1ZT'}</p>
+                </div>
+                <div className="text-right">
+                  <span className="px-2.5 py-1 bg-indigo-700 text-white font-black text-[11px] rounded-lg tracking-wider uppercase block mb-1">
+                    COMMERCIAL DEBIT NOTE
+                  </span>
+                  <div className="font-mono font-extrabold text-indigo-950 text-sm">{selectedDebitNoteForSlip.debitNoteNumber}</div>
+                  <div className="text-[10px] text-slate-500 font-mono">Slip: {selectedDebitNoteForSlip.dispatchSlipNumber || 'SLIP-RTV-2026-01'}</div>
+                  <div className="text-[11px] text-slate-600 font-bold mt-0.5">Date: {selectedDebitNoteForSlip.createdDate}</div>
+                </div>
+              </div>
+
+              {/* Distributor & Return Info Box */}
+              <div className="grid grid-cols-2 gap-4 bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs">
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1">
+                    ISSUED TO DISTRIBUTOR / WHOLESALE DEPOT:
+                  </span>
+                  <div className="font-bold text-slate-900 text-sm">{selectedDebitNoteForSlip.supplierName}</div>
+                  {selectedDebitNoteForSlip.gstin && (
+                    <div className="text-[11px] text-slate-600 font-mono">GSTIN: <strong>{selectedDebitNoteForSlip.gstin}</strong></div>
+                  )}
+                  {selectedDebitNoteForSlip.supplierContact && (
+                    <div className="text-[11px] text-slate-600">Contact: {selectedDebitNoteForSlip.supplierContact}</div>
+                  )}
+                  <div className="text-[11px] text-slate-500">Return Policy Category: <strong>60–90 Days Pre-Expiry Window</strong></div>
+                </div>
+
+                <div className="text-right flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1">
+                      SETTLEMENT STATUS:
+                    </span>
+                    <span className={`inline-block text-[11px] font-black px-2.5 py-1 rounded-full ${
+                      selectedDebitNoteForSlip.status === 'CREDIT_RECEIVED'
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : selectedDebitNoteForSlip.status === 'ACKNOWLEDGED'
+                        ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                        : 'bg-amber-100 text-amber-900 border border-amber-300'
+                    }`}>
+                      {selectedDebitNoteForSlip.status.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                  {selectedDebitNoteForSlip.settlementDate && (
+                    <div className="text-[11px] text-emerald-800 font-bold">
+                      Settled on: {selectedDebitNoteForSlip.settlementDate}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Items Breakdown Table */}
+              <div>
+                <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1.5">
+                  RETURNED PHARMACEUTICAL BATCH DETAILS:
+                </h4>
+                <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-100 text-[10px] font-bold text-slate-600 uppercase border-b border-slate-200">
+                      <tr>
+                        <th className="px-3 py-2">Item Description</th>
+                        <th className="px-2 py-2 text-center">Batch No</th>
+                        <th className="px-2 py-2 text-center">Expiry</th>
+                        <th className="px-2 py-2 text-center">Qty Returned</th>
+                        <th className="px-3 py-2 text-right">Purchase Rate</th>
+                        <th className="px-3 py-2 text-right">Debit Credit Value</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {selectedDebitNoteForSlip.items.map((item, idx) => (
+                        <tr key={idx}>
+                          <td className="px-3 py-2.5 font-bold text-slate-900">
+                            {item.productName}
+                          </td>
+                          <td className="px-2 py-2.5 text-center font-mono text-[11px] font-bold text-slate-700">
+                            {item.batchNumber}
+                          </td>
+                          <td className="px-2 py-2.5 text-center font-semibold text-[11px] text-slate-700">
+                            {item.expiryDate}
+                          </td>
+                          <td className="px-2 py-2.5 text-center font-black text-slate-900">
+                            {item.quantity}
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-medium">
+                            ₹{item.purchaseRate.toFixed(2)}
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-black text-indigo-900">
+                            ₹{item.totalAmount.toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-slate-50 border-t border-slate-200 font-bold">
+                      <tr>
+                        <td colSpan={5} className="px-3 py-2.5 text-right text-slate-700 uppercase tracking-wider text-[11px]">
+                          Total Recoverable Distributor Credit:
+                        </td>
+                        <td className="px-3 py-2.5 text-right text-base font-black text-indigo-900">
+                          ₹{selectedDebitNoteForSlip.totalAmount.toFixed(2)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+
+              {/* Remarks / Memo */}
+              {selectedDebitNoteForSlip.remarks && (
+                <div className="bg-white p-3 rounded-xl border border-slate-200">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Return Memo:</span>
+                  <p className="text-[11px] text-slate-700 italic">{selectedDebitNoteForSlip.remarks}</p>
+                </div>
+              )}
+
+              {/* Statutory Certification & Signatures */}
+              <div className="border-t border-slate-200 pt-3 space-y-3">
+                <p className="text-[10px] text-slate-500 leading-relaxed">
+                  <strong>Declaration:</strong> Certified that the pharmaceutical stock specified above is returned in original, untampered condition within the agreed 60–90 days pre-expiry distributor return window. Please adjust this debit note amount against our upcoming wholesale account purchases.
+                </p>
+
+                <div className="grid grid-cols-2 gap-8 pt-4">
+                  <div className="text-center border-t border-slate-300 pt-2">
+                    <span className="text-[11px] font-bold text-slate-800 block">Authorized Chief Pharmacist</span>
+                    <span className="text-[10px] text-slate-500 font-mono">Reg. No: PH-2024-91823 · Seal &amp; Sign</span>
+                  </div>
+                  <div className="text-center border-t border-slate-300 pt-2">
+                    <span className="text-[11px] font-bold text-slate-800 block">Wholesale Depot Receiving Agent</span>
+                    <span className="text-[10px] text-slate-500">Goods Inward &amp; Acknowledgment Stamp</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Modal Actions */}
+            <div className="border-t border-slate-100 pt-3 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  const slipSummary = `COMMERCIAL DEBIT NOTE: ${selectedDebitNoteForSlip.debitNoteNumber}\nWholesale Supplier: ${selectedDebitNoteForSlip.supplierName}\nDispatch Date: ${selectedDebitNoteForSlip.createdDate}\nTotal Credit: ₹${selectedDebitNoteForSlip.totalAmount.toFixed(2)}\nItems:\n` +
+                    selectedDebitNoteForSlip.items.map(it => `• ${it.quantity}x ${it.productName} (Batch: ${it.batchNumber}, Exp: ${it.expiryDate}) - ₹${it.totalAmount.toFixed(2)}`).join('\n');
+                  navigator.clipboard.writeText(slipSummary);
+                  setSlipCopied(true);
+                  setTimeout(() => setSlipCopied(false), 2500);
+                }}
+                className="px-4 py-2 border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl flex items-center space-x-1.5 cursor-pointer"
+              >
+                {slipCopied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                <span>{slipCopied ? 'Slip Copied!' : 'Copy Summary'}</span>
+              </button>
+
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedDebitNoteForSlip(null)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-4 py-2 bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-bold rounded-xl shadow-md flex items-center space-x-1.5 cursor-pointer active:scale-95"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Print Official Dispatch Slip</span>
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
       )}

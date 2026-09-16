@@ -17,7 +17,11 @@ import {
   addClearanceGiftToCart,
   applySentimentDiscount,
   setRackRoboModalOpen,
-  addItemToCart
+  addItemToCart,
+  addReorderPushAlert,
+  convertReorderAlertToPO,
+  triggerLowStockIntimation,
+  dismissReorderToast
 } from '../store/posSlice';
 import { analyzeDrugInteractions } from '../utils/drugInteractionEngine';
 import { getMedicineDetails } from '../utils/medicineDetails';
@@ -33,7 +37,7 @@ import type { Product } from '../types/pos';
 import {
   Trash2, Plus, Minus, AlertTriangle, AlertOctagon, UserCheck,
   Stethoscope, Edit2, Percent, FileText, RefreshCcw, Pill, Mic, Volume2, Zap,
-  PackageOpen, BadgeAlert, Tag, Gift, Sparkles, CheckCircle2, X,
+  PackageOpen, BadgeAlert, Tag, Gift, Sparkles, CheckCircle2, X, Check,
   Star, ArrowRightLeft, BellRing, MapPin, TrendingUp, ChevronDown, ChevronUp,
   Lightbulb, Flame, Coins, ShieldCheck
 } from 'lucide-react';
@@ -49,6 +53,8 @@ export const CartTable: React.FC = () => {
   const patientDetails = currentSession?.patientDetails;
   const appliedSentimentDiscount = currentSession?.appliedSentimentDiscount || 0;
   const detectedSentiment = currentSession?.detectedSentiment;
+  const reorderPushAlerts = useSelector((state: RootState) => state.pos.reorderPushAlerts || []);
+  const activeReorderToast = useSelector((state: RootState) => state.pos.activeReorderToast);
 
   const [showBulkDiscount, setShowBulkDiscount] = useState<boolean>(false);
   const [customBulkDiscount, setCustomBulkDiscount] = useState<string>('');
@@ -716,15 +722,65 @@ export const CartTable: React.FC = () => {
                           </div>
                         </div>
                       )}
-                      {/* Safety threshold low-stock warning */}
-                      {item.selectedBatch.stockQuantity - item.quantity <= 10 && (
-                        <div className="mt-1 p-1 bg-amber-50 border border-amber-300 rounded text-[9px] text-amber-900 flex items-center justify-between shadow-2xs">
-                          <span className="flex items-center space-x-1 font-bold">
-                            <BellRing className="w-2.5 h-2.5 text-amber-600 animate-bounce shrink-0" />
-                            <span>Safety Reorder Alert: Only {Math.max(0, item.selectedBatch.stockQuantity - item.quantity)} units remaining in shelf</span>
-                          </span>
-                        </div>
-                      )}
+                      {/* Pharmacist Safety Reorder Intimation Chip (Task #41) */}
+                      {item.selectedBatch.stockQuantity - item.quantity <= 10 && (() => {
+                        const remaining = Math.max(0, item.selectedBatch.stockQuantity - item.quantity);
+                        const matchedAlert = reorderPushAlerts.find(
+                          a => a.productId === item.productId && a.batchNumber === item.selectedBatch.batchNumber
+                        );
+                        const isQueued = matchedAlert?.status === 'ADDED_TO_PO';
+
+                        return (
+                          <div className={`mt-1.5 p-1.5 rounded-lg text-[9.5px] border flex items-center justify-between gap-2 shadow-2xs transition-all ${
+                            isQueued 
+                              ? 'bg-emerald-50/80 border-emerald-300 text-emerald-900' 
+                              : 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-300 text-amber-950'
+                          }`}>
+                            <div className="flex items-center space-x-1.5 min-w-0">
+                              <BellRing className={`w-3 h-3 shrink-0 ${isQueued ? 'text-emerald-600' : 'text-amber-600 animate-bounce'}`} />
+                              <div className="truncate">
+                                <span className="font-extrabold">Safety Reorder Intimation:</span>{' '}
+                                <span className="font-semibold text-rose-700">Only {remaining} {remaining === 1 ? 'unit' : 'units'} left</span>{' '}
+                                <span className="text-slate-500">(Min: 10)</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center space-x-1 shrink-0">
+                              {isQueued ? (
+                                <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-black text-[9px] border border-emerald-300">
+                                  <Check className="w-2.5 h-2.5 text-emerald-700" />
+                                  <span>Queued in Draft PO</span>
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const alertId = matchedAlert?.id || `alert-${Date.now()}`;
+                                    if (!matchedAlert) {
+                                      dispatch(addReorderPushAlert({
+                                        id: alertId,
+                                        productId: item.productId,
+                                        productName: item.product.name,
+                                        batchNumber: item.selectedBatch.batchNumber,
+                                        currentStock: remaining,
+                                        minThreshold: 10,
+                                        saltComposition: item.product.saltComposition,
+                                        suggestedReorderQty: 50
+                                      }));
+                                    }
+                                    dispatch(convertReorderAlertToPO({ alertId, reorderQty: 50 }));
+                                  }}
+                                  className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-extrabold text-[9px] shadow-2xs cursor-pointer transition-all"
+                                  title="Add 50 units of this medicine to procurement draft Purchase Order"
+                                >
+                                  <Zap className="w-2.5 h-2.5 text-amber-200" />
+                                  <span>+ Add to Reorder PO</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
                       {item.sentimentDiscountApplied && (
                         <div className="mt-1 bg-purple-50 border border-purple-200 rounded p-1 text-[9.5px]">
                           <span className="text-purple-900 font-bold flex items-center space-x-1">
@@ -821,9 +877,10 @@ export const CartTable: React.FC = () => {
                         stockExceeded ? 'border-rose-400 bg-rose-50' : 'border-slate-300'
                       }`}>
                         <button
-                          onClick={() =>
-                            dispatch(updateCartItemQuantity({ cartItemId: item.cartItemId, quantity: item.quantity - 1 }))
-                          }
+                          onClick={() => {
+                            const nextQty = item.quantity - 1;
+                            dispatch(updateCartItemQuantity({ cartItemId: item.cartItemId, quantity: nextQty }));
+                          }}
                           className="px-1.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-slate-900 rounded-l cursor-pointer"
                         >
                           <Minus className="w-3 h-3" />
@@ -831,21 +888,40 @@ export const CartTable: React.FC = () => {
                         <input
                           type="number"
                           value={item.quantity}
-                          onChange={(e) =>
-                            dispatch(
-                              updateCartItemQuantity({
-                                cartItemId: item.cartItemId,
-                                quantity: Math.max(0, parseInt(e.target.value) || 0),
-                              })
-                            )
-                          }
+                          onChange={(e) => {
+                            const newQty = Math.max(0, parseInt(e.target.value) || 0);
+                            dispatch(updateCartItemQuantity({ cartItemId: item.cartItemId, quantity: newQty }));
+                            const remaining = item.selectedBatch.stockQuantity - newQty;
+                            if (remaining <= 10 && remaining >= 0) {
+                              dispatch(triggerLowStockIntimation({
+                                productId: item.productId,
+                                productName: item.product.name,
+                                batchNumber: item.selectedBatch.batchNumber,
+                                remainingStock: remaining,
+                                minThreshold: 10,
+                                saltComposition: item.product.saltComposition
+                              }));
+                            }
+                          }}
                           className="w-8 text-center text-xs font-bold text-slate-900 focus:outline-hidden"
                           min="1"
                         />
                         <button
-                          onClick={() =>
-                            dispatch(updateCartItemQuantity({ cartItemId: item.cartItemId, quantity: item.quantity + 1 }))
-                          }
+                          onClick={() => {
+                            const nextQty = item.quantity + 1;
+                            dispatch(updateCartItemQuantity({ cartItemId: item.cartItemId, quantity: nextQty }));
+                            const remaining = item.selectedBatch.stockQuantity - nextQty;
+                            if (remaining <= 10 && remaining >= 0) {
+                              dispatch(triggerLowStockIntimation({
+                                productId: item.productId,
+                                productName: item.product.name,
+                                batchNumber: item.selectedBatch.batchNumber,
+                                remainingStock: remaining,
+                                minThreshold: 10,
+                                saltComposition: item.product.saltComposition
+                              }));
+                            }
+                          }}
                           className="px-1.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-slate-900 rounded-r cursor-pointer"
                         >
                           <Plus className="w-3 h-3" />
@@ -1159,6 +1235,62 @@ export const CartTable: React.FC = () => {
         onClose={() => setIsBundleModalOpen(false)}
         highlightBundleId={selectedBundleId}
       />
+
+      {/* ── 🔔 REAL-TIME FLOATING REORDER INTIMATION TOAST (Task #41) ── */}
+      {activeReorderToast && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm w-full bg-slate-900 text-white rounded-2xl shadow-2xl border border-amber-500/50 p-3.5 animate-slideUp font-sans">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center shrink-0">
+                <BellRing className="w-4 h-4 text-amber-400 animate-bounce" />
+              </div>
+              <div>
+                <p className="text-xs font-black text-white tracking-tight">
+                  Safety Reorder Intimation
+                </p>
+                <p className="text-[10px] text-slate-300">
+                  Stock breached safety threshold during billing
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => dispatch(dismissReorderToast())}
+              className="text-slate-400 hover:text-white p-1 cursor-pointer transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="mt-2.5 p-2 bg-slate-800/80 rounded-xl border border-slate-700 text-xs space-y-1">
+            <p className="font-bold text-amber-300 truncate">
+              {activeReorderToast.productName}
+            </p>
+            <div className="flex items-center justify-between text-[11px] text-slate-300">
+              <span>Remaining: <strong className="text-rose-400 font-bold">{activeReorderToast.currentStock} units</strong></span>
+              <span>Threshold: <strong className="text-slate-200 font-semibold">{activeReorderToast.minThreshold || 10} units</strong></span>
+            </div>
+          </div>
+
+          <div className="mt-2.5 flex items-center justify-end space-x-2 pt-1">
+            <button
+              onClick={() => dispatch(dismissReorderToast())}
+              className="px-2.5 py-1 text-[10.5px] font-bold text-slate-400 hover:text-white transition-colors cursor-pointer"
+            >
+              Dismiss
+            </button>
+            <button
+              onClick={() => {
+                dispatch(convertReorderAlertToPO({ alertId: activeReorderToast.id, reorderQty: 50 }));
+                dispatch(dismissReorderToast());
+              }}
+              className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-black text-[11px] rounded-xl shadow-md cursor-pointer transition-all active:scale-95 flex items-center space-x-1"
+            >
+              <Zap className="w-3 h-3 text-slate-950" />
+              <span>1-Click Add to PO</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

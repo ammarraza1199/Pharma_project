@@ -7,9 +7,11 @@ import {
   deleteConsultationRecord,
   applySentimentDiscount,
   setSessionSentiment,
-  setChronicRefillModalOpen
+  setChronicRefillModalOpen,
+  linkValueAddedServiceToSession,
+  unlinkValueAddedServiceFromSession
 } from '../store/posSlice';
-import type { VoiceConsultationRecord, CustomerSentimentResult } from '../types/pos';
+import type { VoiceConsultationRecord, CustomerSentimentResult, ValueAddedServiceLink } from '../types/pos';
 import { analyzeCustomerSentiment } from '../utils/sentimentEngine';
 import {
   Mic,
@@ -37,8 +39,83 @@ import {
   ArrowRight,
   Tag,
   Activity,
-  RefreshCw
+  RefreshCw,
+  Gift,
+  Link2,
+  Check,
+  Languages,
+  Copy
 } from 'lucide-react';
+
+export const SPEECH_LANGUAGES = [
+  { code: 'en-IN', label: 'English (India)', native: 'Indian English', flag: '🇮🇳' },
+  { code: 'hi-IN', label: 'Hindi (हिन्दी)', native: 'हिन्दी', flag: '🇮🇳' },
+  { code: 'te-IN', label: 'Telugu (తెలుగు)', native: 'తెలుగు', flag: '🇮🇳' },
+  { code: 'ta-IN', label: 'Tamil (தமிழ்)', native: 'தமிழ்', flag: '🇮🇳' },
+];
+
+export interface LiveTranscriptEntry {
+  id: string;
+  speaker: 'PATIENT' | 'PHARMACIST';
+  text: string;
+  timestamp: string;
+}
+
+export const AVAILABLE_VALUE_SERVICES: {
+  id: string;
+  name: string;
+  type: 'DIAGNOSTIC_SERVICE' | 'SPECIAL_DISCOUNT' | 'WELLNESS_PLAN';
+  discountPercent: number;
+  discountAmount: number;
+  description: string;
+  badge: string;
+}[] = [
+  {
+    id: 'vas-bp-vitals',
+    name: 'Complimentary BP & Vitals Check',
+    type: 'DIAGNOSTIC_SERVICE',
+    discountPercent: 0,
+    discountAmount: 0,
+    description: 'Free clinical blood pressure, pulse, and oxygen saturation check at counter',
+    badge: 'FREE DIAGNOSTIC'
+  },
+  {
+    id: 'vas-hba1c-token',
+    name: 'Preventive HbA1c Blood Sugar Screening Token',
+    type: 'DIAGNOSTIC_SERVICE',
+    discountPercent: 0,
+    discountAmount: 0,
+    description: 'Complimentary diagnostic voucher for next routine HbA1c test',
+    badge: 'FREE LAB VOUCHER'
+  },
+  {
+    id: 'vas-loyalty-5',
+    name: 'Agreed 5% Loyalty Courtesy Discount',
+    type: 'SPECIAL_DISCOUNT',
+    discountPercent: 5,
+    discountAmount: 0,
+    description: 'Direct 5% counter courtesy discount agreed during pharmacist consultation',
+    badge: '5% CART DISCOUNT'
+  },
+  {
+    id: 'vas-chronic-10',
+    name: 'Agreed 10% Chronic Care Adherence Discount',
+    type: 'SPECIAL_DISCOUNT',
+    discountPercent: 10,
+    discountAmount: 0,
+    description: 'Special 10% adherence discount on prescription chronic medications',
+    badge: '10% ADHERENCE DISCOUNT'
+  },
+  {
+    id: 'vas-diet-guide',
+    name: 'Personalized Diabetic Diet & Nutrition Guide',
+    type: 'WELLNESS_PLAN',
+    discountPercent: 0,
+    discountAmount: 0,
+    description: 'Free comprehensive nutritional counseling guide and lifestyle checklist',
+    badge: 'FREE WELLNESS GUIDE'
+  }
+];
 
 const CATEGORY_OPTIONS: { id: VoiceConsultationRecord['category']; label: string; color: string }[] = [
   { id: 'CHRONIC_CARE', label: 'Chronic Care & Refill', color: 'bg-indigo-500/10 text-indigo-700 border-indigo-200' },
@@ -102,6 +179,237 @@ export const VoiceConsultationModal: React.FC = () => {
   const timerIntervalRef = useRef<any>(null);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const speechRecognitionRef = useRef<any>(null);
+
+  // Task #48: Value-Added Services & Cart Linking State
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>(['vas-bp-vitals']);
+  const [autoApplyToCart, setAutoApplyToCart] = useState<boolean>(true);
+  const [historyLinkedNotice, setHistoryLinkedNotice] = useState<string | null>(null);
+
+  // Task #49: Multi-Dialect Speech-to-Text & Live Transcription State
+  const [speechLanguage, setSpeechLanguage] = useState<string>('en-IN');
+  const [activeSpeakerChannel, setActiveSpeakerChannel] = useState<'PATIENT' | 'PHARMACIST'>('PATIENT');
+  const [interimTranscript, setInterimTranscript] = useState<string>('');
+  const [liveTranscriptLog, setLiveTranscriptLog] = useState<LiveTranscriptEntry[]>([]);
+  const [isSpeechRecognitionActive, setIsSpeechRecognitionActive] = useState<boolean>(false);
+  const [speechConfidence, setSpeechConfidence] = useState<number | null>(null);
+  const [activeFieldDictation, setActiveFieldDictation] = useState<'CHIEF_DISCUSSION' | 'PHARMACIST_ADVICE' | null>(null);
+  const [isSimulatingSpeech, setIsSimulatingSpeech] = useState<boolean>(false);
+  const [transcriptCopied, setTranscriptCopied] = useState<boolean>(false);
+  const simTimerRef = useRef<any>(null);
+
+  const totalWordsTranscribed = useMemo(() => {
+    const chiefWords = chiefDiscussion.trim() ? chiefDiscussion.trim().split(/\s+/).length : 0;
+    const adviceWords = pharmacistAdvice.trim() ? pharmacistAdvice.trim().split(/\s+/).length : 0;
+    return chiefWords + adviceWords;
+  }, [chiefDiscussion, pharmacistAdvice]);
+
+  const stopSpeechRecognitionInstance = () => {
+    if (speechRecognitionRef.current) {
+      try {
+        speechRecognitionRef.current.stop();
+      } catch (e) {}
+      speechRecognitionRef.current = null;
+    }
+    setIsSpeechRecognitionActive(false);
+    setActiveFieldDictation(null);
+    setInterimTranscript('');
+  };
+
+  const startSpeechRecognitionInstance = (targetSpeaker?: 'PATIENT' | 'PHARMACIST') => {
+    const speaker = targetSpeaker || activeSpeakerChannel;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      console.warn('SpeechRecognition API is not supported on this browser platform.');
+      return;
+    }
+
+    try {
+      if (speechRecognitionRef.current) {
+        try { speechRecognitionRef.current.stop(); } catch (e) {}
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = speechLanguage;
+
+      recognition.onstart = () => {
+        setIsSpeechRecognitionActive(true);
+      };
+
+      recognition.onresult = (event: any) => {
+        let interim = '';
+        let finalChunk = '';
+        let conf = 0.95;
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const res = event.results[i];
+          if (res.isFinal) {
+            finalChunk += res[0].transcript + ' ';
+            if (res[0].confidence) conf = res[0].confidence;
+          } else {
+            interim += res[0].transcript;
+          }
+        }
+
+        setInterimTranscript(interim);
+        if (conf > 0) setSpeechConfidence(Math.round(conf * 100));
+
+        if (finalChunk.trim()) {
+          const text = finalChunk.trim();
+          const entry: LiveTranscriptEntry = {
+            id: `trans-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+            speaker,
+            text,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+          };
+          setLiveTranscriptLog(prev => [...prev, entry]);
+
+          if (speaker === 'PATIENT') {
+            setChiefDiscussion(prev => prev ? `${prev} ${text}` : text);
+          } else {
+            setPharmacistAdvice(prev => prev ? `${prev} ${text}` : text);
+          }
+          setInterimTranscript('');
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('SpeechRecognition error:', event.error);
+        if (event.error !== 'no-speech') {
+          setIsSpeechRecognitionActive(false);
+          setActiveFieldDictation(null);
+        }
+      };
+
+      recognition.onend = () => {
+        setIsSpeechRecognitionActive(false);
+        setActiveFieldDictation(null);
+      };
+
+      recognition.start();
+      speechRecognitionRef.current = recognition;
+      setIsSpeechRecognitionActive(true);
+    } catch (e) {
+      console.warn('SpeechRecognition start error:', e);
+      setIsSpeechRecognitionActive(false);
+      setActiveFieldDictation(null);
+    }
+  };
+
+  const simulateSpeechStream = (scenario: 'SYMPTOMS' | 'PRICE' | 'CHRONIC') => {
+    if (isSimulatingSpeech) return;
+    if (simTimerRef.current) clearInterval(simTimerRef.current);
+
+    let patientSentence = '';
+    let pharmacistSentence = '';
+
+    if (scenario === 'SYMPTOMS') {
+      patientSentence = 'Doctor, I have had severe sore throat, dry cough, and mild fever since yesterday. Can you advise an effective relief medicine?';
+      pharmacistSentence = 'I recommend warm salt water gargling, Paracetamol 650mg after food, and Cetirizine 10mg at bedtime for cough relief.';
+      setCategory('OTC_GUIDANCE');
+    } else if (scenario === 'PRICE') {
+      patientSentence = 'This doctor-prescribed medicine is too expensive for our family budget. Do you have a cheaper generic alternative with identical salts?';
+      pharmacistSentence = 'Yes, we have an equivalent bio-generic formulation at 45% lower price with full DCGI quality assurance, plus 5% loyalty discount.';
+      setCategory('OTC_GUIDANCE');
+    } else {
+      patientSentence = 'I need to refill my regular monthly diabetes and BP prescription for 30 days. Do you offer an automated reminder delivery program?';
+      pharmacistSentence = 'Certainly! We have enrolled you in our 30-day automatic WhatsApp refill service with complimentary blood pressure check at counter.';
+      setCategory('CHRONIC_CARE');
+    }
+
+    setIsSimulatingSpeech(true);
+    setIsSpeechRecognitionActive(true);
+    setActiveSpeakerChannel('PATIENT');
+    setSpeechConfidence(98);
+
+    const patientWords = patientSentence.split(' ');
+    const pharmacistWords = pharmacistSentence.split(' ');
+
+    let step = 0;
+    let patientAccum = '';
+    let pharmacistAccum = '';
+
+    simTimerRef.current = setInterval(() => {
+      if (step < patientWords.length) {
+        patientAccum += (patientAccum ? ' ' : '') + patientWords[step];
+        setInterimTranscript(patientAccum);
+        step++;
+      } else if (step === patientWords.length) {
+        // Commit patient sentence
+        const entry: LiveTranscriptEntry = {
+          id: `trans-sim-pat-${Date.now()}`,
+          speaker: 'PATIENT',
+          text: patientSentence,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        };
+        setLiveTranscriptLog(prev => [...prev, entry]);
+        setChiefDiscussion(prev => prev ? `${prev} ${patientSentence}` : patientSentence);
+        setInterimTranscript('');
+        setActiveSpeakerChannel('PHARMACIST');
+        step++;
+      } else if (step <= patientWords.length + pharmacistWords.length) {
+        const phIndex = step - (patientWords.length + 1);
+        pharmacistAccum += (pharmacistAccum ? ' ' : '') + pharmacistWords[phIndex];
+        setInterimTranscript(pharmacistAccum);
+        step++;
+      } else {
+        // Commit pharmacist sentence & finish
+        clearInterval(simTimerRef.current);
+        simTimerRef.current = null;
+
+        const entry: LiveTranscriptEntry = {
+          id: `trans-sim-ph-${Date.now()}`,
+          speaker: 'PHARMACIST',
+          text: pharmacistSentence,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        };
+        setLiveTranscriptLog(prev => [...prev, entry]);
+        setPharmacistAdvice(prev => prev ? `${prev} ${pharmacistSentence}` : pharmacistSentence);
+        setInterimTranscript('');
+        setIsSimulatingSpeech(false);
+        setIsSpeechRecognitionActive(false);
+        setActiveSpeakerChannel('PATIENT');
+      }
+    }, 120);
+  };
+
+  const toggleFieldDictation = (field: 'CHIEF_DISCUSSION' | 'PHARMACIST_ADVICE') => {
+    if (activeFieldDictation === field) {
+      stopSpeechRecognitionInstance();
+    } else {
+      const targetSpeaker = field === 'CHIEF_DISCUSSION' ? 'PATIENT' : 'PHARMACIST';
+      setActiveSpeakerChannel(targetSpeaker);
+      setActiveFieldDictation(field);
+      startSpeechRecognitionInstance(targetSpeaker);
+    }
+  };
+
+  const handleCopyTranscript = () => {
+    const fullText = `[PATIENT DISCUSSION]:\n${chiefDiscussion}\n\n[PHARMACIST ADVICE]:\n${pharmacistAdvice}`;
+    navigator.clipboard.writeText(fullText);
+    setTranscriptCopied(true);
+    setTimeout(() => setTranscriptCopied(false), 2000);
+  };
+
+  const handleClearTranscript = () => {
+    if (confirm('Clear transcribed discussion notes and speech logs?')) {
+      setChiefDiscussion('');
+      setPharmacistAdvice('');
+      setLiveTranscriptLog([]);
+      setInterimTranscript('');
+    }
+  };
+
+  const handleLinkServiceToActiveBill = (consultationId: string, service: ValueAddedServiceLink) => {
+    dispatch(linkValueAddedServiceToSession({
+      sessionId: activeSessionId,
+      consultationId,
+      service
+    }));
+    setHistoryLinkedNotice(`Linked "${service.name}" to active bill cart!`);
+    setTimeout(() => setHistoryLinkedNotice(null), 3500);
+  };
 
   // Sentiment Feedback Banner & Live Sentiment Analysis (Task #50)
   const [appliedDiscountNotice, setAppliedDiscountNotice] = useState<string | null>(null);
@@ -168,12 +476,12 @@ export const VoiceConsultationModal: React.FC = () => {
         // ignore
       }
     }
-    if (speechRecognitionRef.current) {
-      try {
-        speechRecognitionRef.current.stop();
-      } catch (e) {}
-      speechRecognitionRef.current = null;
+    if (simTimerRef.current) {
+      clearInterval(simTimerRef.current);
+      simTimerRef.current = null;
     }
+    stopSpeechRecognitionInstance();
+    setIsSimulatingSpeech(false);
   };
 
   // Start Audio Recording
@@ -204,32 +512,8 @@ export const VoiceConsultationModal: React.FC = () => {
         stream.getTracks().forEach(track => track.stop());
       };
 
-      // Real-time speech recognition if supported
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        try {
-          const recognition = new SpeechRecognition();
-          recognition.continuous = true;
-          recognition.interimResults = true;
-          recognition.lang = 'en-IN';
-          recognition.onresult = (event: any) => {
-            let finalTranscript = '';
-            for (let i = 0; i < event.results.length; i++) {
-              finalTranscript += event.results[i][0].transcript + ' ';
-            }
-            if (finalTranscript.trim()) {
-              setChiefDiscussion(prev => {
-                const combined = prev ? `${prev} ${finalTranscript.trim()}` : finalTranscript.trim();
-                return combined;
-              });
-            }
-          };
-          recognition.start();
-          speechRecognitionRef.current = recognition;
-        } catch (e) {
-          console.warn('SpeechRecognition start failed', e);
-        }
-      }
+      // Real-time speech recognition instance
+      startSpeechRecognitionInstance(activeSpeakerChannel);
 
       recorder.start(250); // Slice chunks every 250ms
       setRecordState('RECORDING');
@@ -293,6 +577,7 @@ export const VoiceConsultationModal: React.FC = () => {
       setAudioUrl('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
     }
 
+    stopSpeechRecognitionInstance();
     setRecordState('STOPPED');
   };
 
@@ -302,6 +587,9 @@ export const VoiceConsultationModal: React.FC = () => {
     setRecordDuration(0);
     setAudioUrl(null);
     setIsPlayingAudio(false);
+    setLiveTranscriptLog([]);
+    setInterimTranscript('');
+    setIsSimulatingSpeech(false);
   };
 
   const togglePlayAudio = () => {
@@ -352,6 +640,17 @@ export const VoiceConsultationModal: React.FC = () => {
     }
 
     const now = new Date();
+    const linkedServices: ValueAddedServiceLink[] = AVAILABLE_VALUE_SERVICES
+      .filter(s => selectedServiceIds.includes(s.id))
+      .map(s => ({
+        id: `${s.id}-${Date.now()}`,
+        name: s.name,
+        type: s.type,
+        discountPercent: s.discountPercent,
+        discountAmount: s.discountAmount,
+        linkedAt: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }));
+
     const newRecord: VoiceConsultationRecord = {
       id: `consult-${Date.now()}`,
       patientName: patientName.trim(),
@@ -369,11 +668,22 @@ export const VoiceConsultationModal: React.FC = () => {
       pharmacistName: activePharmacist.name,
       counterNumber: activePharmacist.counterNumber,
       sessionId: activeSessionId,
-      sentimentResult
+      sentimentResult,
+      linkedValueAddedServices: linkedServices
     };
 
     dispatch(saveConsultationRecord(newRecord));
     dispatch(setSessionSentiment(sentimentResult));
+
+    if (autoApplyToCart && linkedServices.length > 0) {
+      const primaryService = linkedServices.find(s => s.discountPercent && s.discountPercent > 0) || linkedServices[0];
+      dispatch(linkValueAddedServiceToSession({
+        sessionId: activeSessionId,
+        consultationId: newRecord.id,
+        service: primaryService
+      }));
+    }
+
     alert('Consultation record & voice note saved successfully!');
 
     // Reset form and switch to history
@@ -657,6 +967,253 @@ export const VoiceConsultationModal: React.FC = () => {
                   )}
                 </div>
 
+                {/* ── TASK #49: LIVE SPEECH-TO-TEXT (STT) STREAM & TRANSCRIPTION DECK ── */}
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3.5 text-left">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 bg-indigo-600 text-white rounded-lg shadow-xs">
+                        <Languages className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                          <span>Live Speech-to-Text (STT) Stream</span>
+                        </h4>
+                        <p className="text-[10px] text-slate-500">
+                          Real-time voice transcription with multi-dialect Indian speech recognition.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Live Status Badge */}
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1.5 ${
+                      isSpeechRecognitionActive || isSimulatingSpeech
+                        ? 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse'
+                        : 'bg-slate-100 text-slate-600 border-slate-200'
+                    }`}>
+                      {(isSpeechRecognitionActive || isSimulatingSpeech) ? (
+                        <>
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+                          <span>● TRANSCRIBING ({speechConfidence || 95}%)</span>
+                        </>
+                      ) : (
+                        <span>STT STANDBY</span>
+                      )}
+                    </span>
+                  </div>
+
+                  {/* Multi-Dialect Indian Language Selector */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1.5">
+                      Transcription Dialect / Language
+                    </label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {SPEECH_LANGUAGES.map(lang => (
+                        <button
+                          key={lang.code}
+                          type="button"
+                          onClick={() => {
+                            setSpeechLanguage(lang.code);
+                            if (isSpeechRecognitionActive) {
+                              stopSpeechRecognitionInstance();
+                              setTimeout(() => startSpeechRecognitionInstance(activeSpeakerChannel), 200);
+                            }
+                          }}
+                          className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-between cursor-pointer ${
+                            speechLanguage === lang.code
+                              ? 'bg-indigo-50 border-indigo-300 text-indigo-900 shadow-2xs'
+                              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <span>{lang.flag}</span>
+                            <span>{lang.native}</span>
+                          </span>
+                          {speechLanguage === lang.code && <Check className="w-3 h-3 text-indigo-600" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Active Speaker Channel Routing */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1.5">
+                      Active Speaker Channel (Auto-Route Transcribed Text)
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveSpeakerChannel('PATIENT');
+                          if (isSpeechRecognitionActive) {
+                            stopSpeechRecognitionInstance();
+                            setTimeout(() => startSpeechRecognitionInstance('PATIENT'), 200);
+                          }
+                        }}
+                        className={`p-2 rounded-xl text-xs font-bold border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                          activeSpeakerChannel === 'PATIENT'
+                            ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <span>🗣️ Patient Inquiring</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveSpeakerChannel('PHARMACIST');
+                          if (isSpeechRecognitionActive) {
+                            stopSpeechRecognitionInstance();
+                            setTimeout(() => startSpeechRecognitionInstance('PHARMACIST'), 200);
+                          }
+                        }}
+                        className={`p-2 rounded-xl text-xs font-bold border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                          activeSpeakerChannel === 'PHARMACIST'
+                            ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <span>🩺 Pharmacist Advising</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Audio Equalizer & Interim Streaming Phrase Preview */}
+                  <div className="p-3 bg-slate-900 rounded-xl text-white space-y-2 border border-slate-800">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-slate-400 flex items-center gap-1 font-mono">
+                        <Activity className="w-3.5 h-3.5 text-emerald-400" />
+                        {activeSpeakerChannel === 'PATIENT' ? 'Patient Channel Active' : 'Pharmacist Channel Active'}
+                      </span>
+                      {/* Mini Equalizer waveform bars */}
+                      <div className="flex items-end gap-0.5 h-3.5">
+                        {[4, 7, 3, 9, 6, 12, 5, 8, 10, 4, 7, 3].map((height, i) => (
+                          <span
+                            key={i}
+                            className={`w-1 rounded-full transition-all duration-150 ${
+                              isSpeechRecognitionActive || isSimulatingSpeech
+                                ? 'bg-emerald-400 animate-pulse'
+                                : 'bg-slate-700'
+                            }`}
+                            style={{
+                              height: isSpeechRecognitionActive || isSimulatingSpeech ? `${height}px` : '3px',
+                              animationDelay: `${(i % 5) * 0.15}s`
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Interim phrase stream with blinking cursor */}
+                    <div className="min-h-[44px] bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80 text-xs font-mono leading-relaxed">
+                      {interimTranscript ? (
+                        <p className="text-emerald-300">
+                          <span className="text-[10px] uppercase font-bold text-slate-400 mr-1.5">
+                            [{activeSpeakerChannel} STREAMING]:
+                          </span>
+                          {interimTranscript}
+                          <span className="inline-block w-1.5 h-3.5 ml-1 bg-emerald-400 animate-ping align-middle" />
+                        </p>
+                      ) : liveTranscriptLog.length > 0 ? (
+                        <p className="text-slate-300 text-[11px]">
+                          <span className="text-[10px] uppercase font-bold text-slate-500 mr-1">
+                            [LATEST {liveTranscriptLog[liveTranscriptLog.length - 1].speaker}]:
+                          </span>
+                          "{liveTranscriptLog[liveTranscriptLog.length - 1].text}"
+                        </p>
+                      ) : (
+                        <p className="text-slate-500 text-[11px] italic">
+                          Awaiting voice stream... Speak into microphone or select a sample dialogue below.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Live Transcript Log Timeline (if any entries exist) */}
+                  {liveTranscriptLog.length > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-bold text-slate-700">Transcript Log ({liveTranscriptLog.length} phrases)</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={handleCopyTranscript}
+                            className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer"
+                          >
+                            {transcriptCopied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                            <span>{transcriptCopied ? 'Copied' : 'Copy All'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleClearTranscript}
+                            className="text-[10px] font-bold text-rose-600 hover:text-rose-800 cursor-pointer"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+                      <div className="max-h-28 overflow-y-auto p-2 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5 text-left">
+                        {liveTranscriptLog.map(entry => (
+                          <div key={entry.id} className="text-[11px] leading-tight flex items-start gap-1.5">
+                            <span className={`text-[9px] font-black px-1.5 py-0.2 rounded shrink-0 ${
+                              entry.speaker === 'PATIENT'
+                                ? 'bg-indigo-100 text-indigo-800'
+                                : 'bg-emerald-100 text-emerald-800'
+                            }`}>
+                              {entry.speaker === 'PATIENT' ? 'PATIENT' : 'PHARM'}
+                            </span>
+                            <span className="text-slate-700 flex-1">{entry.text}</span>
+                            <span className="text-[9px] text-slate-400 shrink-0">{entry.timestamp}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Transcribing Metrics Footer */}
+                  <div className="flex items-center justify-between text-[10px] text-slate-500 font-medium px-1">
+                    <span>Transcribed: <strong className="text-slate-800">{totalWordsTranscribed} words</strong></span>
+                    <span>Confidence: <strong className="text-emerald-700">{speechConfidence || 95}%</strong></span>
+                    <span>Engine: <strong className="text-slate-700">Web Speech STT</strong></span>
+                  </div>
+
+                  {/* STT Simulation Engine Shortcuts for Zero-Mic Testing */}
+                  <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                    <span className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                      ⚡ Stream Sample Dialogues (Dev/Demo Mode)
+                    </span>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <button
+                        type="button"
+                        disabled={isSimulatingSpeech}
+                        onClick={() => simulateSpeechStream('SYMPTOMS')}
+                        className="py-1.5 px-2 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 rounded-lg text-[10px] font-bold transition-all truncate cursor-pointer"
+                        title="Simulate patient asking for throat & cough advice"
+                      >
+                        💊 Symptoms
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isSimulatingSpeech}
+                        onClick={() => simulateSpeechStream('PRICE')}
+                        className="py-1.5 px-2 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 rounded-lg text-[10px] font-bold transition-all truncate cursor-pointer"
+                        title="Simulate patient asking for generic alternative"
+                      >
+                        🏷️ Price / Generic
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isSimulatingSpeech}
+                        onClick={() => simulateSpeechStream('CHRONIC')}
+                        className="py-1.5 px-2 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 rounded-lg text-[10px] font-bold transition-all truncate cursor-pointer"
+                        title="Simulate chronic prescription refill inquiry"
+                      >
+                        🔄 Chronic Refill
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Quick Advice Tips */}
                 <div className="bg-white p-4 rounded-xl border border-slate-200 text-xs text-slate-600 space-y-2">
                   <span className="font-bold text-slate-800 flex items-center gap-1.5 text-[11px] uppercase tracking-wider">
@@ -760,9 +1317,24 @@ export const VoiceConsultationModal: React.FC = () => {
 
                   {/* Chief Discussion Textarea */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Chief Discussion & Patient Inquiries *
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold text-slate-700">
+                        Chief Discussion &amp; Patient Inquiries *
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => toggleFieldDictation('CHIEF_DISCUSSION')}
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border flex items-center gap-1 transition-all cursor-pointer ${
+                          activeFieldDictation === 'CHIEF_DISCUSSION'
+                            ? 'bg-rose-500 text-white border-rose-600 animate-pulse shadow-xs'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                        }`}
+                        title="Click to dictate speech directly into Chief Discussion"
+                      >
+                        <Mic className="w-3 h-3" />
+                        <span>{activeFieldDictation === 'CHIEF_DISCUSSION' ? '● Dictating (Stop)' : '🎤 Dictate'}</span>
+                      </button>
+                    </div>
                     <textarea
                       rows={3}
                       required
@@ -775,9 +1347,24 @@ export const VoiceConsultationModal: React.FC = () => {
 
                   {/* Pharmacist Instructions Textarea */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Pharmacist Clinical Instructions & Follow-up Advice
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold text-slate-700">
+                        Pharmacist Clinical Instructions &amp; Follow-up Advice
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => toggleFieldDictation('PHARMACIST_ADVICE')}
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border flex items-center gap-1 transition-all cursor-pointer ${
+                          activeFieldDictation === 'PHARMACIST_ADVICE'
+                            ? 'bg-emerald-600 text-white border-emerald-700 animate-pulse shadow-xs'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                        }`}
+                        title="Click to dictate speech directly into Pharmacist Advice"
+                      >
+                        <Mic className="w-3 h-3" />
+                        <span>{activeFieldDictation === 'PHARMACIST_ADVICE' ? '● Dictating (Stop)' : '🎤 Dictate'}</span>
+                      </button>
+                    </div>
                     <textarea
                       rows={2}
                       value={pharmacistAdvice}
@@ -825,6 +1412,79 @@ export const VoiceConsultationModal: React.FC = () => {
                         + Add Tag
                       </button>
                     </div>
+                  </div>
+
+                  {/* ── VALUE-ADDED SERVICES & SPECIAL DISCOUNTS (Task #48) ── */}
+                  <div className="p-4 rounded-2xl border bg-gradient-to-br from-slate-50 to-emerald-50/40 border-emerald-200/80 shadow-xs space-y-3">
+                    <div className="flex items-center justify-between border-b border-emerald-100 pb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-emerald-600 text-white rounded-lg shadow-xs">
+                          <Gift className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                            <span>Agreed Value-Added Services &amp; Discounts</span>
+                            <span className="text-[10px] font-bold px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded-full border border-emerald-200">
+                              Voice Consultation Linked
+                            </span>
+                          </h4>
+                          <p className="text-[10px] text-slate-500">
+                            Select diagnostic vouchers, adherence discounts, or wellness tokens agreed during audio consultation.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Services Checklist */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {AVAILABLE_VALUE_SERVICES.map(srv => {
+                        const isChecked = selectedServiceIds.includes(srv.id);
+                        return (
+                          <div
+                            key={srv.id}
+                            onClick={() => {
+                              if (isChecked) {
+                                setSelectedServiceIds(selectedServiceIds.filter(id => id !== srv.id));
+                              } else {
+                                setSelectedServiceIds([...selectedServiceIds, srv.id]);
+                              }
+                            }}
+                            className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-all flex items-start gap-2 ${
+                              isChecked
+                                ? 'bg-emerald-50/90 border-emerald-400 shadow-2xs'
+                                : 'bg-white border-slate-200 hover:border-emerald-200'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {}}
+                              className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="font-bold text-slate-900 truncate">{srv.name}</span>
+                                <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 shrink-0">
+                                  {srv.badge}
+                                </span>
+                              </div>
+                              <p className="text-[10.5px] text-slate-500 leading-tight mt-0.5">{srv.description}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Auto-apply to cart toggle */}
+                    <label className="flex items-center space-x-2 text-xs font-semibold text-slate-700 pt-1 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={autoApplyToCart}
+                        onChange={e => setAutoApplyToCart(e.target.checked)}
+                        className="rounded text-emerald-600 focus:ring-emerald-500"
+                      />
+                      <span>Apply selected benefit / discount to active bill cart automatically upon save</span>
+                    </label>
                   </div>
 
                   {/* ── TASK #50: REAL-TIME CUSTOMER SENTIMENT ANALYSIS & DYNAMIC ACTIONS ── */}
@@ -1114,6 +1774,23 @@ export const VoiceConsultationModal: React.FC = () => {
                 </div>
               </div>
 
+              {/* Linked to Bill Notice Toast */}
+              {historyLinkedNotice && (
+                <div className="p-3 bg-emerald-100 border border-emerald-300 text-emerald-950 rounded-xl text-xs font-bold flex items-center justify-between animate-fadeIn">
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+                    <span>✓ {historyLinkedNotice}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setHistoryLinkedNotice(null)}
+                    className="text-emerald-700 hover:text-emerald-900 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
               {/* Records List */}
               {filteredRecords.length === 0 ? (
                 <div className="bg-white p-12 text-center rounded-2xl border border-slate-200 space-y-3">
@@ -1237,6 +1914,64 @@ export const VoiceConsultationModal: React.FC = () => {
                                   {t}
                                 </span>
                               ))}
+                            </div>
+                          )}
+
+                          {/* Task #48: Linked Value-Added Services & Discounts Badge and Cart Linker */}
+                          {rec.linkedValueAddedServices && rec.linkedValueAddedServices.length > 0 && (
+                            <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-2.5 space-y-1.5 text-xs">
+                              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-emerald-800">
+                                <span className="flex items-center gap-1">
+                                  <Gift className="w-3 h-3 text-emerald-600" />
+                                  <span>Agreed Value Services ({rec.linkedValueAddedServices.length})</span>
+                                </span>
+                                <span className="text-emerald-600 font-bold">Voice Consultation Tagged</span>
+                              </div>
+
+                              <div className="space-y-1">
+                                {rec.linkedValueAddedServices.map(srv => {
+                                  const isCurrentlyLinkedToSession =
+                                    currentSession?.linkedVoiceConsultationId === rec.id &&
+                                    currentSession?.appliedValueAddedService?.id === srv.id;
+
+                                  return (
+                                    <div
+                                      key={srv.id}
+                                      className="flex items-center justify-between bg-white px-2.5 py-1.5 rounded-lg border border-emerald-200 text-[11px]"
+                                    >
+                                      <div className="flex items-center space-x-1.5">
+                                        <span className="font-bold text-slate-800">{srv.name}</span>
+                                        {srv.discountPercent ? (
+                                          <span className="text-[9.5px] font-black bg-purple-100 text-purple-800 px-1.5 py-0.2 rounded">
+                                            {srv.discountPercent}% OFF
+                                          </span>
+                                        ) : (
+                                          <span className="text-[9.5px] font-bold bg-teal-100 text-teal-800 px-1.5 py-0.2 rounded">
+                                            FREE TOKEN
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {isCurrentlyLinkedToSession ? (
+                                        <span className="inline-flex items-center space-x-1 text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                                          <Check className="w-3 h-3" />
+                                          <span>Applied to Cart</span>
+                                        </span>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleLinkServiceToActiveBill(rec.id, srv)}
+                                          className="inline-flex items-center space-x-1 text-[10px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-md transition-all cursor-pointer active:scale-95"
+                                          title="Apply this consultation discount or diagnostic voucher to current active POS bill"
+                                        >
+                                          <Link2 className="w-3 h-3 text-emerald-600" />
+                                          <span>Link to Bill Cart</span>
+                                        </button>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             </div>
                           )}
                         </div>

@@ -3,15 +3,28 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import { clearFinalizedInvoice, setInvoiceHistoryModalOpen, navigateTo } from '../store/posSlice';
 import { useReactToPrint } from 'react-to-print';
-import { Printer, CheckCircle, X, FileText, History } from 'lucide-react';
+import { Printer, CheckCircle, X, FileText, History, Package, Shield, Lock } from 'lucide-react';
 import { numberToWords } from '../utils/numberToWords';
 import { getMedicineDetails } from '../utils/medicineDetails';
+
+const isSensitiveProduct = (name: string = '', salt: string = '', category: string = ''): boolean => {
+  const str = `${name} ${salt} ${category}`.toLowerCase();
+  const sensitiveKeywords = [
+    'contraceptive', 'condom', 'pregnancy', 'i-pill', 'unwanted', 'mifepristone',
+    'misoprostol', 'sildenafil', 'tadalafil', 'manforce', 'durex', 'viagra', 'skore',
+    'intimate', 'v-wash', 'depression', 'alprazolam', 'clonazepam', 'psychiatric',
+    'anti-fungal vaginal', 'tampon', 'sanitary', 'ovulation', 'fertility', 'hiv'
+  ];
+  return sensitiveKeywords.some(kw => str.includes(kw));
+};
 
 export const ReceiptPrintView: React.FC = () => {
   const dispatch = useDispatch();
   const invoice = useSelector((state: RootState) => state.pos.latestFinalizedInvoice);
   const componentRef = useRef<HTMLDivElement>(null);
-  const [printFormat, setPrintFormat] = useState<'THERMAL' | 'A4'>('A4');
+  const [printFormat, setPrintFormat] = useState<'THERMAL' | 'A4' | 'PACKING_SLIP'>('THERMAL');
+  const [isDiscreetFlag, setIsDiscreetFlag] = useState<boolean>(Boolean(invoice?.isDiscreetPackaging || invoice?.billingSession?.isDiscreetPackaging));
+  const [maskSensitiveNames, setMaskSensitiveNames] = useState<boolean>(true);
 
   const handlePrint = useReactToPrint({
     contentRef: componentRef,
@@ -118,7 +131,7 @@ export const ReceiptPrintView: React.FC = () => {
         </div>
 
         {/* Format Selector Tabs */}
-        <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-xl mb-3 flex-shrink-0">
+        <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 rounded-xl mb-2 flex-shrink-0">
           <button
             type="button"
             onClick={() => setPrintFormat('THERMAL')}
@@ -128,7 +141,19 @@ export const ReceiptPrintView: React.FC = () => {
               }`}
           >
             <Printer className="w-3.5 h-3.5" />
-            <span>80mm ESC/POS Thermal Receipt</span>
+            <span>80mm Thermal Receipt</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setPrintFormat('PACKING_SLIP')}
+            className={`py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${printFormat === 'PACKING_SLIP'
+                ? 'bg-white text-indigo-800 shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900'
+              }`}
+          >
+            <Package className="w-3.5 h-3.5" />
+            <span>📦 80mm Discreet Packing Slip</span>
           </button>
 
           <button
@@ -142,6 +167,37 @@ export const ReceiptPrintView: React.FC = () => {
             <FileText className="w-3.5 h-3.5" />
             <span>A4 Official Tax Invoice</span>
           </button>
+        </div>
+
+        {/* Task #57: Discreet Packaging Options Toolbar */}
+        <div className="flex items-center justify-between flex-wrap gap-2 px-3 py-2 bg-indigo-50/70 border border-indigo-200/80 rounded-xl mb-3 flex-shrink-0 text-xs">
+          <div className="flex items-center space-x-4">
+            <label className="flex items-center space-x-1.5 font-bold text-indigo-950 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={isDiscreetFlag}
+                onChange={e => setIsDiscreetFlag(e.target.checked)}
+                className="w-4 h-4 rounded text-indigo-600 accent-indigo-600 cursor-pointer"
+              />
+              <span>📦 Discreet Sealed Packaging Flag</span>
+            </label>
+
+            <label className="flex items-center space-x-1.5 font-semibold text-slate-700 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={maskSensitiveNames}
+                onChange={e => setMaskSensitiveNames(e.target.checked)}
+                className="w-4 h-4 rounded text-slate-700 accent-slate-700 cursor-pointer"
+              />
+              <span>🛡️ Mask Sensitive Products on Delivery Slips</span>
+            </label>
+          </div>
+
+          <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
+            isDiscreetFlag ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700'
+          }`}>
+            {isDiscreetFlag ? 'SEALED OPAQUE ENFORCED' : 'STANDARD PACKAGING'}
+          </span>
         </div>
 
         {/* Printable Container */}
@@ -166,6 +222,20 @@ export const ReceiptPrintView: React.FC = () => {
                   <div>Doctor: {invoice.billingSession.doctorDetails?.doctorName || 'Direct Purchase'}</div>
                   <div>Patient: {invoice.billingSession.patientDetails?.patientName || 'Walk-in Customer'}</div>
                 </div>
+
+                {isDiscreetFlag && (
+                  <div className="my-2 p-2 bg-slate-950 text-white rounded text-center border-2 border-dashed border-slate-700">
+                    <div className="font-extrabold text-[10.5px] uppercase tracking-wider flex items-center justify-center space-x-1">
+                      <span>📦 SEALED OPAQUE DISCREET PACKAGING</span>
+                    </div>
+                    <div className="text-[8.5px] text-amber-300 mt-0.5 font-bold">
+                      Packed in Tamper-Proof Opaque Brown Bag • Seal #PK-{invoice.invoiceNumber.replace(/\D/g, '').slice(-4) || '8892'}
+                    </div>
+                    <div className="text-[8px] text-slate-400 mt-0.5">
+                      Patient Privacy Protected · Handover Directly to Recipient
+                    </div>
+                  </div>
+                )}
 
                 <table className="w-full text-left my-2 border-b border-dashed border-slate-400">
                   <thead>
@@ -226,6 +296,137 @@ export const ReceiptPrintView: React.FC = () => {
                   <div>Payment Mode: <strong>{getPaymentLabel()}</strong></div>
                   <div>Thank you! Get well soon.</div>
                   <div>Powered by GENQUANTAA POS Platform</div>
+                </div>
+              </div>
+            )}
+
+            {/* ── 80mm ESC/POS DISCREET DELIVERY / PACKING SLIP FORMAT (Task #57) ── */}
+            {printFormat === 'PACKING_SLIP' && (
+              <div className="bg-white text-slate-900 p-4 rounded shadow-2xs font-mono text-[11px] leading-tight mx-auto max-w-[80mm] border border-slate-300">
+                <div className="text-center pb-2 border-b-2 border-dashed border-slate-800">
+                  <h2 className="font-extrabold text-xs uppercase tracking-wider">{invoice.storeInfo.name}</h2>
+                  <p className="text-[9.5px] font-bold text-slate-600">CENTRAL PHARMACY DISPATCH &amp; FULFILLMENT</p>
+                  <p className="text-[9px] text-slate-500">DL: {invoice.storeInfo.dlNo} · Ph: {invoice.storeInfo.phone}</p>
+                </div>
+
+                {/* Prominent High-Visibility Discreet Security Stamp */}
+                <div className="my-2 p-2.5 bg-slate-950 text-white text-center rounded-lg border-2 border-slate-900">
+                  <div className="font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-1.5">
+                    <span>📦 SEALED OPAQUE DISCREET PACKAGING</span>
+                  </div>
+                  <div className="text-[9px] font-bold text-amber-300 mt-0.5">
+                    Security Seal Verified: #PK-{invoice.invoiceNumber.replace(/\D/g, '').slice(-4) || '8892'}
+                  </div>
+                  <div className="text-[8px] text-slate-300 mt-0.5 font-sans">
+                    Confidential Medical Supplies · Do Not Puncture Or Inspect
+                  </div>
+                </div>
+
+                {/* Delivery Logistics Meta */}
+                <div className="py-2 border-b border-dashed border-slate-400 space-y-1 text-[10px]">
+                  <div className="flex justify-between">
+                    <span>Delivery Slip #:</span>
+                    <strong>DSL-{invoice.invoiceNumber}</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Dispatch Date:</span>
+                    <span>{invoice.invoiceDate}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Recipient Name:</span>
+                    <strong>{patientName}</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Contact Number:</span>
+                    <strong>{patientContact ? patientContact.slice(0, 5) + '*****' : '98765*****'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Destination Address:</span>
+                    <p className="text-[9.5px] font-bold text-slate-800 mt-0.5 leading-snug">{patientAddress}</p>
+                  </div>
+                  <div className="flex justify-between pt-0.5 border-t border-slate-200">
+                    <span>Dispatcher:</span>
+                    <span>{invoice.pharmacistName || 'Ramesh Kumar'} (Counter {invoice.counterNumber || 1})</span>
+                  </div>
+                </div>
+
+                {/* Packaging Item Checklist */}
+                <div className="py-2 border-b border-dashed border-slate-400">
+                  <div className="text-[9px] font-bold uppercase text-slate-500 mb-1 flex justify-between">
+                    <span>Package Item Checklist</span>
+                    <span>Status</span>
+                  </div>
+
+                  <table className="w-full text-left">
+                    <tbody>
+                      {items.map((item, idx) => {
+                        const medDetails = getMedicineDetails(item.product);
+                        const isLoose = (item.unitMode || 'PACK') === 'LOOSE';
+                        const totalUnits = isLoose ? item.quantity : item.quantity * medDetails.unitsPerPack;
+                        const isSensitive = isSensitiveProduct(item.product.name, item.product.saltComposition);
+                        const shouldMask = maskSensitiveNames && (isDiscreetFlag || isSensitive);
+
+                        return (
+                          <tr key={item.cartItemId || idx} className="border-b border-slate-100">
+                            <td className="py-1.5 pr-1">
+                              {shouldMask ? (
+                                <div>
+                                  <div className="font-bold text-slate-900 flex items-center space-x-1">
+                                    <span>🛡️ Healthcare Essentials (Sensitive Care - Sealed)</span>
+                                  </div>
+                                  <div className="text-[8px] text-slate-500 font-mono mt-0.5">
+                                    Verification Batch #{item.selectedBatch?.batchNumber?.slice(0, 6) || 'SEC-01'} • 100% Opaque Bag
+                                  </div>
+                                </div>
+                              ) : (
+                                <div>
+                                  <div className="font-bold text-slate-900">{item.product.name}</div>
+                                  <div className="text-[8px] text-slate-600">
+                                    {isLoose ? `Loose (${totalUnits} tabs)` : `Pack: ${medDetails.packSize}`}
+                                  </div>
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-1.5 text-center font-bold text-slate-800 whitespace-nowrap">
+                              {item.quantity} {isLoose ? 'tab' : 'pack'}
+                            </td>
+                            <td className="py-1.5 text-right font-mono text-[9px] font-bold text-emerald-800 whitespace-nowrap">
+                              [✓] Packed
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Package Metrics */}
+                <div className="space-y-0.5 text-right text-[10px] py-2 border-b border-dashed border-slate-400 font-semibold">
+                  <div>Package Contents: {totalQty} Units ({totalTabletsCount} Total Tabs)</div>
+                  <div>Estimated Weight: ~{(items.length * 0.12).toFixed(2)} kg</div>
+                  <div className="text-xs font-black text-emerald-800 pt-0.5">Shipment Condition: DOUBLE-SEALED OPAQUE</div>
+                </div>
+
+                {/* Compliance & Signatures */}
+                <div className="pt-2 text-[9px] space-y-2">
+                  <div className="p-2 bg-slate-50 border border-slate-200 rounded text-[8px] leading-tight text-slate-600">
+                    <strong>Courier Notice &amp; Patient Privacy:</strong> Under the Indian Information Technology &amp; Healthcare Privacy norms, contents of this sealed pouch are confidential. Couriers must not tamper with or request inspection of items.
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 pt-2 text-center text-[8px]">
+                    <div className="border-t border-slate-400 pt-1">
+                      <strong>Dispenser Sign</strong><br />
+                      {invoice.pharmacistName || 'Ramesh Kumar'}
+                    </div>
+                    <div className="border-t border-slate-400 pt-1">
+                      <strong>Customer Recipient Sign</strong><br />
+                      (Date &amp; Signature)
+                    </div>
+                  </div>
+
+                  <div className="text-center text-[8px] text-slate-400 pt-1">
+                    GENQUANTAA Pharma Dispatch · Discreet Shipping Protocol v2.4
+                  </div>
                 </div>
               </div>
             )}

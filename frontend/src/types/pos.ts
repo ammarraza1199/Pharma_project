@@ -130,6 +130,8 @@ export interface BillingSession {
   detectedSentiment?: CustomerSentimentResult;
   appliedSentimentDiscount?: number;
   isDiscreetPackaging?: boolean;
+  linkedVoiceConsultationId?: string;
+  appliedValueAddedService?: ValueAddedServiceLink;
   createdAt: string;
 }
 
@@ -194,6 +196,7 @@ export interface FinalizedInvoice {
   counterNumber?: number;
   isEmergencyInvoice?: boolean;
   emergencyCondition?: string;
+  isDiscreetPackaging?: boolean;
   storeInfo: {
     name: string;
     dlNo: string;
@@ -251,6 +254,7 @@ export interface ReturnCreditNote {
   grossRefundAmount?: number;
   restockingFeePercent?: number;
   restockingFeeDeducted?: number;
+  feeReason?: string;
   netRefundAmount?: number;
   totalRefundAmount: number;
   refundMethod: 'CASH' | 'UPI' | 'STORE_CREDIT';
@@ -375,6 +379,7 @@ export interface DeliveryOrder {
   verificationDeadline?: string; // 24 Hours SLA countdown window
   pharmacistName?: string;
   invoiceNumber?: string; // Generated tax invoice number
+  isDiscreetPackaging?: boolean;
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -457,6 +462,15 @@ export interface InterStoreChatMessage {
   };
 }
 
+export interface ValueAddedServiceLink {
+  id: string;
+  name: string;
+  type: 'DIAGNOSTIC_SERVICE' | 'SPECIAL_DISCOUNT' | 'WELLNESS_PLAN';
+  discountPercent?: number;
+  discountAmount?: number;
+  linkedAt: string;
+}
+
 export interface VoiceConsultationRecord {
   id: string;
   patientName: string;
@@ -476,6 +490,7 @@ export interface VoiceConsultationRecord {
   counterNumber?: number;
   sessionId?: string;
   sentimentResult?: CustomerSentimentResult;
+  linkedValueAddedServices?: ValueAddedServiceLink[];
 }
 
 export type PILLanguage = 'en' | 'hi' | 'te' | 'ta' | 'kn';
@@ -674,6 +689,26 @@ export interface ReorderPushAlert {
   runoutDays?: number;
   timestamp: string;
   dismissed?: boolean;
+  status?: 'PENDING' | 'ADDED_TO_PO' | 'DISMISSED';
+  supplierName?: string;
+  suggestedReorderQty?: number;
+}
+
+export interface DoctorIntimationRecord {
+  id: string;
+  productId: string;
+  productName: string;
+  batchNumber: string;
+  expiryDate: string;
+  daysLeft: number;
+  stockQuantity: number;
+  doctorId: string;
+  doctorName: string;
+  clinicName: string;
+  doctorPhone: string;
+  memoText: string;
+  intimatedAt: string;
+  channel: 'WHATSAPP' | 'SMS' | 'COPIED';
 }
 
 // ── GROUP 2: EXPIRY ACTIONS, RETURNS & SHELF MANAGEMENT (Tasks #22, #23, #42, #43, #44) ───────────
@@ -718,6 +753,9 @@ export interface SupplierDebitNote {
   totalAmount: number;
   creditNoteRef?: string;
   remarks?: string;
+  dispatchSlipNumber?: string;
+  settlementDate?: string;
+  creditReceivedAmount?: number;
 }
 
 export interface RackRoboModalState {
@@ -730,5 +768,37 @@ export interface RackRoboModalState {
     tier: number;
     bin: number;
   };
+}
+
+export interface SubstituteEvent {
+  id: string;
+  timestamp: string;
+  date: string;
+  originalProductId: string;
+  originalProductName: string;
+  originalBrand?: string;
+  saltComposition: string;
+  substitutedProductId?: string;
+  substitutedProductName?: string;
+  substitutedBrand?: string;
+  status: 'ACCEPTED' | 'REJECTED' | 'HESITANT';
+  marginGain: number;
+  customerSavings: number;
+  originalPrice: number;
+  substitutedPrice: number;
+  pharmacistName: string;
+  counterNumber: number;
+  patientResponseNote?: string;
+}
+
+export interface SubstituteDailyInsight {
+  date: string;
+  dayName: string;
+  promptedCount: number;
+  acceptedCount: number;
+  rejectedCount: number;
+  successRatePercent: number;
+  totalMarginGain: number;
+  totalCustomerSavings: number;
 }
 

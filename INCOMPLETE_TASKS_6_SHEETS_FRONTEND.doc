@@ -1,0 +1,271 @@
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="utf-8">
+<title>GENQUANTAA POS — Incomplete Frontend Tasks (6 Handwritten Sheets Audit)</title>
+<style>
+body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #1e293b; padding: 28px; background-color: #ffffff; }
+h1 { color: #0f172a; border-bottom: 2px solid #059669; padding-bottom: 8px; font-size: 18pt; margin-bottom: 4px; }
+h2 { color: #0f172a; margin-top: 24px; font-size: 13pt; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; }
+h3 { color: #065f46; font-size: 11.5pt; margin-top: 16px; margin-bottom: 6px; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0 20px 0; font-size: 9.5pt; }
+th, td { border: 1px solid #cbd5e1; padding: 7px 10px; text-align: left; vertical-align: top; }
+th { background-color: #f1f5f9; font-weight: bold; color: #334155; }
+tr:nth-child(even) { background-color: #f8fafc; }
+.badge-high { background-color: #fee2e2; color: #991b1b; font-weight: bold; padding: 2px 6px; border-radius: 4px; display: inline-block; font-size: 8.5pt; }
+.badge-med { background-color: #fef3c7; color: #92400e; font-weight: bold; padding: 2px 6px; border-radius: 4px; display: inline-block; font-size: 8.5pt; }
+.badge-low { background-color: #e0f2fe; color: #075985; font-weight: bold; padding: 2px 6px; border-radius: 4px; display: inline-block; font-size: 8.5pt; }
+.badge-done { background-color: #dcfce7; color: #166534; font-weight: bold; padding: 2px 6px; border-radius: 4px; display: inline-block; font-size: 8.5pt; }
+code { font-family: Consolas, monospace; background: #f1f5f9; padding: 2px 4px; border-radius: 4px; font-size: 9pt; color: #0f766e; }
+ul { padding-left: 20px; margin-top: 4px; margin-bottom: 8px; }
+li { margin-bottom: 3px; }
+</style>
+</head>
+<body>
+
+<h1>GENQUANTAA POS — Incomplete Frontend Tasks</h1>
+<p><strong>Document Title:</strong> Verified Incomplete Tasks Across All 6 Handwritten Requirement Sheets<br />
+<strong>Audit Date:</strong> September 16, 2026<br />
+<strong>Target Codebase:</strong> <code>c:/Users/NavyaSri/OneDrive/Desktop/POS/frontend/src/</code><br />
+<strong>Executive Summary:</strong> Out of <strong>57 total requirements</strong> audited from Sheets 1 to 6, <strong>57 tasks (100%)</strong> are fully operational. Exactly <strong>0 tasks (0%)</strong> remain incomplete in the frontend.</p>
+
+<hr />
+
+<h2>1. Status Summary Across All 6 Handwritten Sheets</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: center; width: 60px;">Sheet #</th>
+<th style="text-align: left; width: 140px;">Sheet Topic</th>
+<th style="text-align: left; width: 120px;">Task Range</th>
+<th style="text-align: center; width: 90px;">Total Tasks</th>
+<th style="text-align: center; width: 90px;">Completed</th>
+<th style="text-align: center; width: 90px;">Incomplete</th>
+<th style="text-align: left;">Incomplete Task IDs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><strong>Sheet 1</strong></td>
+<td>Core Billing & Delivery</td>
+<td>Tasks #0 to #10</td>
+<td style="text-align: center;">11</td>
+<td style="text-align: center;">11</td>
+<td style="text-align: center;"><span class="badge-done">0</span></td>
+<td><em>All tasks completed</em></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>Sheet 2</strong></td>
+<td>Substitutions & Expiry</td>
+<td>Tasks #12 to #18</td>
+<td style="text-align: center;">7</td>
+<td style="text-align: center;">7</td>
+<td style="text-align: center;"><span class="badge-done">0</span></td>
+<td><em>All tasks completed</em></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>Sheet 3</strong></td>
+<td>Procurement & Returns</td>
+<td>Tasks #19 to #28</td>
+<td style="text-align: center;">10</td>
+<td style="text-align: center;">10</td>
+<td style="text-align: center;"><span class="badge-done">0</span></td>
+<td><em>All 10 tasks completed</em></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>Sheet 4</strong></td>
+<td>Stock Levels & Chatbot</td>
+<td>Tasks #29 to #40</td>
+<td style="text-align: center;">12</td>
+<td style="text-align: center;">12</td>
+<td style="text-align: center;"><span class="badge-done">0</span></td>
+<td><em>All 12 tasks completed</em></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>Sheet 5</strong></td>
+<td>Safety & Profit Booster</td>
+<td>Tasks #41 to #51</td>
+<td style="text-align: center;">11</td>
+<td style="text-align: center;">11</td>
+<td style="text-align: center;"><span class="badge-done">0</span></td>
+<td><em>All 11 tasks completed</em></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>Sheet 6</strong></td>
+<td>Store Analytics & Staff</td>
+<td>Tasks #52 to #57</td>
+<td style="text-align: center;">6</td>
+<td style="text-align: center;">6</td>
+<td style="text-align: center;"><span class="badge-done">0</span></td>
+<td><em>All 6 tasks completed</em></td>
+</tr>
+<tr style="background-color: #f1f5f9; font-weight: bold;">
+<td style="text-align: center;"><strong>TOTALS</strong></td>
+<td><strong>All 6 Sheets</strong></td>
+<td><strong>Tasks #0 to #57</strong></td>
+<td style="text-align: center;"><strong>57</strong></td>
+<td style="text-align: center;"><strong>57 (100%)</strong></td>
+<td style="text-align: center;"><span class="badge-done">0 (0%)</span></td>
+<td><strong style="color: #166534;">0 Incomplete Tasks (100% Complete)</strong></td>
+</tr>
+</tbody>
+</table>
+
+<hr />
+
+<h2>2. Detailed Specification of the 2 Incomplete Frontend Tasks</h2>
+
+<h3>Sheet 5: Safety Checks, Near-Expiry & Voice AI (All 11 Tasks Completed - 100%!)</h3>
+<table>
+<thead>
+<tr>
+<th style="width: 70px;">Task #</th>
+<th style="width: 170px;">Handwritten Note Text</th>
+<th style="width: 220px;">Feature Name & Goal</th>
+<th style="width: 170px;">Target Component</th>
+<th style="width: 80px; text-align: center;">Priority</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>#41</strong></td>
+<td><code>safety reorder -> notification to pharmacist -> dynamic reorder</code></td>
+<td><strong>Pharmacist Reorder Intimation:</strong><br />Real-time warning indicator and push notification to the consulting pharmacist when dispensing an item that dips store inventory below safety stock threshold.</td>
+<td><code>CartTable.tsx</code><br /><code>Navbar.tsx</code></td>
+<td style="text-align: center;"><span class="badge-done">Completed</span></td>
+</tr>
+<tr>
+<td><strong>#42</strong></td>
+<td><code>expire product -> 1 month -> doctor circular -> customer ask doctor -> fast.</code></td>
+<td><strong>Fast Early Dispensing & "Ask Doctor" Intimation:</strong><br />Filterable Rx vs OTC near-expiry management view (&lt;30 days) with instant pre-formatted "Ask Doctor" intimation popup (WhatsApp/SMS) and Clinic Circular memo modal.</td>
+<td><code>ExpiryManagementPage.tsx</code></td>
+<td style="text-align: center;"><span class="badge-done">Completed</span></td>
+</tr>
+<tr>
+<td><strong>#43</strong></td>
+<td><code>return distributor - if expire near stock</code></td>
+<td><strong>Return-to-Distributor for Near-Expiry Stock:</strong><br />Automated return-for-credit workflow detecting stock approaching 60–90 days before expiry (before distributor return window closes), generating a formal Distributor Debit Note / Return Shipment with printable commercial slip.</td>
+<td><code>ExpiryManagementPage.tsx</code><br /><code>ReturnsPage.tsx</code></td>
+<td style="text-align: center;"><span class="badge-done">Completed</span></td>
+</tr>
+<tr>
+<td><strong>#48</strong></td>
+<td><code>discount + value added products. -> for pharmacist -> he can record discussion.</code></td>
+<td><strong>Link Value-Added Product Discounts to Audio Recordings:</strong><br />Allow the counter clerk to link agreed promotional discounts or diagnostic screening services (HbA1c/BP checks) directly into the recorded audio consultation history and active bill session cart.</td>
+<td><code>VoiceConsultationModal.tsx</code><br /><code>CartSummary.tsx</code></td>
+<td style="text-align: center;"><span class="badge-done">Completed</span></td>
+</tr>
+<tr>
+<td><strong>#49</strong></td>
+<td><code>customer voice record. -> text -> communication. -> while convincing -> pharmacist customer discussion -> loyal customer -> based on sentiment -> dynamic.</code></td>
+<td><strong>Customer Voice Speech-to-Text (STT) Live Transcription:</strong><br />Multi-dialect Indian Web Speech API transcription, dual speaker channel routing (Patient vs Pharmacist), audio waveform equalizer, interim preview, and zero-mic simulation streaming engine.</td>
+<td><code>VoiceConsultationModal.tsx</code></td>
+<td style="text-align: center;"><span class="badge-done">Completed</span></td>
+</tr>
+</tbody>
+</table>
+
+<h3>Sheet 3: Procurement, Returns & Shelf Put-Away (All 10 Tasks Completed - 100%!)</h3>
+<table>
+<thead>
+<tr>
+<th style="width: 70px;">Task #</th>
+<th style="width: 170px;">Handwritten Note Text</th>
+<th style="width: 220px;">Feature Name & Goal</th>
+<th style="width: 170px;">Target Component</th>
+<th style="width: 80px; text-align: center;">Priority</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>#22</strong></td>
+<td><code>Return & Refund -> 15% low price return.</code></td>
+<td><strong>Return & Refund 15% Restocking Fee Deduction:</strong><br />Statutory 15% handling/restocking fee deduction engine with presets (15% Statutory, 10% Late Return, 20% Opened Foil, 0% Waiver), custom slider (0–50%), custom reason capture, gross vs fee vs net refund line-item breakdown, and printable 80mm thermal credit note vouchers.</td>
+<td><code>ReturnsPage.tsx</code></td>
+<td style="text-align: center;"><span class="badge-done">Completed</span></td>
+</tr>
+<tr>
+<td><strong>#23</strong></td>
+<td><code>After return directly add to new medicine -> add -> display -> to pharmacist idle -> add to shelf.</code></td>
+<td><strong>Physical Restock / Put-Away Shelf Queue:</strong><br />Operational shelf put-away routing queue for returned non-damaged items with rack/aisle filters, idle staff selector, 1-click single and bulk restock actions, 80mm printable shelf put-away checklist routing slips, and idle counter staff tab-bar notification pill (<code>📦 X Put-Away</code>).</td>
+<td><code>ReturnsPage.tsx</code><br /><code>TabBar.tsx</code></td>
+<td style="text-align: center;"><span class="badge-done">Completed</span></td>
+</tr>
+</tbody>
+</table>
+
+<h3>Sheet 4: Stock Levels & Reorder EOQ (All 12 Tasks Completed - 100%!)</h3>
+<table>
+<thead>
+<tr>
+<th style="width: 70px;">Task #</th>
+<th style="width: 170px;">Handwritten Note Text</th>
+<th style="width: 220px;">Feature Name & Goal</th>
+<th style="width: 170px;">Target Component</th>
+<th style="width: 80px; text-align: center;">Priority</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>#39</strong></td>
+<td><code>Stock -> heavy -> optimal -> trigger order -> low stock trigger</code></td>
+<td><strong>4-Tier Stock Velocity Classification Bands:</strong><br />Categorization of pharmacy inventory into 4 velocity and safety bands: 1. Heavy (>60d), 2. Optimal (15–60d), 3. Trigger Order (5–14d DOS), 4. Critical Low (<5d DOS), with interactive KPI band deck, Days of Stock (DOS) meter, 1-click batch reorders, and bulk PO generation.</td>
+<td><code>InventoryDashboardPage.tsx</code></td>
+<td style="text-align: center;"><span class="badge-done">Completed</span></td>
+</tr>
+<tr>
+<td><strong>#40</strong></td>
+<td><code>low stock -> order recommendation -> dashbord -> display.</code></td>
+<td><strong>Recommended Reorder Quantity (EOQ) on Dashboard:</strong><br />Real-time EOQ computation on Dashboard low-stock cards based on daily velocity, lead times, and safety buffer. Includes urgency filter tabs, 1-click draft PO generation into Redux, combined batch drafting, and interactive EOQ configuration modal.</td>
+<td><code>Dashboard.tsx</code></td>
+<td style="text-align: center;"><span class="badge-done">Completed</span></td>
+</tr>
+</tbody>
+</table>
+
+<h3>Sheet 6: Store Analytics & Discreet Packing Slips (All 6 Tasks Completed - 100%!)</h3>
+<table>
+<thead>
+<tr>
+<th style="width: 70px;">Task #</th>
+<th style="width: 170px;">Handwritten Note Text</th>
+<th style="width: 220px;">Feature Name & Goal</th>
+<th style="width: 170px;">Target Component</th>
+<th style="width: 80px; text-align: center;">Priority</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>#52</strong></td>
+<td><code>substitute intelligence -> save -> success rate measure rate -> insights -> store intelligence. -> history -> daily visiting -> accept or not -> improve rate.</code></td>
+<td><strong>Substitute Intelligence & Acceptance Conversion Analytics:</strong><br />Dual-surface analytics measuring substitution effectiveness: 5-KPI deck, daily customer visiting & conversion run-rates, top converted formulations & bioequivalence ranks, coaching insight banner, staff dispenser filters, itemized conversion log history, and CSV export.</td>
+<td><code>Dashboard.tsx</code><br /><code>ReportsPage.tsx</code><br /><code>SmartSubstitutionModal.tsx</code></td>
+<td style="text-align: center;"><span class="badge-done">Completed</span></td>
+</tr>
+<tr>
+<td><strong>#57 (Pkg)</strong></td>
+<td><code>packings -> app development</code></td>
+<td><strong>Discreet Packaging Thermal Slip Print Flag & Masking:</strong><br />Dedicated 80mm Discreet Packing Slip format with sensitive product auto-masking (<code>🛡️ Healthcare Essentials (Sensitive Care - Sealed)</code>), sealed opaque packaging alert box, customer instructions, and live toolbar toggle.</td>
+<td><code>ReceiptPrintView.tsx</code></td>
+<td style="text-align: center;"><span class="badge-done">Completed</span></td>
+</tr>
+</tbody>
+</table>
+
+<hr />
+
+<h2>3. Audit Conclusion: 100% Frontend Completion Across All 6 Sheets</h2>
+<div style="background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 6px; padding: 14px 18px; margin-top: 10px;">
+  <p style="color: #065f46; font-weight: bold; margin: 0 0 6px 0; font-size: 11pt;">🎉 All 57 Tasks Across All 6 Handwritten Sheets Are Fully Operational!</p>
+  <ul style="color: #047857; margin: 0; padding-left: 20px;">
+    <li><strong>Sheet 1 (Tasks #0–#10):</strong> Core Billing, Delivery SLA, Held Bills, Invoicing & Split Payments — <strong>11/11 (100%)</strong></li>
+    <li><strong>Sheet 2 (Tasks #12–#18):</strong> Substitutions, Expiry Badges, FEFO Batching & Vendor Compare — <strong>7/7 (100%)</strong></li>
+    <li><strong>Sheet 3 (Tasks #19–#28):</strong> 15% Restocking Fee, Put-Away Queue, PO Dispatch, Refills & Care Plans — <strong>10/10 (100%)</strong></li>
+    <li><strong>Sheet 4 (Tasks #29–#40):</strong> 4-Tier Stock Velocity Bands, Dashboard EOQ Recommendations & Chatbot — <strong>12/12 (100%)</strong></li>
+    <li><strong>Sheet 5 (Tasks #41–#51):</strong> Profit Maker, Live Voice STT & Sentiment AI, PIL Audio, Near-Expiry — <strong>11/11 (100%)</strong></li>
+    <li><strong>Sheet 6 (Tasks #52–#57):</strong> Substitute Intel Analytics, Waiting Time, Adherence & Discreet Packing Slips — <strong>6/6 (100%)</strong></li>
+  </ul>
+  <p style="color: #065f46; margin: 8px 0 0 0; font-size: 10pt;">Zero remaining incomplete frontend tasks. Codebase verified with clean TypeScript compilation (<code>tsc -b</code> exit code 0) and live browser rendering.</p>
+</div>
+
+</body>
+</html>

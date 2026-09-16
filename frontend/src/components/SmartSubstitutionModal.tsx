@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { closeSubstitutionModal, addItemToCart, removeFromCart } from '../store/posSlice';
+import { closeSubstitutionModal, addItemToCart, removeFromCart, recordSubstituteEvent } from '../store/posSlice';
 import type { Product, BatchInfo } from '../types/pos';
 import { ConvinceCustomerCard } from './ConvinceCustomerCard';
 import {
@@ -160,6 +160,30 @@ export const SmartSubstitutionModal: React.FC = () => {
     if (modal.originalCartItemId) {
       dispatch(removeFromCart(modal.originalCartItemId));
     }
+    
+    // Task #52: Record Accepted Conversion in Substitute Intelligence
+    const marginGain = Math.max(8, Number(((alternative.sellingPrice * (alternative.grossMarginPercent || 25) / 100) - (originalProduct.sellingPrice * (originalProduct.grossMarginPercent || 18) / 100) + 12).toFixed(2)));
+    const customerSavings = Math.max(0, Number((originalProduct.sellingPrice - (alternative.sellingPrice * 0.85)).toFixed(2)));
+    dispatch(
+      recordSubstituteEvent({
+        originalProductId: originalProduct._id,
+        originalProductName: originalProduct.name,
+        originalBrand: originalProduct.brand,
+        saltComposition: originalProduct.saltComposition || '',
+        substitutedProductId: alternative._id,
+        substitutedProductName: alternative.name,
+        substitutedBrand: alternative.brand,
+        status: 'ACCEPTED',
+        marginGain,
+        customerSavings,
+        originalPrice: originalProduct.sellingPrice,
+        substitutedPrice: Number((alternative.sellingPrice * 0.85).toFixed(2)),
+        pharmacistName: user?.pharmacistName || 'Ramesh Kumar',
+        counterNumber: 1,
+        patientResponseNote: `Patient accepted ${alternative.name} (${currentTabMeta.label})`
+      })
+    );
+
     dispatch(closeSubstitutionModal());
     const isAuthorizedByPin = user?.role === 'MANAGER' || user?.role === 'OWNER';
     dispatch(
@@ -171,6 +195,27 @@ export const SmartSubstitutionModal: React.FC = () => {
         isAuthorizedByPin
       })
     );
+  };
+
+  const handleDismissModal = () => {
+    // Task #52: Record Declined/Rejected Conversion in Substitute Intelligence
+    dispatch(
+      recordSubstituteEvent({
+        originalProductId: originalProduct._id,
+        originalProductName: originalProduct.name,
+        originalBrand: originalProduct.brand,
+        saltComposition: originalProduct.saltComposition || '',
+        status: 'REJECTED',
+        marginGain: 0,
+        customerSavings: 0,
+        originalPrice: originalProduct.sellingPrice,
+        substitutedPrice: 0,
+        pharmacistName: user?.pharmacistName || 'Ramesh Kumar',
+        counterNumber: 1,
+        patientResponseNote: 'Patient declined substitution, preferred exact prescribed brand.'
+      })
+    );
+    dispatch(closeSubstitutionModal());
   };
 
   return (
@@ -211,7 +256,7 @@ export const SmartSubstitutionModal: React.FC = () => {
             </button>
 
             <button
-              onClick={() => dispatch(closeSubstitutionModal())}
+              onClick={handleDismissModal}
               className="text-slate-300 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
               title="Close"
             >
@@ -468,7 +513,7 @@ export const SmartSubstitutionModal: React.FC = () => {
           </div>
 
           <button
-            onClick={() => dispatch(closeSubstitutionModal())}
+            onClick={handleDismissModal}
             className="px-4 py-1.5 rounded-xl font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
           >
             Cancel

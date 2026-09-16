@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import {
@@ -13,8 +13,16 @@ import {
   RotateCcw, CheckCircle2, FileText,
   ShoppingBag, Plus, Trash2, Box, MapPin,
   Check, Percent, Layers, Clock, AlertTriangle,
-  ArrowRight, ShieldCheck, Printer, Search
+  ArrowRight, ShieldCheck, Printer, Search, Truck,
+  X, Download, Sliders, User, Sparkles, CheckSquare, Tag, Eye, ChevronRight
 } from 'lucide-react';
+
+const RESTOCKING_PRESETS = [
+  { percent: 15, label: '15% Statutory (Default)', reason: 'Statutory retail packaging inspection & QC fee' },
+  { percent: 10, label: '10% Unopened Late Return', reason: 'Customer return >7 days with intact outer packaging' },
+  { percent: 20, label: '20% Opened Foil / Strip', reason: 'Unsealed strip return requiring quarantine & restock QC' },
+  { percent: 0,  label: '0% Courtesy Waiver', reason: 'Prescription/doctor change or counter courtesy waiver' }
+];
 
 export const ReturnsPage: React.FC = () => {
   const dispatch = useDispatch();
@@ -32,13 +40,22 @@ export const ReturnsPage: React.FC = () => {
   const [refundMethod, setRefundMethod] = useState<'CASH' | 'UPI' | 'STORE_CREDIT'>('CASH');
   const [invoiceLookupLoading, setInvoiceLookupLoading] = useState<boolean>(false);
 
-  // Task #22: 15% Restocking Fee State
+  // Task #22: 15% Restocking Fee & Credit Note Modal State
   const [applyRestockingFee, setApplyRestockingFee] = useState<boolean>(true);
   const [restockingFeePercent, setRestockingFeePercent] = useState<number>(15);
+  const [feeReason, setFeeReason] = useState<string>('Statutory retail packaging inspection & QC fee');
+  const [showCreditNoteModal, setShowCreditNoteModal] = useState<boolean>(false);
+  const [activePrintNote, setActivePrintNote] = useState<ReturnCreditNote | null>(null);
 
-  // Task #23: Put-Away Search & Filter
+  // Task #23: Put-Away Search, Rack Filter & Routing Slip State
   const [putAwaySearch, setPutAwaySearch] = useState<string>('');
   const [putAwayFilter, setPutAwayFilter] = useState<'ALL' | 'PENDING' | 'COMPLETED'>('ALL');
+  const [selectedRackFilter, setSelectedRackFilter] = useState<string>('ALL');
+  const [selectedRestockerStaff, setSelectedRestockerStaff] = useState<string>(
+    currentUser?.pharmacistName || 'Ramesh Kumar (Counter 1)'
+  );
+  const [showPutAwaySlipModal, setShowPutAwaySlipModal] = useState<boolean>(false);
+  const [putAwayToast, setPutAwayToast] = useState<string | null>(null);
 
   // Auto-fill from invoice number
   const handleInvoiceLookup = async () => {
@@ -154,6 +171,7 @@ export const ReturnsPage: React.FC = () => {
       grossRefundAmount: Number(grossRefundAmount.toFixed(2)),
       restockingFeePercent: applyRestockingFee ? restockingFeePercent : 0,
       restockingFeeDeducted: Number(restockingFeeDeducted.toFixed(2)),
+      feeReason: applyRestockingFee ? feeReason : 'Fee Waived (0%)',
       netRefundAmount: Number(netRefundAmount.toFixed(2)),
       totalRefundAmount: Number(netRefundAmount.toFixed(2)),
       refundMethod
@@ -176,26 +194,61 @@ export const ReturnsPage: React.FC = () => {
 
     dispatch(processReturnCreditNote(creditNote));
     setGeneratedNote(creditNote);
+    setActivePrintNote(creditNote);
+    setShowCreditNoteModal(true);
     setReturnItems([]);
   };
+
+  // Unique Storage Racks for Put-Away Filtering
+  const availableRacks = useMemo(() => {
+    const set = new Set<string>();
+    putAwayTasks.forEach(t => {
+      if (t.rackLocation && t.rackLocation !== 'Unassigned') {
+        set.add(t.rackLocation);
+      }
+    });
+    return Array.from(set).sort();
+  }, [putAwayTasks]);
 
   // Put-Away Tasks Filtering
   const pendingPutAwayCount = putAwayTasks.filter(t => t.status === 'PENDING').length;
   const completedPutAwayCount = putAwayTasks.filter(t => t.status === 'COMPLETED').length;
 
-  const filteredPutAwayTasks = putAwayTasks.filter(t => {
-    if (putAwayFilter !== 'ALL' && t.status !== putAwayFilter) return false;
-    if (putAwaySearch.trim()) {
-      const q = putAwaySearch.toLowerCase();
-      return (
-        t.productName.toLowerCase().includes(q) ||
-        t.batchNumber.toLowerCase().includes(q) ||
-        t.rackLocation.toLowerCase().includes(q) ||
-        t.creditNoteNo.toLowerCase().includes(q)
-      );
+  const filteredPutAwayTasks = useMemo(() => {
+    return putAwayTasks.filter(t => {
+      if (putAwayFilter !== 'ALL' && t.status !== putAwayFilter) return false;
+      if (selectedRackFilter !== 'ALL' && t.rackLocation !== selectedRackFilter) return false;
+      if (putAwaySearch.trim()) {
+        const q = putAwaySearch.toLowerCase();
+        return (
+          t.productName.toLowerCase().includes(q) ||
+          t.batchNumber.toLowerCase().includes(q) ||
+          t.rackLocation.toLowerCase().includes(q) ||
+          t.creditNoteNo.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [putAwayTasks, putAwayFilter, selectedRackFilter, putAwaySearch]);
+
+  const handleBulkPutAwayRack = (targetRack?: string) => {
+    const targets = putAwayTasks.filter(t => 
+      t.status === 'PENDING' && 
+      (!targetRack || targetRack === 'ALL' || t.rackLocation === targetRack)
+    );
+    if (targets.length === 0) {
+      alert('No pending put-away tasks found for this rack selection.');
+      return;
     }
-    return true;
-  });
+    targets.forEach(t => {
+      dispatch(completePutAwayTask({
+        taskId: t.id,
+        restockedBy: selectedRestockerStaff
+      }));
+    });
+    setPutAwayToast(`✓ Restocked ${targets.length} medicines to physical shelves by ${selectedRestockerStaff}!`);
+    setTimeout(() => setPutAwayToast(null), 4000);
+  };
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-100 p-4 space-y-4 font-sans select-none">
@@ -264,6 +317,27 @@ export const ReturnsPage: React.FC = () => {
               {pendingPutAwayCount} Pending
             </span>
           )}
+        </button>
+      </div>
+
+      {/* ── DISTRIBUTOR RTV DEBIT NOTE CROSS-LINK BANNER (Task #43) ── */}
+      <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-3 flex items-center justify-between flex-wrap gap-2 text-xs">
+        <div className="flex items-center space-x-2.5">
+          <div className="p-2 bg-indigo-100 text-indigo-700 rounded-xl">
+            <Truck className="w-4 h-4" />
+          </div>
+          <div>
+            <span className="font-bold text-indigo-950 block">Returning Near-Expiry Stock to Wholesale Distributor (RTV)?</span>
+            <span className="text-[11px] text-indigo-700">Issue commercial supplier debit notes 60–90 days prior to expiry for 100% distributor credit recovery.</span>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => dispatch(navigateTo('EXPIRY_MANAGEMENT'))}
+          className="px-3.5 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white font-bold text-xs rounded-xl shadow-2xs transition-all cursor-pointer flex items-center space-x-1.5 active:scale-95"
+        >
+          <span>Distributor Debit Notes &amp; RTV</span>
+          <ArrowRight className="w-3.5 h-3.5" />
         </button>
       </div>
 
@@ -401,62 +475,141 @@ export const ReturnsPage: React.FC = () => {
           </div>
 
           {/* Task #22: 15% Statutory Restocking / Depreciation Fee Card */}
-          <div className="bg-amber-50/70 border border-amber-300 rounded-2xl p-4 shadow-xs">
+          <div className="bg-amber-50/80 border border-amber-300 rounded-2xl p-4 shadow-xs space-y-3">
             <div className="flex items-start justify-between flex-wrap gap-3">
               <div className="flex items-start space-x-2.5">
-                <Percent className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+                <div className="p-2 bg-amber-500 text-white rounded-xl shadow-2xs shrink-0 mt-0.5">
+                  <Percent className="w-5 h-5" />
+                </div>
                 <div>
                   <div className="flex items-center space-x-2">
-                    <h4 className="text-xs font-black text-amber-950 font-heading">
-                      Statutory 15% Restocking / Depreciation Fee
+                    <h4 className="text-xs font-black text-amber-950 font-heading uppercase tracking-wider">
+                      Statutory 15% Restocking / Handling Deduction
                     </h4>
-                    <span className="text-[10px] font-extrabold bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full">
-                      Pharma Retail Policy
+                    <span className="text-[10px] font-extrabold bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full border border-amber-300">
+                      Indian Retail Pharmacy Rule
                     </span>
                   </div>
-                  <p className="text-[11px] text-amber-800 mt-0.5 max-w-2xl leading-relaxed">
-                    Applies a standard 15% handling deduction on customer-returned unsealed strips, late returns, or opened packages to compensate storage and verification inspection.
+                  <p className="text-[11px] text-amber-900/90 mt-0.5 max-w-2xl leading-relaxed">
+                    Applies a standard 15% handling deduction on customer-returned unsealed strips, late returns, or opened packages to compensate storage verification and repackaging QC.
                   </p>
                 </div>
               </div>
 
-              <label className="flex items-center space-x-2 bg-white px-3 py-1.5 rounded-xl border border-amber-300 shadow-2xs cursor-pointer select-none">
+              <label className="flex items-center space-x-2 bg-white px-3.5 py-2 rounded-xl border border-amber-300 shadow-xs cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={applyRestockingFee}
                   onChange={e => setApplyRestockingFee(e.target.checked)}
                   className="w-4 h-4 text-amber-600 rounded border-amber-300 focus:ring-amber-500 cursor-pointer"
                 />
-                <span className="text-xs font-black text-slate-800">
+                <span className="text-xs font-black text-slate-900">
                   Deduct {restockingFeePercent}% Restocking Fee
                 </span>
               </label>
             </div>
 
+            {/* Restocking Fee Presets & Custom Configuration */}
+            {applyRestockingFee && (
+              <div className="pt-2 border-t border-amber-200/90 space-y-2.5 animate-fadeIn">
+                <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
+                  <span className="font-bold text-amber-950 flex items-center space-x-1">
+                    <Tag className="w-3.5 h-3.5 text-amber-700" />
+                    <span>Deduction Presets:</span>
+                  </span>
+                  <div className="flex items-center space-x-1.5 flex-wrap gap-1">
+                    {RESTOCKING_PRESETS.map(preset => (
+                      <button
+                        key={preset.percent}
+                        type="button"
+                        onClick={() => {
+                          setRestockingFeePercent(preset.percent);
+                          setFeeReason(preset.reason);
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer ${
+                          restockingFeePercent === preset.percent
+                            ? 'bg-amber-600 text-white shadow-xs'
+                            : 'bg-white text-slate-700 border border-amber-300 hover:bg-amber-100'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs font-semibold">
+                  <div>
+                    <label className="block text-amber-950 text-[11px] mb-1 font-bold">
+                      Reason for Restocking Deduction (Printed on Voucher):
+                    </label>
+                    <input
+                      type="text"
+                      value={feeReason}
+                      onChange={e => setFeeReason(e.target.value)}
+                      placeholder="e.g. Unsealed outer packaging, customer late return..."
+                      className="w-full p-2 text-xs border border-amber-300 rounded-xl bg-white font-medium text-slate-800 focus:outline-hidden"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex justify-between items-center text-[11px] text-amber-950 mb-1">
+                      <span className="font-bold">Custom Deduction Percentage:</span>
+                      <span className="font-black font-mono text-amber-900 bg-amber-200/80 px-2 py-0.5 rounded-md border border-amber-300">
+                        {restockingFeePercent}% Restocking Fee
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="50"
+                      step="1"
+                      value={restockingFeePercent}
+                      onChange={e => setRestockingFeePercent(parseInt(e.target.value) || 0)}
+                      className="w-full accent-amber-600 cursor-pointer"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Financial Breakdown Pills */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-3 pt-3 border-t border-amber-200/80">
-              <div className="bg-white rounded-xl p-2.5 border border-amber-200">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-amber-200/90">
+              <div className="bg-white rounded-xl p-2.5 border border-amber-200 shadow-2xs">
                 <div className="text-[10px] font-bold text-slate-500 uppercase">Gross Return Value</div>
-                <div className="text-sm font-black text-slate-900 mt-0.5">
+                <div className="text-base font-black text-slate-900 mt-0.5">
                   ₹{grossRefundAmount.toFixed(2)}
                 </div>
+                <div className="text-[10px] text-slate-400 font-medium">Billed Item Total</div>
               </div>
 
-              <div className="bg-white rounded-xl p-2.5 border border-amber-200">
-                <div className="text-[10px] font-bold text-amber-700 uppercase flex items-center justify-between">
-                  <span>15% Handling Deduction</span>
-                  {applyRestockingFee && <span className="text-[9px] bg-amber-100 px-1.5 py-0.2 rounded font-mono">-15%</span>}
+              <div className="bg-white rounded-xl p-2.5 border border-amber-200 shadow-2xs">
+                <div className="text-[10px] font-bold text-amber-800 uppercase flex items-center justify-between">
+                  <span>{restockingFeePercent}% Restocking Deduction</span>
+                  {applyRestockingFee && (
+                    <span className="text-[9px] bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.2 rounded font-mono font-bold">
+                      -{restockingFeePercent}%
+                    </span>
+                  )}
                 </div>
-                <div className="text-sm font-black text-rose-600 mt-0.5">
+                <div className="text-base font-black text-rose-600 mt-0.5">
                   {applyRestockingFee ? `-₹${restockingFeeDeducted.toFixed(2)}` : '₹0.00 (Waived)'}
                 </div>
+                <div className="text-[10px] text-amber-700 font-medium truncate max-w-[200px]" title={feeReason}>
+                  {applyRestockingFee ? feeReason : 'Full Customer Courtesy Refund'}
+                </div>
               </div>
 
-              <div className="bg-emerald-50 rounded-xl p-2.5 border border-emerald-300">
-                <div className="text-[10px] font-bold text-emerald-800 uppercase">Net Payable Refund</div>
-                <div className="text-sm font-black text-emerald-900 mt-0.5">
+              <div className="bg-emerald-50 rounded-xl p-2.5 border border-emerald-300 shadow-2xs">
+                <div className="text-[10px] font-bold text-emerald-800 uppercase flex items-center justify-between">
+                  <span>Net Refund Payable</span>
+                  <span className="text-[9px] bg-emerald-200 text-emerald-900 font-bold px-1.5 py-0.2 rounded">
+                    {refundMethod}
+                  </span>
+                </div>
+                <div className="text-base font-black text-emerald-900 mt-0.5">
                   ₹{netRefundAmount.toFixed(2)}
                 </div>
+                <div className="text-[10px] text-emerald-700 font-medium">Payable to Customer</div>
               </div>
             </div>
           </div>
@@ -484,7 +637,7 @@ export const ReturnsPage: React.FC = () => {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs" style={{ minWidth: '700px' }}>
+              <table className="w-full text-left border-collapse text-xs" style={{ minWidth: '760px' }}>
                 <thead>
                   <tr className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                     <th className="px-4 py-2.5">Medicine Name</th>
@@ -494,7 +647,7 @@ export const ReturnsPage: React.FC = () => {
                     <th className="px-3 py-2.5 text-right">Unit Rate</th>
                     <th className="px-3 py-2.5 text-center">Reason</th>
                     <th className="px-3 py-2.5 text-center">Restocked</th>
-                    <th className="px-4 py-2.5 text-right">Line Total</th>
+                    <th className="px-4 py-2.5 text-right">Line Refund (Gross / Fee / Net)</th>
                     <th className="px-3 py-2.5 text-center"></th>
                   </tr>
                 </thead>
@@ -506,46 +659,65 @@ export const ReturnsPage: React.FC = () => {
                       </td>
                     </tr>
                   ) : (
-                    returnItems.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-2.5 font-bold text-slate-900">{item.productName}</td>
-                        <td className="px-3 py-2.5 text-center font-mono text-slate-700">{item.batchNumber}</td>
-                        <td className="px-3 py-2.5 text-center">
-                          <span className="text-[10px] font-black bg-cyan-50 text-cyan-800 border border-cyan-200 px-2 py-0.5 rounded-full inline-flex items-center space-x-1">
-                            <MapPin className="w-2.5 h-2.5 text-cyan-600" />
-                            <span>{item.rackLocation || 'Rack B-01'}</span>
-                          </span>
-                        </td>
-                        <td className="px-3 py-2.5 text-center font-black text-slate-900">{item.quantityReturned}</td>
-                        <td className="px-3 py-2.5 text-right font-semibold text-slate-800">₹{item.unitPrice.toFixed(2)}</td>
-                        <td className="px-3 py-2.5 text-center">
-                          <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">
-                            {item.reason.replace(/_/g, ' ')}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2.5 text-center">
-                          {item.restocked ? (
-                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                              Yes (➔ Put-Away)
+                    returnItems.map((item, idx) => {
+                      const lineFee = applyRestockingFee ? (item.refundAmount * restockingFeePercent) / 100 : 0;
+                      const lineNet = item.refundAmount - lineFee;
+
+                      return (
+                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-2.5">
+                            <div className="font-bold text-slate-900">{item.productName}</div>
+                          </td>
+                          <td className="px-3 py-2.5 text-center font-mono text-slate-700">{item.batchNumber}</td>
+                          <td className="px-3 py-2.5 text-center">
+                            <span className="text-[10px] font-black bg-cyan-50 text-cyan-800 border border-cyan-200 px-2 py-0.5 rounded-full inline-flex items-center space-x-1">
+                              <MapPin className="w-2.5 h-2.5 text-cyan-600" />
+                              <span>{item.rackLocation || 'Rack B-01'}</span>
                             </span>
-                          ) : (
-                            <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
-                              No (Disposal)
+                          </td>
+                          <td className="px-3 py-2.5 text-center font-black text-slate-900">{item.quantityReturned}</td>
+                          <td className="px-3 py-2.5 text-right font-semibold text-slate-800">₹{item.unitPrice.toFixed(2)}</td>
+                          <td className="px-3 py-2.5 text-center">
+                            <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">
+                              {item.reason.replace(/_/g, ' ')}
                             </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2.5 text-right font-black text-slate-900">₹{item.refundAmount.toFixed(2)}</td>
-                        <td className="px-3 py-2.5 text-center">
-                          <button
-                            onClick={() => handleRemoveReturnItem(idx)}
-                            className="text-slate-400 hover:text-rose-600 p-1 cursor-pointer"
-                            title="Remove Line Item"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
+                          </td>
+                          <td className="px-3 py-2.5 text-center">
+                            {item.restocked ? (
+                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                Yes (➔ Put-Away)
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
+                                No (Disposal)
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-mono">
+                            <div className="font-black text-slate-900 text-xs">
+                              ₹{lineNet.toFixed(2)}
+                            </div>
+                            {applyRestockingFee && (
+                              <div className="text-[10px] text-rose-600 font-bold">
+                                -₹{lineFee.toFixed(2)} ({restockingFeePercent}%)
+                              </div>
+                            )}
+                            <div className="text-[9.5px] text-slate-400">
+                              Gross: ₹{item.refundAmount.toFixed(2)}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5 text-center">
+                            <button
+                              onClick={() => handleRemoveReturnItem(idx)}
+                              className="text-slate-400 hover:text-rose-600 p-1 cursor-pointer"
+                              title="Remove Line Item"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -554,7 +726,7 @@ export const ReturnsPage: React.FC = () => {
             {/* Bottom Action Bar */}
             <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-wrap justify-between items-center gap-3">
               <div className="text-xs text-slate-500 max-w-lg">
-                💡 Issuing this credit note records the refund voucher, logs the 15% restocking fee deduction, and automatically queues restockable items into the <strong>Physical Shelf Put-Away Queue</strong>.
+                💡 Issuing this credit note records the refund voucher, logs the {restockingFeePercent}% restocking fee deduction, and automatically queues restockable items into the <strong>Physical Shelf Put-Away Queue</strong>.
               </div>
               <button
                 onClick={handleProcessReturn}
@@ -574,31 +746,43 @@ export const ReturnsPage: React.FC = () => {
           {/* Generated Credit Note Modal / Card Preview */}
           {generatedNote && (
             <div className="bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-4 shadow-sm text-xs text-emerald-950 space-y-3 animate-fadeIn">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center space-x-2">
                   <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                   <span className="font-extrabold text-sm font-heading">
                     Credit Note Issued: {generatedNote.creditNoteNo}
                   </span>
-                  <span className="text-[10px] bg-emerald-200/80 text-emerald-900 font-bold px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] bg-emerald-200/80 text-emerald-900 font-bold px-2 py-0.5 rounded-full border border-emerald-300">
                     {generatedNote.refundMethod} Refund Completed
                   </span>
                 </div>
-                <button
-                  onClick={() => setGeneratedNote(null)}
-                  className="text-xs bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg hover:bg-emerald-800 cursor-pointer"
-                >
-                  Dismiss Preview
-                </button>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => {
+                      setActivePrintNote(generatedNote);
+                      setShowCreditNoteModal(true);
+                    }}
+                    className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer transition-all active:scale-95"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>🖨️ Print Thermal Credit Note</span>
+                  </button>
+                  <button
+                    onClick={() => setGeneratedNote(null)}
+                    className="text-xs bg-emerald-200 text-emerald-900 font-bold px-3 py-1.5 rounded-xl hover:bg-emerald-300 cursor-pointer"
+                  >
+                    Dismiss
+                  </button>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 bg-white/80 p-3 rounded-xl border border-emerald-200 text-[11px]">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 bg-white/90 p-3 rounded-xl border border-emerald-200 text-[11px]">
                 <div>Original Invoice: <strong className="font-mono text-slate-800">{generatedNote.originalInvoiceNo}</strong></div>
                 <div>Patient Name: <strong className="text-slate-800">{generatedNote.patientName}</strong></div>
                 <div>Gross Value: <strong className="text-slate-800">₹{(generatedNote.grossRefundAmount || generatedNote.totalRefundAmount).toFixed(2)}</strong></div>
                 <div>
                   Restocking Fee: <strong className="text-amber-800">
-                    {generatedNote.restockingFeeDeducted ? `-₹${generatedNote.restockingFeeDeducted.toFixed(2)} (15%)` : 'Waived'}
+                    {generatedNote.restockingFeeDeducted ? `-₹${generatedNote.restockingFeeDeducted.toFixed(2)} (${generatedNote.restockingFeePercent || 15}%)` : 'Waived'}
                   </strong>
                 </div>
               </div>
@@ -624,31 +808,45 @@ export const ReturnsPage: React.FC = () => {
           {/* Processed Return Credit Notes Log */}
           {returnNotes.length > 0 && (
             <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-3">
-              <h3 className="text-xs font-bold text-slate-900 font-heading">
-                Processed Return Credit Notes ({returnNotes.length})
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-slate-900 font-heading">
+                  Processed Return Credit Notes ({returnNotes.length})
+                </h3>
+                <span className="text-[10px] text-slate-400">Click 'Print Voucher' to print thermal slip</span>
+              </div>
               <div className="space-y-2">
                 {returnNotes.map((note) => (
                   <div
                     key={note.creditNoteNo}
-                    className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex justify-between items-center text-xs flex-wrap gap-2"
+                    className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex justify-between items-center text-xs flex-wrap gap-2 hover:bg-slate-100/70 transition-colors"
                   >
                     <div>
-                      <span className="font-mono font-bold text-slate-800">{note.creditNoteNo}</span>
+                      <span className="font-mono font-bold text-slate-900">{note.creditNoteNo}</span>
                       <span className="text-slate-400 mx-2">•</span>
                       <span className="font-semibold text-slate-700">Orig: {note.originalInvoiceNo}</span>
                       <span className="text-slate-400 mx-2">•</span>
                       <span className="text-slate-600">Patient: {note.patientName}</span>
                       {note.restockingFeeDeducted && note.restockingFeeDeducted > 0 && (
-                        <span className="ml-2 text-[9.5px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded">
-                          15% Fee: -₹{note.restockingFeeDeducted.toFixed(2)}
+                        <span className="ml-2 text-[9.5px] bg-amber-100 text-amber-900 border border-amber-300 font-bold px-1.5 py-0.5 rounded">
+                          {note.restockingFeePercent || 15}% Restock Fee: -₹{note.restockingFeeDeducted.toFixed(2)}
                         </span>
                       )}
                     </div>
-                    <div className="text-right">
+                    <div className="flex items-center space-x-3">
                       <span className="font-black text-rose-700">
                         ₹{note.totalRefundAmount.toFixed(2)} ({note.refundMethod})
                       </span>
+                      <button
+                        onClick={() => {
+                          setActivePrintNote(note);
+                          setShowCreditNoteModal(true);
+                        }}
+                        className="px-2.5 py-1 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 hover:text-slate-900 font-bold text-[11px] rounded-lg shadow-2xs cursor-pointer flex items-center space-x-1"
+                        title="Print 80mm Thermal Return Voucher"
+                      >
+                        <Printer className="w-3 h-3 text-slate-500" />
+                        <span>Print Slip</span>
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -663,6 +861,19 @@ export const ReturnsPage: React.FC = () => {
       {/* ════════════════════════════════════════════════════════════════ */}
       {activeTab === 'PUTAWAY_QUEUE' && (
         <div className="space-y-4">
+          {/* Put-Away Floating Toast */}
+          {putAwayToast && (
+            <div className="bg-purple-900 text-white text-xs font-bold p-3.5 rounded-2xl flex items-center justify-between shadow-md border border-purple-700 animate-fadeIn">
+              <div className="flex items-center space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-purple-300" />
+                <span>{putAwayToast}</span>
+              </div>
+              <button onClick={() => setPutAwayToast(null)} className="text-purple-300 hover:text-white p-1 cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
           {/* Put-Away Operational KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 shadow-xs">
@@ -674,7 +885,7 @@ export const ReturnsPage: React.FC = () => {
                 {pendingPutAwayCount}
               </div>
               <p className="text-[10px] text-purple-600 mt-0.5">
-                Returned medicines waiting on counter to be placed on storage racks
+                Returned medicines waiting on counter for idle staff shelf placement
               </p>
             </div>
 
@@ -711,37 +922,101 @@ export const ReturnsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Search and Status Filters */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-xs flex flex-wrap items-center justify-between gap-2.5">
-            <div className="relative flex-1 min-w-[240px]">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={putAwaySearch}
-                onChange={e => setPutAwaySearch(e.target.value)}
-                placeholder="Search by medicine, batch, rack (e.g. Rack B-14)..."
-                className="w-full pl-9 pr-3 py-1.5 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
-              />
+          {/* Search, Rack Filter & Idle Staff Actions Toolbar */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-3.5 shadow-xs space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+              {/* Search */}
+              <div className="relative md:col-span-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={putAwaySearch}
+                  onChange={e => setPutAwaySearch(e.target.value)}
+                  placeholder="Search medicine, batch, rack..."
+                  className="w-full pl-9 pr-3 py-1.5 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
+                />
+              </div>
+
+              {/* Filter by Rack / Aisle */}
+              <div className="flex items-center space-x-1.5 text-xs font-semibold">
+                <span className="text-slate-500 whitespace-nowrap flex items-center space-x-1">
+                  <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Rack:</span>
+                </span>
+                <select
+                  value={selectedRackFilter}
+                  onChange={e => setSelectedRackFilter(e.target.value)}
+                  className="w-full p-1.5 border border-slate-300 rounded-xl text-xs font-bold bg-white text-slate-800 focus:outline-hidden cursor-pointer"
+                >
+                  <option value="ALL">All Storage Locations ({putAwayTasks.length})</option>
+                  {availableRacks.map(r => (
+                    <option key={r} value={r}>📍 {r}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Restocker Staff Selector */}
+              <div className="flex items-center space-x-1.5 text-xs font-semibold">
+                <span className="text-slate-500 whitespace-nowrap flex items-center space-x-1">
+                  <User className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Restocker:</span>
+                </span>
+                <select
+                  value={selectedRestockerStaff}
+                  onChange={e => setSelectedRestockerStaff(e.target.value)}
+                  className="w-full p-1.5 border border-slate-300 rounded-xl text-xs font-bold bg-white text-purple-900 focus:outline-hidden cursor-pointer"
+                >
+                  <option value="Ramesh Kumar (Lead Pharmacist)">Ramesh Kumar (Lead Pharmacist)</option>
+                  <option value="Priya Sharma (Counter 2)">Priya Sharma (Counter 2)</option>
+                  <option value="Suresh Patel (Store Associate)">Suresh Patel (Store Associate)</option>
+                  <option value="Amit Verma (Inventory Clerk)">Amit Verma (Inventory Clerk)</option>
+                </select>
+              </div>
             </div>
 
-            <div className="flex items-center space-x-1.5 text-xs font-bold">
-              {[
-                { key: 'ALL',       label: `All Items (${putAwayTasks.length})` },
-                { key: 'PENDING',   label: `⏳ Pending (${pendingPutAwayCount})` },
-                { key: 'COMPLETED', label: `✓ Completed (${completedPutAwayCount})` },
-              ].map(tab => (
+            {/* Status Pills & Idle Counter Staff Bulk Actions */}
+            <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-slate-100">
+              <div className="flex items-center space-x-1.5 text-xs font-bold">
+                {[
+                  { key: 'ALL',       label: `All Items (${putAwayTasks.length})` },
+                  { key: 'PENDING',   label: `⏳ Pending (${pendingPutAwayCount})` },
+                  { key: 'COMPLETED', label: `✓ Completed (${completedPutAwayCount})` },
+                ].map(tab => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setPutAwayFilter(tab.key as any)}
+                    className={`px-3 py-1 rounded-xl transition-all cursor-pointer ${
+                      putAwayFilter === tab.key
+                        ? 'bg-purple-700 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Bulk Put-Away & Print Routing Slip Actions */}
+              <div className="flex items-center space-x-2">
+                {pendingPutAwayCount > 0 && (
+                  <button
+                    onClick={() => handleBulkPutAwayRack(selectedRackFilter === 'ALL' ? undefined : selectedRackFilter)}
+                    className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center space-x-1 cursor-pointer active:scale-95"
+                    title="Complete put-away for all items in the filtered rack"
+                  >
+                    <Box className="w-3.5 h-3.5" />
+                    <span>⚡ Bulk Restock {selectedRackFilter === 'ALL' ? 'All Pending' : selectedRackFilter}</span>
+                  </button>
+                )}
                 <button
-                  key={tab.key}
-                  onClick={() => setPutAwayFilter(tab.key as any)}
-                  className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
-                    putAwayFilter === tab.key
-                      ? 'bg-purple-700 text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
+                  onClick={() => setShowPutAwaySlipModal(true)}
+                  className="px-3 py-1.5 bg-white border border-purple-300 hover:bg-purple-50 text-purple-900 font-bold text-xs rounded-xl shadow-2xs transition-all flex items-center space-x-1 cursor-pointer"
+                  title="Print an 80mm routing checklist slip for shelf placement"
                 >
-                  {tab.label}
+                  <Printer className="w-3.5 h-3.5 text-purple-600" />
+                  <span>📄 Print Shelf Routing Slip</span>
                 </button>
-              ))}
+              </div>
             </div>
           </div>
 
@@ -753,12 +1028,12 @@ export const ReturnsPage: React.FC = () => {
                 <span>Physical Put-Away Operational Tasks ({filteredPutAwayTasks.length})</span>
               </span>
               <span className="text-[11px] text-slate-400">
-                Returned items waiting for staff shelf placement
+                Idle counter staff can confirm physical shelf placement below
               </span>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs" style={{ minWidth: '750px' }}>
+              <table className="w-full text-left border-collapse text-xs" style={{ minWidth: '780px' }}>
                 <thead>
                   <tr className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                     <th className="px-4 py-2.5">Medicine Name</th>
@@ -775,7 +1050,7 @@ export const ReturnsPage: React.FC = () => {
                   {filteredPutAwayTasks.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="py-12 text-center text-slate-400">
-                        No put-away tasks found for the current search filter.
+                        No put-away tasks found for the current search/rack filter.
                       </td>
                     </tr>
                   ) : (
@@ -790,7 +1065,7 @@ export const ReturnsPage: React.FC = () => {
                         </td>
                         <td className="px-3 py-3 text-center font-black text-purple-900">
                           <span className="bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-full">
-                            {task.quantity} Units
+                            +{task.quantity} Units
                           </span>
                         </td>
                         <td className="px-3 py-3">
@@ -846,10 +1121,10 @@ export const ReturnsPage: React.FC = () => {
                             <button
                               onClick={() => dispatch(completePutAwayTask({
                                 taskId: task.id,
-                                restockedBy: currentUser?.pharmacistName || 'Staff Restocker'
+                                restockedBy: selectedRestockerStaff
                               }))}
                               className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer active:scale-95 inline-flex items-center space-x-1"
-                              title="Confirm physical medicine put-away on shelf"
+                              title={`Confirm physical medicine put-away on ${task.rackLocation}`}
                             >
                               <Check className="w-3.5 h-3.5" />
                               <span>Put Away ✓</span>
@@ -876,6 +1151,219 @@ export const ReturnsPage: React.FC = () => {
                 className="text-purple-700 hover:underline font-bold cursor-pointer"
               >
                 Open Visual Shelf Map →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL 1: 80MM THERMAL RETURN CREDIT NOTE PRINT MODAL (Task #22) ── */}
+      {showCreditNoteModal && activePrintNote && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+            
+            {/* Modal Top Header */}
+            <div className="p-3.5 bg-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Printer className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs font-black uppercase tracking-wider">80mm Thermal Credit Note Voucher</span>
+              </div>
+              <button
+                onClick={() => setShowCreditNoteModal(false)}
+                className="text-slate-400 hover:text-white p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Thermal Slip Content (Simulating 80mm POS Receipt) */}
+            <div className="p-5 overflow-y-auto bg-amber-50/20 font-mono text-[11px] text-slate-900 space-y-3 select-text border-b border-dashed border-slate-300">
+              {/* Store Header */}
+              <div className="text-center space-y-0.5">
+                <h2 className="text-sm font-black tracking-tight text-slate-900 font-sans">GENQUANTAA HEALTHCARE PHARMACY</h2>
+                <p className="text-[10px] text-slate-500">Retail &amp; Clinical Dispensing License</p>
+                <p className="text-[10px] text-slate-600">D.L. No: TG/HYD/2024/0084 · GSTIN: 36AAACG0123M1Z8</p>
+                <p className="text-[10px] text-slate-600">Road No. 2, Banjara Hills, Hyderabad - 500034</p>
+                <p className="text-[10px] text-slate-600">Phone: +91 98490 12345 · Helpline: 1800-425-7890</p>
+              </div>
+
+              <div className="border-t border-b border-dashed border-slate-400 py-1 text-center font-bold text-[11.5px] uppercase tracking-wider">
+                *** CUSTOMER RETURN CREDIT NOTE ***
+              </div>
+
+              {/* Receipt Metadata */}
+              <div className="grid grid-cols-2 gap-1 text-[10px] text-slate-700">
+                <div>Credit Note No: <strong className="text-slate-900">{activePrintNote.creditNoteNo}</strong></div>
+                <div className="text-right">Date: {activePrintNote.returnDate}</div>
+                <div>Original Inv: <strong className="text-slate-900">{activePrintNote.originalInvoiceNo}</strong></div>
+                <div className="text-right">Patient: <strong className="text-slate-900">{activePrintNote.patientName}</strong></div>
+                <div>Pharmacist: {selectedRestockerStaff.split(' ')[0]}</div>
+                <div className="text-right">Channel: <strong>{activePrintNote.refundMethod}</strong></div>
+              </div>
+
+              {/* Returned Items Table */}
+              <div className="border-t border-b border-dashed border-slate-400 py-1.5 space-y-1">
+                <div className="flex justify-between font-bold text-[10px] text-slate-600 uppercase">
+                  <span>Item &amp; Batch</span>
+                  <span>Qty × Rate</span>
+                  <span className="text-right">Gross Total</span>
+                </div>
+                {activePrintNote.items.map((it, i) => (
+                  <div key={i} className="text-[10.5px]">
+                    <div className="flex justify-between font-bold text-slate-900">
+                      <span>{it.productName}</span>
+                      <span>₹{it.refundAmount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-[9.5px] text-slate-500">
+                      <span>Batch: {it.batchNumber} (Shelf: {it.rackLocation || 'Rack B-01'})</span>
+                      <span>{it.quantityReturned} × ₹{it.unitPrice.toFixed(2)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Financial Totals */}
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between text-slate-600">
+                  <span>Gross Return Value:</span>
+                  <span className="font-bold">₹{(activePrintNote.grossRefundAmount || activePrintNote.totalRefundAmount).toFixed(2)}</span>
+                </div>
+
+                <div className="flex justify-between text-rose-700 font-bold">
+                  <span>
+                    Statutory Restocking Fee ({activePrintNote.restockingFeePercent || 15}%):
+                  </span>
+                  <span>
+                    {activePrintNote.restockingFeeDeducted && activePrintNote.restockingFeeDeducted > 0
+                      ? `-₹${activePrintNote.restockingFeeDeducted.toFixed(2)}`
+                      : '₹0.00 (Waived)'}
+                  </span>
+                </div>
+
+                {activePrintNote.feeReason && (
+                  <div className="text-[9.5px] text-amber-800 italic pl-1">
+                    Reason: {activePrintNote.feeReason}
+                  </div>
+                )}
+
+                <div className="border-t border-slate-400 pt-1 flex justify-between text-sm font-black text-slate-900">
+                  <span>NET REFUND PAYABLE:</span>
+                  <span>₹{activePrintNote.totalRefundAmount.toFixed(2)}</span>
+                </div>
+              </div>
+
+              {/* Barcode & Policy Note */}
+              <div className="text-center pt-2 space-y-1">
+                <div className="font-mono text-xs tracking-widest text-slate-600">
+                  * {activePrintNote.creditNoteNo} *
+                </div>
+                <div className="text-[9px] text-slate-500 leading-tight">
+                  Statutory 15% handling/inspection fee deducted per Indian Pharmacy Retail Return Policy. Store credit vouchers are valid across all GENQUANTAA branches for 30 days.
+                </div>
+                <div className="text-[9.5px] font-bold text-slate-700">*** THANK YOU · GENQUANTAA CARES ***</div>
+              </div>
+            </div>
+
+            {/* Modal Bottom Action Buttons */}
+            <div className="p-3 bg-slate-50 flex items-center justify-between gap-2 text-xs">
+              <button
+                onClick={() => setShowCreditNoteModal(false)}
+                className="px-3.5 py-2 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-100 cursor-pointer"
+              >
+                Close
+              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => alert(`Downloaded PDF voucher for ${activePrintNote.creditNoteNo}`)}
+                  className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-xl flex items-center space-x-1 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download PDF</span>
+                </button>
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow-xs flex items-center space-x-1.5 cursor-pointer active:scale-95"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Print 80mm Slip</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL 2: 80MM SHELF PUT-AWAY ROUTING SLIP (Task #23) ──────────── */}
+      {showPutAwaySlipModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-3.5 bg-purple-950 text-white flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Box className="w-4 h-4 text-purple-300" />
+                <span className="text-xs font-black uppercase tracking-wider">Shelf Put-Away Pick &amp; Placement Slip</span>
+              </div>
+              <button
+                onClick={() => setShowPutAwaySlipModal(false)}
+                className="text-purple-300 hover:text-white p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto bg-purple-50/20 font-mono text-[11px] text-slate-900 space-y-3 select-text">
+              <div className="text-center space-y-0.5">
+                <h3 className="text-sm font-black font-sans text-purple-950">GENQUANTAA PHARMACY</h3>
+                <p className="text-[10px] text-purple-700 font-bold uppercase tracking-wider">Counter Returns Put-Away Routing Sheet</p>
+                <p className="text-[10px] text-slate-500">
+                  Date: {new Date().toLocaleDateString('en-IN')} · Restocker: {selectedRestockerStaff}
+                </p>
+              </div>
+
+              <div className="border-t border-b border-dashed border-purple-300 py-1 text-center font-bold text-[10.5px] text-purple-900">
+                PENDING SHELF RESTOCKS: {putAwayTasks.filter(t => t.status === 'PENDING').length} ITEMS
+              </div>
+
+              <div className="space-y-2.5">
+                {putAwayTasks.filter(t => t.status === 'PENDING').map((t, idx) => (
+                  <div key={t.id} className="bg-white p-2.5 rounded-xl border border-purple-200 space-y-1">
+                    <div className="flex items-center justify-between font-bold text-slate-900">
+                      <span className="flex items-center space-x-1.5">
+                        <span className="w-4 h-4 border border-slate-400 rounded-sm inline-block"></span>
+                        <span>{idx + 1}. {t.productName}</span>
+                      </span>
+                      <span className="text-purple-700 font-black">+{t.quantity} Units</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1 text-[10px] text-slate-600 pl-5">
+                      <div>Batch: <strong className="font-mono">{t.batchNumber}</strong></div>
+                      <div>Coord: <strong className="text-cyan-800">📍 {t.rackLocation}</strong></div>
+                      <div className="col-span-2 text-slate-500">
+                        Placement: {t.shelfTier || 'Tier 2 (Mid)'} · {t.binNumber || 'Bin 04'} (Ref: {t.creditNoteNo})
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="border-t border-dashed border-slate-400 pt-2 text-[9.5px] text-slate-500 text-center space-y-1">
+                <p>Verify seal integrity before placing medicines back onto storage racks.</p>
+                <p className="pt-2 text-slate-700 font-bold">Physical Restock Signature: ______________________</p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 flex items-center justify-between gap-2 text-xs">
+              <button
+                onClick={() => setShowPutAwaySlipModal(false)}
+                className="px-3.5 py-2 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-100 cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => window.print()}
+                className="px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white font-black rounded-xl shadow-xs flex items-center space-x-1.5 cursor-pointer active:scale-95"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Print Routing Slip</span>
               </button>
             </div>
           </div>
