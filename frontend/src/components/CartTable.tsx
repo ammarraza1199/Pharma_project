@@ -16,15 +16,26 @@ import {
   applyNearExpiryClearanceDiscount,
   addClearanceGiftToCart,
   applySentimentDiscount,
-  setRackRoboModalOpen
+  setRackRoboModalOpen,
+  addItemToCart
 } from '../store/posSlice';
 import { analyzeDrugInteractions } from '../utils/drugInteractionEngine';
 import { getMedicineDetails } from '../utils/medicineDetails';
 import {
+  analyzeMarginMaximizer,
+  companionItemToProduct,
+  type CompanionItem
+} from '../utils/marginMaximizerEngine';
+import { CLINICAL_CARE_BUNDLES } from '../utils/clinicalBundlesEngine';
+import { ConvinceCustomerCard } from './ConvinceCustomerCard';
+import { ClinicalBundleModal } from './ClinicalBundleModal';
+import type { Product } from '../types/pos';
+import {
   Trash2, Plus, Minus, AlertTriangle, AlertOctagon, UserCheck,
   Stethoscope, Edit2, Percent, FileText, RefreshCcw, Pill, Mic, Volume2, Zap,
   PackageOpen, BadgeAlert, Tag, Gift, Sparkles, CheckCircle2, X,
-  Star, ArrowRightLeft, BellRing, MapPin
+  Star, ArrowRightLeft, BellRing, MapPin, TrendingUp, ChevronDown, ChevronUp,
+  Lightbulb, Flame, Coins, ShieldCheck
 } from 'lucide-react';
 
 export const CartTable: React.FC = () => {
@@ -42,8 +53,29 @@ export const CartTable: React.FC = () => {
   const [showBulkDiscount, setShowBulkDiscount] = useState<boolean>(false);
   const [customBulkDiscount, setCustomBulkDiscount] = useState<string>('');
   const [dismissClearancePrompt, setDismissClearancePrompt] = useState<boolean>(false);
+  const [isMarginMaximizerOpen, setIsMarginMaximizerOpen] = useState<boolean>(true);
+  const [addedCompanionId, setAddedCompanionId] = useState<string | null>(null);
+  const [isCartConvinceOpen, setIsCartConvinceOpen] = useState<boolean>(false);
+  const [cartConvinceProduct, setCartConvinceProduct] = useState<{ alternative: Product; originalName: string } | null>(null);
+  const [isBundleModalOpen, setIsBundleModalOpen] = useState<boolean>(false);
+  const [selectedBundleId, setSelectedBundleId] = useState<string | undefined>(undefined);
 
   const interactionResult = analyzeDrugInteractions(items);
+  const marginAnalysis = analyzeMarginMaximizer(items);
+
+  const handleAddCompanion = (companion: CompanionItem) => {
+    const prod = companionItemToProduct(companion);
+    dispatch(
+      addItemToCart({
+        product: prod,
+        selectedBatch: companion.sampleBatch,
+        quantity: 1,
+        unitMode: 'PACK'
+      })
+    );
+    setAddedCompanionId(companion.id);
+    setTimeout(() => setAddedCompanionId(null), 1600);
+  };
 
   // ── UNIFIED EXPIRY BADGE SYSTEM (Red / Orange / Amber / Green) ──────────
   type ExpiryLevel = 'URGENT' | 'CRITICAL' | 'WARNING' | 'SAFE' | 'EXPIRED';
@@ -533,6 +565,21 @@ export const CartTable: React.FC = () => {
                               <Star className="w-2.5 h-2.5 text-amber-600 fill-amber-500" />
                               <span>Best Seller Alternative</span>
                             </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCartConvinceProduct({
+                                  alternative: item.product,
+                                  originalName: item.substitutedFor || 'Prescribed Brand'
+                                });
+                                setIsCartConvinceOpen(true);
+                              }}
+                              className="text-[9px] bg-amber-100 hover:bg-amber-200 text-amber-950 font-black px-1.5 py-0.2 rounded border border-amber-300 flex items-center space-x-0.5 shadow-2xs transition-colors cursor-pointer"
+                              title="Open Convince Customer talking points & bio-equivalence reassurance"
+                            >
+                              <Sparkles className="w-2.5 h-2.5 text-amber-700" />
+                              <span>🗣️ Convince Script</span>
+                            </button>
                           </>
                         ) : item.discountPercent > 0 ? (
                           <span className="text-[9px] bg-emerald-50 text-emerald-700 font-bold px-1 rounded border border-emerald-200">
@@ -577,6 +624,29 @@ export const CartTable: React.FC = () => {
                           <MapPin className="w-2.5 h-2.5 text-cyan-600" />
                           <span>{item.selectedBatch?.location || 'Rack'}</span>
                         </button>
+
+                        {/* Clinical Care Bundle Affinity Indicator */}
+                        {(() => {
+                          const matchedBundle = CLINICAL_CARE_BUNDLES.find(b =>
+                            b.items.some(bi => bi.name.toLowerCase().includes(item.product.name.toLowerCase()) || item.product.name.toLowerCase().includes(bi.name.toLowerCase())) ||
+                            b.triggerKeywords.some((kw: string) => item.product.name.toLowerCase().includes(kw.toLowerCase()) || (item.product.saltComposition || '').toLowerCase().includes(kw.toLowerCase()))
+                          );
+                          if (!matchedBundle || item.isClearanceGift) return null;
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedBundleId(matchedBundle.id);
+                                setIsBundleModalOpen(true);
+                              }}
+                              className="text-[9px] bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold px-1.5 py-0.5 rounded border border-teal-200 flex items-center space-x-1 cursor-pointer transition-colors shadow-2xs"
+                              title={`Click to view complete ${matchedBundle.title} bundle`}
+                            >
+                              <span>{matchedBundle.iconEmoji}</span>
+                              <span>Kit: {matchedBundle.shortTitle}</span>
+                            </button>
+                          );
+                        })()}
                       </div>
 
                       {/* ── ⚠️ TASK #54: CUSTOMER ADHERENCE PARTIAL COURSE DETECTION ── */}
@@ -878,7 +948,176 @@ export const CartTable: React.FC = () => {
         )}
       </div>
 
-      {/* ── INLINE MINOR AI DRUG INTERACTION ALERT ─────────────────── */}
+      {/* ── 💎 TASK #45: PROFIT MAKER / MARGIN MAXIMIZER SHELF WIDGET ──────── */}
+      <div className="mt-2.5 flex-shrink-0 bg-gradient-to-r from-emerald-50 via-teal-50/60 to-indigo-50/70 border-2 border-emerald-300/80 rounded-2xl p-2.5 shadow-xs transition-all">
+        {/* Widget Header Bar */}
+        <div className="flex items-center justify-between flex-wrap gap-2 pb-1.5 border-b border-emerald-200/60">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white flex items-center justify-center shadow-xs flex-shrink-0">
+              <Sparkles className="w-4 h-4 text-amber-300 animate-spin-slow" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-black text-slate-900 tracking-tight flex items-center space-x-1">
+                  <span>💎 Profit Maker &amp; Margin Maximizer</span>
+                </span>
+                <span className="bg-emerald-100 text-emerald-800 text-[9px] font-black px-2 py-0.5 rounded-full border border-emerald-300 uppercase tracking-wider">
+                  35%–48% Margins
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-600">
+                Contextual high-margin companion checkout boosters recommended based on active cart medicines
+              </p>
+            </div>
+          </div>
+
+          {/* Real-time Profit & Margin Analytics */}
+          <div className="flex items-center space-x-2">
+            <div className="hidden sm:flex items-center space-x-1.5 bg-white/80 border border-emerald-200 px-2.5 py-1 rounded-xl shadow-2xs">
+              <Coins className="w-3.5 h-3.5 text-emerald-600" />
+              <div className="text-right">
+                <div className="text-[9px] font-bold text-slate-400 uppercase leading-none">Cart Gross Margin</div>
+                <div className="text-xs font-black text-emerald-800 leading-tight">
+                  {marginAnalysis.currentCartAvgMarginPercent}% (₹{marginAnalysis.currentCartGrossProfit.toFixed(2)})
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-1.5 bg-gradient-to-r from-amber-500 to-emerald-600 text-white px-2.5 py-1 rounded-xl shadow-2xs font-extrabold text-[11px]">
+              <Flame className="w-3.5 h-3.5 text-amber-200 animate-bounce" />
+              <span>
+                {marginAnalysis.maxPotentialProfitBumpPercent > 0
+                  ? `+${marginAnalysis.maxPotentialProfitBumpPercent}% Profit Bump`
+                  : 'High Profit Boosters'}
+              </span>
+            </div>
+
+            {/* Collapse / Expand Toggle */}
+            <button
+              onClick={() => setIsMarginMaximizerOpen(!isMarginMaximizerOpen)}
+              className="flex items-center space-x-1 text-xs font-bold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-xl transition-all cursor-pointer shadow-2xs"
+              title={isMarginMaximizerOpen ? 'Collapse Shelf' : 'Expand Shelf'}
+            >
+              <span>{isMarginMaximizerOpen ? 'Hide Shelf' : `Show Shelf (${marginAnalysis.recommendations.length})`}</span>
+              {isMarginMaximizerOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Horizontal Companion Shelf (Expanded) */}
+        {isMarginMaximizerOpen ? (
+          <div className="pt-2">
+            <div className="flex space-x-2.5 overflow-x-auto pb-1.5 pt-0.5 scrollbar-thin">
+              {marginAnalysis.recommendations.map((comp) => {
+                const isJustAdded = addedCompanionId === comp.id;
+
+                return (
+                  <div
+                    key={comp.id}
+                    className={`w-[220px] flex-shrink-0 bg-white/95 rounded-xl border p-2.5 flex flex-col justify-between shadow-2xs hover:shadow-md transition-all relative ${
+                      comp.isTopPick
+                        ? 'border-emerald-400 ring-2 ring-emerald-400/20'
+                        : 'border-slate-200 hover:border-emerald-300'
+                    }`}
+                  >
+                    {/* Top Affinity Badge */}
+                    {comp.isTopPick && (
+                      <div className="absolute -top-2 left-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[8.5px] font-black px-2 py-0.2 rounded-full shadow-xs uppercase tracking-wider flex items-center space-x-1">
+                        <Sparkles className="w-2.5 h-2.5 text-amber-300" />
+                        <span>Clinical Match</span>
+                      </div>
+                    )}
+
+                    <div>
+                      {/* Emoji + Category + Margin Tag */}
+                      <div className="flex items-start justify-between mt-1">
+                        <div className="text-xl leading-none">{comp.iconEmoji}</div>
+                        <span className="bg-emerald-50 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-md border border-emerald-300">
+                          {comp.badgeText}
+                        </span>
+                      </div>
+
+                      {/* Product Name & Pack Size */}
+                      <h4 className="text-[11px] font-extrabold text-slate-900 mt-1.5 line-clamp-2 leading-tight min-h-[28px]" title={comp.name}>
+                        {comp.name}
+                      </h4>
+                      <p className="text-[9.5px] text-slate-500 font-medium mt-0.5">
+                        {comp.packSize} • {comp.brand}
+                      </p>
+
+                      {/* Selling Price & Profit Contribution */}
+                      <div className="mt-2 bg-emerald-50/70 border border-emerald-200/80 rounded-lg p-1.5 flex items-center justify-between">
+                        <div>
+                          <div className="text-[9px] text-slate-500 line-through">MRP ₹{comp.mrp.toFixed(2)}</div>
+                          <div className="text-xs font-black text-slate-900">₹{comp.sellingPrice.toFixed(2)}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-[9px] font-bold text-emerald-700">
+                            +₹{comp.netProfitAmount.toFixed(2)} Profit
+                          </div>
+                          <div className="text-[8.5px] font-extrabold text-amber-700">
+                            +{comp.projectedProfitBumpPercent}% bump
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Clinical Reason & Talking Point */}
+                      <div className="mt-1.5 text-[9.5px] text-slate-600 bg-slate-50 border border-slate-200/60 rounded-md p-1 leading-snug">
+                        <p className="font-semibold text-slate-800 truncate" title={comp.clinicalReason}>
+                          💡 {comp.clinicalReason}
+                        </p>
+                        <p className="text-[8.5px] text-slate-500 italic truncate mt-0.5" title={comp.verbalScript}>
+                          🗣️ &quot;{comp.verbalScript}&quot;
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* 1-Click Instant Add Action */}
+                    <div className="mt-2.5">
+                      <button
+                        onClick={() => handleAddCompanion(comp)}
+                        disabled={isJustAdded}
+                        className={`w-full py-1.5 px-2 rounded-lg text-[10.5px] font-black transition-all cursor-pointer flex items-center justify-center space-x-1 shadow-xs active:scale-97 ${
+                          isJustAdded
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-slate-900 hover:bg-emerald-700 text-white'
+                        }`}
+                        title={`Add ${comp.name} to cart with 1 click`}
+                      >
+                        {isJustAdded ? (
+                          <>
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-200 animate-pulse" />
+                            <span>Added to Cart!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="w-3 h-3 text-amber-300" />
+                            <span>+ Add Companion (₹{comp.sellingPrice})</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          /* Collapsed Teaser Bar */
+          <div
+            onClick={() => setIsMarginMaximizerOpen(true)}
+            className="pt-1.5 flex items-center justify-between text-[11px] text-slate-700 font-bold cursor-pointer hover:text-emerald-800 transition-colors"
+          >
+            <div className="flex items-center space-x-1.5">
+              <span className="text-amber-500">⚡</span>
+              <span>
+                {marginAnalysis.recommendations.length} high-margin companion boosters available (Potential <strong>+{marginAnalysis.maxPotentialProfitBumpPercent}% profit bump</strong>).
+              </span>
+            </div>
+            <span className="text-emerald-700 hover:underline text-[10px] font-black">Open Shelf ▾</span>
+          </div>
+        )}
+      </div>
       {interactionResult.hasMinor && (
         <div className="mt-2.5 bg-amber-100/90 border border-amber-400 rounded-xl p-3 flex items-start space-x-2.5 text-amber-950 text-xs flex-shrink-0 shadow-2xs animate-fadeIn">
           <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5 animate-bounce" />
@@ -897,6 +1136,29 @@ export const CartTable: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* ── 🗣️ TASK #46: CONVINCE CUSTOMER FLOATING OVERLAY IN CART ─────── */}
+      {isCartConvinceOpen && cartConvinceProduct && (
+        <ConvinceCustomerCard
+          originalProduct={{
+            ...cartConvinceProduct.alternative,
+            name: cartConvinceProduct.originalName,
+            sellingPrice: Number((cartConvinceProduct.alternative.sellingPrice / 0.85).toFixed(2))
+          }}
+          alternativeProduct={cartConvinceProduct.alternative}
+          onClose={() => {
+            setIsCartConvinceOpen(false);
+            setCartConvinceProduct(null);
+          }}
+        />
+      )}
+
+      {/* ── CLINICAL CARE BUNDLE CATALOG MODAL ── */}
+      <ClinicalBundleModal
+        isOpen={isBundleModalOpen}
+        onClose={() => setIsBundleModalOpen(false)}
+        highlightBundleId={selectedBundleId}
+      />
     </div>
   );
 };

@@ -84,8 +84,8 @@ Inventory & Expiry,Low Stock Dashboard Alert,Dashboard display of low stock item
 Clinical & AI Insights,Expired Stock Prescription Review,View prescription history for expired/near-expiry stock and contact doctor.,,ExpiryManagementPage.tsx,Ask Doctor WhatsApp Memo,Connected
 Inventory & Expiry,Distributor Expiry Returns,Process distributor returns for near-expiry and expired stock.,,ExpiryManagementPage.tsx & ReturnsPage.tsx,POST /api/returns & Debit Note Log,Connected
 Store & Staff Ops,RAAC / Robotic Selection,Integration with automated/robotic drug selection systems (RAAC).,,RackSelectionRoboModal.tsx,Local 2D Visual Shelf & Bin Locator,Connected
-Clinical & AI Insights,Profit Maker Margin Maximizer,"Highlight higher-margin alternative brands (e.g. Dettol, Bandages) to boost profit.",,SmartSubstitutionModal.tsx,Local AI / Redux Logic,Connected
-Clinical & AI Insights,Sales Insights Pitch Guidance,Provide key messages and overlapping screens to help pharmacists convince customers.,,CartSummary.tsx,Local AI / Redux Logic,Connected
+Clinical & AI Insights,Profit Maker Margin Maximizer,"Highlight higher-margin companion items (e.g. Dettol, Bandages, Multivitamins) to boost profit.",,CartTable.tsx & ProductSearch.tsx & marginMaximizerEngine.ts,Local AI / Redux Logic,Connected
+Clinical & AI Insights,Sales Insights Pitch Guidance,Provide key messages and overlapping screens to help pharmacists convince customers.,,SmartSubstitutionModal.tsx & CartTable.tsx & ConvinceCustomerCard.tsx,Local AI / Redux Logic,Connected
 Clinical & AI Insights,Combo Recommendation Popup,Suggest complementary add-on products (Combos) during billing.,,CartSummary.tsx,Local AI / Redux Logic,Connected
 Billing & Invoicing,Discount & Value-Added Product Prompts,Prompt pharmacists with desirable value-added items at checkout.,,CartSummary.tsx,Local AI / Redux Logic,Connected
 CRM & Loyalty,Customer Voice Record & Discussion Notes,Record text/voice notes during customer discussion for consultation logging.,,Pending Audio Recording Module (Requires counter microphone audio recorder MediaRecorder API & consultation note storage),MediaRecorder API,Not Created

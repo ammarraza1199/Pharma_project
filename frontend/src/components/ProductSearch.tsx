@@ -21,11 +21,12 @@ import {
 } from 'lucide-react';
 
 // ── Filter & Sort Types ──────────────────────────────────────────────────────
-type FilterTab = 'ALL' | 'PREVIOUSLY_ORDERED' | 'REGULAR' | 'SCHEDULE_H' | 'SCHEDULE_H1' | 'SCHEDULE_X' | 'LOW_STOCK' | 'NEAR_EXPIRY' | 'OUT_OF_STOCK';
+type FilterTab = 'ALL' | 'MARGIN_MAXIMIZER' | 'PREVIOUSLY_ORDERED' | 'REGULAR' | 'SCHEDULE_H' | 'SCHEDULE_H1' | 'SCHEDULE_X' | 'LOW_STOCK' | 'NEAR_EXPIRY' | 'OUT_OF_STOCK';
 type SortKey = 'name' | 'price_asc' | 'price_desc' | 'stock' | 'margin';
 
 const FILTER_TABS: { key: FilterTab; label: string; color: string }[] = [
   { key: 'ALL', label: 'All', color: 'text-slate-700 bg-slate-100 border-slate-300' },
+  { key: 'MARGIN_MAXIMIZER', label: '💎 Margin Maximizer', color: 'text-emerald-950 bg-emerald-100 border-emerald-400 font-extrabold shadow-2xs' },
   { key: 'PREVIOUSLY_ORDERED', label: '🕒 Previously Ordered', color: 'text-purple-700 bg-purple-50 border-purple-300 font-bold' },
   { key: 'REGULAR', label: 'Regular', color: 'text-emerald-700 bg-emerald-50 border-emerald-300' },
   { key: 'SCHEDULE_H', label: 'Sch-H', color: 'text-amber-700 bg-amber-50 border-amber-300' },
@@ -133,6 +134,7 @@ export const ProductSearch: React.FC = () => {
       if (!textMatch) return false;
     }
     // Category filter
+    if (activeFilter === 'MARGIN_MAXIMIZER') return p.grossMarginPercent >= 35;
     if (activeFilter === 'PREVIOUSLY_ORDERED') return previouslyOrderedProdIds.has(p._id);
     if (activeFilter === 'LOW_STOCK') return p.stockStatus === 'LOW_STOCK' || (p.totalStock > 0 && p.totalStock <= 20);
     if (activeFilter === 'OUT_OF_STOCK') return p.stockStatus === 'OUT_OF_STOCK' || p.totalStock === 0;
@@ -198,6 +200,7 @@ export const ProductSearch: React.FC = () => {
   const thirtyDaysAhead = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   const tabCounts: Record<FilterTab, number> = {
     ALL: products.length,
+    MARGIN_MAXIMIZER: products.filter(p => p.grossMarginPercent >= 35).length,
     PREVIOUSLY_ORDERED: products.filter(p => previouslyOrderedProdIds.has(p._id)).length,
     REGULAR: products.filter(p => p.scheduleCategory === 'REGULAR').length,
     SCHEDULE_H: products.filter(p => p.scheduleCategory === 'SCHEDULE_H').length,
@@ -457,6 +460,13 @@ export const ProductSearch: React.FC = () => {
                           {badge.label}
                         </span>
                       )}
+
+                      {/* 💎 High-Margin Profit Booster Badge */}
+                      {product.grossMarginPercent >= 35 && (
+                        <span className="flex items-center space-x-0.5 text-[9.5px] font-black px-1.5 py-0.5 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-2xs">
+                          <span>💎 Profit Booster ({product.grossMarginPercent}%)</span>
+                        </span>
+                      )}
                     </div>
 
                     {/* Salt composition */}
@@ -469,7 +479,11 @@ export const ProductSearch: React.FC = () => {
                       <span>Brand: <strong className="text-slate-700">{product.brand}</strong></span>
                       <span>HSN: <strong className="text-slate-700">{product.hsnCode}</strong></span>
                       <span>GST: <strong className="text-slate-700">{product.gstRate}%</strong></span>
-                      <span className="text-emerald-700 font-semibold flex items-center space-x-0.5">
+                      <span className={`flex items-center space-x-0.5 ${
+                        product.grossMarginPercent >= 35
+                          ? 'text-emerald-900 font-black bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-300'
+                          : 'text-emerald-700 font-semibold'
+                      }`}>
                         <TrendingUp className="w-2.5 h-2.5" />
                         <span>Margin {product.grossMarginPercent}%</span>
                       </span>

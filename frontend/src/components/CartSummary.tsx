@@ -11,7 +11,19 @@ import {
   toggleDiscreetPackaging
 } from '../store/posSlice';
 import { getMedicineDetails } from '../utils/medicineDetails';
-import { CreditCard, ShieldAlert, Loader2, ArrowRight, Sparkles, Tag, ShieldCheck, Stethoscope, TestTube, CheckCircle2, Plus, Gift, Clock, Package } from 'lucide-react';
+import {
+  CreditCard, ShieldAlert, Loader2, ArrowRight, Sparkles, Tag,
+  ShieldCheck, Stethoscope, TestTube, CheckCircle2, Plus, Gift,
+  Clock, Package, PackageCheck, Layers
+} from 'lucide-react';
+import {
+  detectRelevantClinicalBundles,
+  bundleItemToProduct,
+  CLINICAL_CARE_BUNDLES,
+  type ClinicalBundle,
+  type BundleItem
+} from '../utils/clinicalBundlesEngine';
+import { ClinicalBundleModal } from './ClinicalBundleModal';
 
 export const CartSummary: React.FC = () => {
   const dispatch = useDispatch();
@@ -28,6 +40,31 @@ export const CartSummary: React.FC = () => {
   const [insuranceTagged, setInsuranceTagged] = useState<boolean>(false);
   const [doctorReferred, setDoctorReferred] = useState<boolean>(false);
   const [labTestsAdded, setLabTestsAdded] = useState<string[]>([]);
+
+  // Smart Clinical Combo Bundles State
+  const [isBundleModalOpen, setIsBundleModalOpen] = useState<boolean>(false);
+  const [selectedBundleModalId, setSelectedBundleModalId] = useState<string | undefined>(undefined);
+  const [addedBundleSuccess, setAddedBundleSuccess] = useState<string | null>(null);
+
+  // Detect clinical care bundle opportunities based on cart items
+  const detectedBundles = detectRelevantClinicalBundles(items);
+  const topBundleRec = detectedBundles.length > 0 ? detectedBundles[0] : null;
+
+  const handleCompleteBundle = (bundleRec: typeof detectedBundles[0]) => {
+    bundleRec.missingItems.forEach(item => {
+      const prod = bundleItemToProduct(item, bundleRec.bundle.title);
+      dispatch(
+        addItemToCart({
+          product: prod,
+          selectedBatch: item.sampleBatch,
+          quantity: 1,
+          unitMode: 'PACK'
+        })
+      );
+    });
+    setAddedBundleSuccess(bundleRec.bundle.title);
+    setTimeout(() => setAddedBundleSuccess(null), 2200);
+  };
 
   // Financial calculations
   const subtotal = items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
@@ -404,6 +441,155 @@ export const CartSummary: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* ── SMART CLINICAL CARE BUNDLE RECOMMENDATIONS ── */}
+        <div className="mt-3 bg-gradient-to-br from-teal-50/80 via-emerald-50/40 to-indigo-50/50 p-3 rounded-xl border border-teal-200/90 space-y-2">
+          {topBundleRec ? (
+            topBundleRec.isComplete ? (
+              /* Case 1: All items for this clinical kit are present */
+              <div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-1.5 bg-emerald-100 border border-emerald-300 rounded-lg text-lg">
+                      {topBundleRec.bundle.iconEmoji}
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-wider text-emerald-800">
+                        Complete Care Kit Active
+                      </div>
+                      <div className="text-xs font-black text-slate-900 leading-tight">
+                        {topBundleRec.bundle.title}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="bg-emerald-600 text-white text-[9.5px] font-black px-2 py-0.5 rounded-full">
+                    Saved ₹{topBundleRec.bundle.totalSavings.toFixed(2)}
+                  </span>
+                </div>
+                <p className="text-[10.5px] text-emerald-900/90 font-medium mt-1">
+                  🎉 All {topBundleRec.bundle.items.length} kit medicines included with pre-configured bundle discount ({topBundleRec.bundle.savingsPercent}% OFF).
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedBundleModalId(undefined);
+                    setIsBundleModalOpen(true);
+                  }}
+                  className="mt-2 w-full py-1 text-[10.5px] font-bold text-teal-800 bg-white hover:bg-teal-50 rounded-lg border border-teal-200 transition-colors cursor-pointer text-center shadow-2xs"
+                >
+                  Browse Other Care Kits...
+                </button>
+              </div>
+            ) : (
+              /* Case 2: Partial kit detected, prompt 1-click completion */
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-1.5 bg-white border border-teal-200 rounded-lg text-lg shadow-2xs">
+                      {topBundleRec.bundle.iconEmoji}
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-wider text-teal-800">
+                        Clinical Care Kit Recommendation
+                      </div>
+                      <div className="text-xs font-black text-slate-900 leading-tight">
+                        {topBundleRec.bundle.title}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="bg-amber-400 text-amber-950 font-black text-[9.5px] px-2 py-0.5 rounded-full">
+                    Save ₹{topBundleRec.completionSavings.toFixed(2)}
+                  </span>
+                </div>
+
+                <p className="text-[10px] text-slate-600 leading-snug">
+                  💡 {topBundleRec.bundle.clinicalRationale}
+                </p>
+
+                {/* Missing items breakdown */}
+                <div className="bg-white/90 rounded-lg p-2 border border-teal-100 space-y-1">
+                  <div className="text-[9.5px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                    <span>Add to complete kit ({topBundleRec.missingItems.length} missing):</span>
+                    <span className="text-emerald-700 font-mono font-bold">+₹{topBundleRec.completionPrice.toFixed(2)}</span>
+                  </div>
+                  <div className="space-y-0.5">
+                    {topBundleRec.missingItems.map(m => (
+                      <div key={m.productId} className="flex items-center justify-between text-[10px] text-slate-700">
+                        <span className="truncate max-w-[170px]">• {m.name}</span>
+                        <span className="font-bold text-emerald-800 font-mono">₹{m.bundlePrice.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 1-Click Action & Explore Button */}
+                <div className="flex items-center space-x-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleCompleteBundle(topBundleRec)}
+                    disabled={addedBundleSuccess === topBundleRec.bundle.title}
+                    className={`flex-1 py-1.5 px-2 rounded-lg text-[10.5px] font-black transition-all cursor-pointer flex items-center justify-center space-x-1 shadow-2xs ${
+                      addedBundleSuccess === topBundleRec.bundle.title
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-teal-700 hover:bg-teal-800 text-white active:scale-98'
+                    }`}
+                  >
+                    {addedBundleSuccess === topBundleRec.bundle.title ? (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-white animate-pulse" />
+                        <span>Kit Completed! ✓</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-3.5 h-3.5 text-amber-300" />
+                        <span>+ Complete Kit (+₹{topBundleRec.completionPrice.toFixed(2)})</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedBundleModalId(topBundleRec.bundle.id);
+                      setIsBundleModalOpen(true);
+                    }}
+                    className="py-1.5 px-2.5 rounded-lg text-[10.5px] font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer"
+                    title="View all 4 clinical care kits catalog"
+                  >
+                    All Kits...
+                  </button>
+                </div>
+              </div>
+            )
+          ) : (
+            /* Case 3: No specific bundle match yet */
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className="p-1 bg-white border border-teal-200 rounded-lg text-base">
+                  🩺
+                </div>
+                <div>
+                  <div className="text-[10.5px] font-black text-slate-800 leading-tight">
+                    Smart Clinical Care Bundles
+                  </div>
+                  <div className="text-[9.5px] text-slate-500">
+                    Pre-configured kits with 14%–16% bundle savings
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedBundleModalId(undefined);
+                  setIsBundleModalOpen(true);
+                }}
+                className="py-1 px-2 text-[10px] font-black text-teal-800 bg-white hover:bg-teal-100 border border-teal-300 rounded-lg transition-colors cursor-pointer shadow-2xs"
+              >
+                Browse 4 Kits...
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Compliance Indicator & Finalize Checkout Trigger */}
@@ -441,6 +627,13 @@ export const CartSummary: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* ── CLINICAL CARE BUNDLE CATALOG MODAL ── */}
+      <ClinicalBundleModal
+        isOpen={isBundleModalOpen}
+        onClose={() => setIsBundleModalOpen(false)}
+        highlightBundleId={selectedBundleModalId}
+      />
     </div>
   );
 };

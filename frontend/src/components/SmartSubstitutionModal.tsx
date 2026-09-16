@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import { closeSubstitutionModal, addItemToCart, removeFromCart } from '../store/posSlice';
 import type { Product, BatchInfo } from '../types/pos';
+import { ConvinceCustomerCard } from './ConvinceCustomerCard';
 import {
   Zap, X, ShieldCheck, Plus, Tag, Sparkles,
   Clock, DollarSign, Package, Award, CheckCircle2,
@@ -80,6 +81,8 @@ export const SmartSubstitutionModal: React.FC = () => {
   const user = useSelector((state: RootState) => state.pos.currentUser);
 
   const [activeTab, setActiveTab] = useState<SubstitutionCriteria>('LEAST_PRICE');
+  const [isConvinceOpen, setIsConvinceOpen] = useState<boolean>(false);
+  const [selectedConvinceAlt, setSelectedConvinceAlt] = useState<Product | null>(null);
   const isReplaceMode = Boolean(modal.originalCartItemId);
 
   const now = useMemo(() => new Date(), []);
@@ -193,13 +196,28 @@ export const SmartSubstitutionModal: React.FC = () => {
               </p>
             </div>
           </div>
-          <button
-            onClick={() => dispatch(closeSubstitutionModal())}
-            className="text-slate-300 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
-            title="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedConvinceAlt(sortedAlternatives[0] || null);
+                setIsConvinceOpen(true);
+              }}
+              className="flex items-center space-x-1.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-black text-xs px-3 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer hover:scale-102 active:scale-97"
+              title="Open verbal talking points and bio-equivalence scripts to convince customer"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-slate-950" />
+              <span>🗣️ Convince Customer Guide</span>
+            </button>
+
+            <button
+              onClick={() => dispatch(closeSubstitutionModal())}
+              className="text-slate-300 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+              title="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Replace mode info banner */}
@@ -381,7 +399,7 @@ export const SmartSubstitutionModal: React.FC = () => {
                       <span>Margin: <strong className="text-indigo-700">{alt.grossMarginPercent}%</strong></span>
                     </div>
 
-                    {/* "You Saved This Much" Callout Pill */}
+                    {/* "You Saved This Much" Callout Pill & Convince Pitch Button */}
                     <div className="mt-2 flex items-center space-x-1.5 flex-wrap gap-y-1">
                       <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-lg flex items-center space-x-1">
                         <Tag className="w-3 h-3 text-emerald-600" />
@@ -394,6 +412,19 @@ export const SmartSubstitutionModal: React.FC = () => {
                           <span>₹{priceDiffVsOriginal.toFixed(2)} cheaper than requested medicine</span>
                         </span>
                       )}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedConvinceAlt(alt);
+                          setIsConvinceOpen(true);
+                        }}
+                        className="bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 text-[10px] font-black px-2 py-0.5 rounded-lg flex items-center space-x-1 transition-colors cursor-pointer shadow-2xs"
+                        title="Open verbal talking points and bio-equivalence pitch for this medicine"
+                      >
+                        <Sparkles className="w-3 h-3 text-amber-700" />
+                        <span>🗣️ Pitch Scripts</span>
+                      </button>
                     </div>
                   </div>
 
@@ -445,6 +476,17 @@ export const SmartSubstitutionModal: React.FC = () => {
         </div>
 
       </div>
+
+      {/* ── 🗣️ TASK #46: CONVINCE CUSTOMER FLOATING OVERLAY CARD ────────── */}
+      {isConvinceOpen && (
+        <ConvinceCustomerCard
+          originalProduct={originalProduct}
+          alternativeProduct={selectedConvinceAlt || sortedAlternatives[0]}
+          onClose={() => setIsConvinceOpen(false)}
+          onSelectAlternative={(prod) => handleSelectAlternative(prod)}
+          isReplaceMode={isReplaceMode}
+        />
+      )}
     </div>
   );
 };
