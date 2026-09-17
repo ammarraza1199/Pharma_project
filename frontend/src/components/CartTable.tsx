@@ -1082,8 +1082,8 @@ export const CartTable: React.FC = () => {
 
         {/* Horizontal Companion Shelf (Expanded) */}
         {isMarginMaximizerOpen ? (
-          <div className="pt-2">
-            <div className="flex space-x-2.5 overflow-x-auto pb-1.5 pt-0.5 scrollbar-thin">
+          <div className="pt-1">
+            <div className="flex space-x-2.5 overflow-x-auto pt-3.5 pb-2 px-1 scrollbar-thin">
               {marginAnalysis.recommendations.map((comp) => {
                 const isJustAdded = addedCompanionId === comp.id;
 
@@ -1098,7 +1098,7 @@ export const CartTable: React.FC = () => {
                   >
                     {/* Top Affinity Badge */}
                     {comp.isTopPick && (
-                      <div className="absolute -top-2 left-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[8.5px] font-black px-2 py-0.2 rounded-full shadow-xs uppercase tracking-wider flex items-center space-x-1">
+                      <div className="absolute -top-2.5 left-2.5 z-10 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[8.5px] font-black px-2.5 py-0.5 rounded-full shadow-xs uppercase tracking-wider flex items-center space-x-1 ring-1.5 ring-white">
                         <Sparkles className="w-2.5 h-2.5 text-amber-300" />
                         <span>Clinical Match</span>
                       </div>

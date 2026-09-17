@@ -481,7 +481,7 @@ export const ExpiryManagementPage: React.FC = () => {
           onClick={() => setViewMode('BATCHES')}
           className={`flex items-center space-x-2 px-4 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${
             viewMode === 'BATCHES'
-              ? 'bg-amber-600 text-white shadow-xs'
+              ? 'bg-slate-900 text-white shadow-xs'
               : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
           }`}
         >
@@ -542,24 +542,27 @@ export const ExpiryManagementPage: React.FC = () => {
           </div>
 
           {/* ── 60–90 DAY PRE-EXPIRY DISTRIBUTOR RETURN-TO-VENDOR (RTV) BANNER ── */}
-          <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 rounded-2xl p-4 text-white shadow-md flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-start space-x-3 max-w-2xl">
-              <div className="p-2.5 bg-white/20 rounded-xl backdrop-blur-xs shrink-0 mt-0.5">
-                <Truck className="w-6 h-6 text-white" />
+          <div className="bg-white border-2 border-slate-200/90 hover:border-indigo-200 rounded-2xl p-4.5 shadow-xs flex items-center justify-between flex-wrap gap-4 transition-all">
+            <div className="flex items-start space-x-3.5 max-w-2xl">
+              <div className="p-3 bg-indigo-50 text-indigo-700 rounded-xl border border-indigo-100 shrink-0 mt-0.5 shadow-2xs">
+                <Truck className="w-6 h-6 text-indigo-700" />
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 <div className="flex items-center space-x-2">
-                  <span className="text-xs font-black uppercase tracking-wider bg-white/25 px-2 py-0.5 rounded-md">
+                  <span className="text-xs font-black uppercase tracking-wider bg-indigo-50 text-indigo-800 border border-indigo-200 px-2.5 py-0.5 rounded-md">
                     Return-to-Vendor (RTV) Pre-Expiry Policy
                   </span>
-                  <span className="text-[11px] font-bold text-amber-100">
+                  <span className="text-[11px] font-bold text-slate-500">
                     60–90 Day Statutory Window
                   </span>
                 </div>
-                <h3 className="text-sm font-extrabold text-white leading-tight">
-                  {rtvEligibleBatches.length} batch(es) nearing manufacturer return deadline · ₹{totalRtvPotentialValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })} recoverable credit
+                <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
+                  {rtvEligibleBatches.length} batch(es) nearing manufacturer return deadline ·{' '}
+                  <span className="text-emerald-700 font-black">
+                    ₹{totalRtvPotentialValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })} recoverable credit
+                  </span>
                 </h3>
-                <p className="text-[11px] text-amber-100 font-medium leading-relaxed">
+                <p className="text-[11.5px] text-slate-600 font-medium leading-relaxed">
                   Wholesale distributors accept near-expiry returns with 100% credit adjustment if debited 60–90 days prior to expiry. Avoid total inventory write-off by issuing batch debit notes today.
                 </p>
               </div>
@@ -570,9 +573,9 @@ export const ExpiryManagementPage: React.FC = () => {
                 type="button"
                 onClick={handleAutomateAllRTVDebitNotes}
                 disabled={rtvEligibleBatches.length === 0}
-                className="px-4 py-2.5 bg-white hover:bg-amber-50 text-amber-900 text-xs font-black rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center space-x-2 active:scale-95"
+                className="px-4 py-2.5 bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-black rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 active:scale-95"
               >
-                <Truck className="w-4 h-4 text-amber-700" />
+                <Truck className="w-4 h-4 text-indigo-200" />
                 <span>Auto-Return All 60–90d Batches</span>
               </button>
             </div>
