@@ -18,6 +18,8 @@ import {
 
 export const InvoicesPage: React.FC = () => {
   const dispatch = useDispatch();
+  const currentUser = useSelector((state: RootState) => state.pos.currentUser);
+  const isManager = currentUser?.role === 'MANAGER' || currentUser?.role === 'OWNER';
 
   const [invoices, setInvoices] = useState<FinalizedInvoice[]>([]);
   const [loading, setLoading] = useState(false);
@@ -187,7 +189,7 @@ export const InvoicesPage: React.FC = () => {
             </button>
           )}
 
-          {invoices.length > 0 && (
+          {isManager && invoices.length > 0 && (
             <button
               onClick={handleExportFullCSV}
               className="flex items-center space-x-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold rounded-xl border border-emerald-300 transition-colors cursor-pointer"
@@ -451,14 +453,16 @@ export const InvoicesPage: React.FC = () => {
                               <Download className="w-4 h-4" />
                             </button>
 
-                            {/* Delete Invoice Record */}
-                            <button
-                              onClick={() => handleDeleteInvoice(inv.invoiceNumber)}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                              title="Delete Invoice from Database"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            {/* Delete Invoice Record (Manager/Owner Only) */}
+                            {isManager && (
+                              <button
+                                onClick={() => handleDeleteInvoice(inv.invoiceNumber)}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                title="Delete Invoice from Database"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>

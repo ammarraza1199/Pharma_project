@@ -1,0 +1,26 @@
+Date,Day,Task,Description,Deliverable,Status,Completed Date
+25-Aug-26,Day 1,Pharma OS Application,Initial repository setup for frontend (React/Vite) and backend (Node/Express),Software,Completed,8/25/2026
+26-Aug-26,Day 2,Pharma OS Application,Created Mongoose data models for Products Invoices and Patients,Database,Completed,8/26/2026
+27-Aug-26,Day 3,Pharma OS Application,Implemented POS cart logic and GST calculation using Redux Toolkit,Software,Completed,8/27/2026
+27-Aug-26,Day 3,Pharma OS Application,"Integrated core features: Auth, Inventory, POS Billing, FEFO, GRN, Returns, Patients, Suppliers, Reports, Drug Engine, and Expiry Mgmt",Software,Completed,8/27/2026
+28-Aug-26,Day 4,Pharma OS Application,Developed frontend Navbar and application routing structure,Website,Completed,8/28/2026
+29-Aug-26,Day 5,Pharma OS Application,Implemented JWT authentication and backend middleware,Software,Completed,8/29/2026
+29-Aug-26,Day 5,Robot Project,Worked on project readiness of robot project,Documentation,Completed,8/29/2026
+30-Aug-26,Day 6,SUNDAY,,,,
+31-Aug-26,Day 7,Pharma OS Application,Integrated Billing API with the frontend POS checkout screen,Software,Completed,8/31/2026
+31-Aug-26,Day 7,Billing OS,Worked on Billing OS marketing video,Marketing,Completed,8/31/2026
+1-Sep-26,Day 8,Pharma OS Application,Developed mock data generation scripts for Invoices and Inventory,Database,Completed,9/1/2026
+1-Sep-26,Day 8,HR OS,Worked on HR OS marketing video,Marketing,Completed,9/1/2026
+2-Sep-26,Day 9,Pharma OS Application,UI refinements for payment processing and invoice generation,Website,Completed,9/2/2026
+3-Sep-26,Day 10,Pharma OS Application,Configured Azure Static Web Apps CI/CD workflow,Pipeline,Completed,9/3/2026
+4-Sep-26,Day 11,Pharma OS Application,Migrated mock data to remote MongoDB cluster and pushed deployment code,Database,Completed,9/4/2026
+4-Sep-26,Day 11,HR OS,Worked on HR OS application development and integration,Software,Completed,9/4/2026
+5-Sep-26,Day 12,HR OS Pipeline,Worked on configuring testing and deploying the HR OS Pipeline,Pipeline,Completed,9/5/2026
+5-Sep-26,Day 12,Pharma OS Application,"Implemented Patient List & Registration API, Supplier Directory API, Settings Save & PIN Change API, and Secure Manager PIN Verification",Software,Completed,9/5/2026
+5-Sep-26,Day 12,Pharma OS Application,"Core POS API Integration, Online Delivery Backend, EMERGENCY_DESK User Role, Owner Staff Management API",Software,Completed,9/5/2026
+6-Sep-26,Day 13,Pharma OS Application,"Sprint 1: Critical Fixes - Expiry alerts API, Invoices API wiring, and CSV export",Software,Completed,9/6/2026
+7-Sep-26,Day 14,Pharma OS Application,"Sprint 2: Security & RBAC - Implement role guards, emergency desk, and user management",Security,Completed,9/7/2026
+7-Sep-26,Day 14,Pharma OS Application,"Core POS API Integration, Online Delivery Backend, EMERGENCY_DESK User Role, Owner Staff Management API",Software,Completed,9/7/2026
+8-Sep-26,Day 15,Pharma OS Application,"Sprint 3: Online Delivery - Create delivery models, routes, and UI integration",Software,Pending,
+9-Sep-26,Day 16,Pharma OS Application,"Sprint 4: Real-time & Automation - Socket.IO events, email sending, and cron jobs",Software,Pending,
+10-Sep-26,Day 17,Pharma OS Application,"Sprint 5: Production Hardening - JWT refresh, webhooks, and multi-counter backend",Software,Pending,

@@ -174,7 +174,7 @@ router.delete('/:invoiceNumber', protect, requireRole('MANAGER', 'OWNER'), async
 });
 
 // GET /api/invoices/export/csv
-router.get('/export/csv', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/export/csv', protect, requireRole('MANAGER', 'OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const invoices = await Invoice.find().sort({ invoiceDate: -1 }).limit(500);
     let csv = 'Invoice No,Date,Patient,Phone,Doctor,Items,Payment Method,Grand Total,CGST,SGST\n';

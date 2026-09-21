@@ -1,7 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { Patient } from '../models/Patient';
 import { Invoice } from '../models/Invoice';
-import { protect, AuthRequest } from '../middleware/auth';
+import { protect, requireRole, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
@@ -71,7 +71,7 @@ router.put('/:id', protect, async (req: AuthRequest, res: Response, next: NextFu
 });
 
 // DELETE /api/patients/:id (soft delete — preserves invoice history)
-router.delete('/:id', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.delete('/:id', protect, requireRole('OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const patient = await Patient.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
     if (!patient) return res.status(404).json({ success: false, message: 'Patient not found.' });

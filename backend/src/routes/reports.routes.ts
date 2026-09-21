@@ -1,7 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { Invoice } from '../models/Invoice';
 import { Product } from '../models/Product';
-import { protect, AuthRequest } from '../middleware/auth';
+import { protect, requireRole, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
@@ -79,7 +79,7 @@ router.get('/dashboard-stats', protect, async (req: AuthRequest, res: Response, 
 });
 
 // GET /api/reports/sales-summary
-router.get('/sales-summary', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/sales-summary', protect, requireRole('MANAGER', 'OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { from, to } = req.query;
     const dateQuery: any = {};
@@ -114,7 +114,7 @@ router.get('/sales-summary', protect, async (req: AuthRequest, res: Response, ne
 });
 
 // GET /api/reports/hsn-tax
-router.get('/hsn-tax', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/hsn-tax', protect, requireRole('MANAGER', 'OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { from, to } = req.query;
     const dateQuery: any = {};
@@ -146,7 +146,7 @@ router.get('/hsn-tax', protect, async (req: AuthRequest, res: Response, next: Ne
 });
 
 // GET /api/reports/top-medicines
-router.get('/top-medicines', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/top-medicines', protect, requireRole('MANAGER', 'OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { from, to } = req.query;
     const dateQuery: any = {};
@@ -171,7 +171,7 @@ router.get('/top-medicines', protect, async (req: AuthRequest, res: Response, ne
 });
 
 // GET /api/reports/payment-split
-router.get('/payment-split', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/payment-split', protect, requireRole('MANAGER', 'OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { from, to } = req.query;
     const dateQuery: any = {};
@@ -197,7 +197,7 @@ router.get('/payment-split', protect, async (req: AuthRequest, res: Response, ne
 });
 
 // GET /api/reports/daily-revenue
-router.get('/daily-revenue', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/daily-revenue', protect, requireRole('MANAGER', 'OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const days = Number(req.query.days || 7);
     const result = [];

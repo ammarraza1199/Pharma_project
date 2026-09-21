@@ -6,7 +6,7 @@ import mongoose from 'mongoose';
 import { User } from '../models/User';
 import { StoreSettings } from '../models/StoreSettings';
 import { config } from '../config/env';
-import { protect, AuthRequest } from '../middleware/auth';
+import { protect, requireRole, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
@@ -215,6 +215,81 @@ router.post('/verify-owner-pin', protect, async (req: Request, res: Response, ne
     if (!settings) return res.status(500).json({ success: false, message: 'Store settings not found.' });
     const isValid = await bcrypt.compare(pin, settings.ownerPin);
     res.json({ success: true, authorized: isValid, message: isValid ? 'PIN verified.' : 'Invalid owner PIN.' });
+  } catch (err) { next(err); }
+});
+
+// GET /api/auth/users — Roster of pharmacy staff (Manager/Owner only)
+router.get('/users', protect, requireRole('MANAGER', 'OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const users = await User.find().select('-passwordHash').sort({ createdAt: -1 });
+      return res.json({ success: true, data: users });
+    }
+
+    const users = inMemoryUsers.map(u => ({
+      id: u.id,
+      _id: u._id,
+      pharmacistName: u.pharmacistName,
+      pharmacyName: u.pharmacyName,
+      licenseNo: u.licenseNo,
+      email: u.email,
+      role: u.role,
+      isActive: u.isActive,
+    }));
+    res.json({ success: true, data: users });
+  } catch (err) { next(err); }
+});
+
+// PUT /api/auth/users/:id/role — Change staff role (Owner only)
+router.put('/users/:id/role', protect, requireRole('OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { role } = req.body;
+    const allowedRoles = ['PHARMACIST', 'MANAGER', 'OWNER', 'EMERGENCY_DESK'];
+    if (!role || !allowedRoles.includes(role)) {
+      return res.status(400).json({ success: false, message: `Invalid role. Must be one of: ${allowedRoles.join(', ')}` });
+    }
+
+    if (req.user?.id === req.params.id && role !== 'OWNER') {
+      return res.status(400).json({ success: false, message: 'Cannot demote your own OWNER account.' });
+    }
+
+    if (mongoose.connection.readyState === 1) {
+      const user = await User.findByIdAndUpdate(req.params.id, { role }, { new: true }).select('-passwordHash');
+      if (user) {
+        return res.json({ success: true, data: user, message: 'User role updated successfully.' });
+      }
+    }
+
+    const memUser = inMemoryUsers.find(u => u.id === req.params.id || u._id === req.params.id);
+    if (!memUser) return res.status(404).json({ success: false, message: 'User not found.' });
+    memUser.role = role;
+    res.json({ success: true, data: memUser, message: 'User role updated successfully.' });
+  } catch (err) { next(err); }
+});
+
+// PUT /api/auth/users/:id/status — Activate/Deactivate staff account (Owner only)
+router.put('/users/:id/status', protect, requireRole('OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { isActive } = req.body;
+    if (typeof isActive !== 'boolean') {
+      return res.status(400).json({ success: false, message: 'isActive boolean is required.' });
+    }
+
+    if (req.user?.id === req.params.id && !isActive) {
+      return res.status(400).json({ success: false, message: 'Cannot deactivate your own account.' });
+    }
+
+    if (mongoose.connection.readyState === 1) {
+      const user = await User.findByIdAndUpdate(req.params.id, { isActive }, { new: true }).select('-passwordHash');
+      if (user) {
+        return res.json({ success: true, data: user, message: `User account ${isActive ? 'activated' : 'deactivated'} successfully.` });
+      }
+    }
+
+    const memUser = inMemoryUsers.find(u => u.id === req.params.id || u._id === req.params.id);
+    if (!memUser) return res.status(404).json({ success: false, message: 'User not found.' });
+    memUser.isActive = isActive;
+    res.json({ success: true, data: memUser, message: `User account ${isActive ? 'activated' : 'deactivated'} successfully.` });
   } catch (err) { next(err); }
 });
 

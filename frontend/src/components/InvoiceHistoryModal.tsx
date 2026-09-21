@@ -20,6 +20,8 @@ export const InvoiceHistoryModal: React.FC = () => {
   const dispatch = useDispatch();
   const isOpen = useSelector((state: RootState) => state.pos.invoiceHistoryModal?.isOpen);
   const invoices = useSelector((state: RootState) => state.pos.invoices || []);
+  const currentUser = useSelector((state: RootState) => state.pos.currentUser);
+  const isManager = currentUser?.role === 'MANAGER' || currentUser?.role === 'OWNER';
 
   const [apiInvoices, setApiInvoices] = useState<FinalizedInvoice[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -339,24 +341,26 @@ export const InvoiceHistoryModal: React.FC = () => {
                             <Download className="w-4 h-4" />
                           </button>
 
-                          {/* Delete Invoice */}
-                          <button
-                            onClick={async () => {
-                              if (window.confirm(`Are you sure you want to remove invoice ${inv.invoiceNumber} from saved history?`)) {
-                                try {
-                                  await api.delete(`/invoices/${inv.invoiceNumber}`);
-                                } catch (err) {
-                                  console.warn('[InvoiceHistoryModal] Backend delete skipped or unauthorized');
+                          {/* Delete Invoice (Manager/Owner Only) */}
+                          {isManager && (
+                            <button
+                              onClick={async () => {
+                                if (window.confirm(`Are you sure you want to remove invoice ${inv.invoiceNumber} from saved history?`)) {
+                                  try {
+                                    await api.delete(`/invoices/${inv.invoiceNumber}`);
+                                  } catch (err) {
+                                    console.warn('[InvoiceHistoryModal] Backend delete skipped or unauthorized');
+                                  }
+                                  dispatch(deleteSavedInvoice(inv.invoiceNumber));
+                                  setApiInvoices(prev => prev.filter(i => i.invoiceNumber !== inv.invoiceNumber));
                                 }
-                                dispatch(deleteSavedInvoice(inv.invoiceNumber));
-                                setApiInvoices(prev => prev.filter(i => i.invoiceNumber !== inv.invoiceNumber));
-                              }
-                            }}
-                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                            title="Delete Saved Record"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                              }}
+                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                              title="Delete Saved Record"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
