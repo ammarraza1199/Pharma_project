@@ -66,14 +66,48 @@ The frontend is built with React, Vite, TypeScript, and TailwindCSS.
 
 ---
 
-## 3. Important Default Credentials
+## 3. Important Default Credentials & Sign-In Access
 
-The backend automatically creates default store settings upon its first startup. Here are the default PINs needed for authorization inside the app (like overriding Schedule X sales or handling stock disposals):
+### 🔑 1. Database Registered Account (MongoDB Atlas)
+Use this primary account to sign in to the live POS terminal:
+
+| Field | Credential |
+|---|---|
+| **Email** | `jane@healthfirst.com` |
+| **Password** | `password123` |
+| **Pharmacist Name** | Pharma 1 |
+| **Store Name** | Hitech Pharna |
+| **Role** | `PHARMACIST` |
+| **Status** | Active (`true`) |
+
+---
+
+### 🛡️ 2. Fallback / Seed Admin Account (Backend Auth)
+In-memory admin user configured as fallback in backend authentication:
+
+| Field | Credential |
+|---|---|
+| **Email** | `admin@genquantaa.com` |
+| **Password** | `1234` |
+| **Pharmacist Name** | Ramesh Kumar (Lead Pharmacist) |
+| **Pharmacy Name** | GENQUANTAA MedPlus Pharmacy |
+| **License No** | DL-2024/HYD/889201 |
+| **Role** | `PHARMACIST` |
+
+---
+
+### 🚨 3. Emergency Desk Sign-In Mode
+On the **Sign In** screen, enter your credentials and select the **🚨 Dr. S. Reddy (Chief Emergency)** workstation card at the bottom of the counter list. This automatically routes directly into the **Emergency Delivery Desk** terminal with pre-approved emergency inventory dispensing.
+
+---
+
+### 🔐 4. Manager & Owner Security PINs
+Default PINs required for high-privilege authorization in the app (Schedule X override, stock disposal, manager actions):
 
 - **Manager PIN:** `1234`
 - **Owner PIN:** `1234`
 
-*(These can be updated later from the Settings page in the application).*
+*(These can be re-configured anytime from **Settings → Security & Authorization**).*
 
 ---
 
@@ -81,20 +115,20 @@ The backend automatically creates default store settings upon its first startup.
 
 ```text
 Pharma_project/
-├── backend/                # Node.js + Express API
+├── backend/                # Node.js + Express + TypeScript API
 │   ├── src/
 │   │   ├── config/         # DB & Env configurations
-│   │   ├── middleware/     # Auth & Error handling
-│   │   ├── models/         # Mongoose Schemas (11 collections)
-│   │   ├── routes/         # API Endpoints
-│   │   └── services/       # Core business logic (Stock, GST, Interactions)
+│   │   ├── middleware/     # Auth, RBAC & Error handling
+│   │   ├── models/         # Mongoose Schemas (Products, Invoices, DeliveryOrders, POs, Consultations, etc.)
+│   │   ├── routes/         # API Endpoints (Auth, Products, Billing, GRN, Returns, Delivery, etc.)
+│   │   └── services/       # Core business logic (Stock, GST, Drug Interactions)
 │   └── package.json
-└── frontend/               # React + Vite UI
+└── frontend/               # React + Vite + TypeScript + TailwindCSS UI
     ├── src/
-    │   ├── components/     # React Components & Pages
-    │   ├── store/          # Redux State Management
-    │   ├── types/          # TypeScript definitions
-    │   └── utils/          # Helper functions (GST calc, Number to Words)
+    │   ├── components/     # React Components (POS, Invoices, Delivery, Patients, Purchase Orders, etc.)
+    │   ├── store/          # Redux State Management (posSlice, store config)
+    │   ├── types/          # TypeScript Domain Definitions
+    │   └── utils/          # Helper functions (API Axios client, WhatsApp Share, GST Engine)
     └── package.json
 ```
 
