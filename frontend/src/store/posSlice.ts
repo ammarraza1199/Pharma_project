@@ -1954,6 +1954,10 @@ export const posSlice = createSlice({
       }
     },
 
+    setPurchaseOrders: (state, action: PayloadAction<PurchaseOrder[]>) => {
+      state.purchaseOrders = action.payload;
+    },
+
     createPurchaseOrder: (state, action: PayloadAction<PurchaseOrder>) => {
       state.purchaseOrders.unshift(action.payload);
     },
@@ -3396,6 +3400,7 @@ export const {
   applyBulk30DayDumpClearance,
   recordSupplierPayment,
   addSupplierBill,
+  setPurchaseOrders,
   createPurchaseOrder,
   updatePurchaseOrderStatus,
   deletePurchaseOrder,

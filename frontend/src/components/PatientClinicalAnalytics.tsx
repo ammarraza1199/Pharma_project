@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import { setPatientDetails, navigateTo } from '../store/posSlice';
 import type { PatientAdherenceRecord, DoctorReferralStat, LabReferralStat } from '../types/pos';
+import api from '../utils/api';
 import {
   HeartPulse, Activity, AlertTriangle, CheckCircle2,
   Users, Stethoscope, FileText, MessageSquare, ArrowRight,
-  TrendingUp, ShieldAlert, Sparkles, Building2, Phone, Calendar
+  TrendingUp, ShieldAlert, Sparkles, Building2, Phone, Calendar,
+  Search, Loader2, Pill, ShieldCheck, RefreshCw, Check
 } from 'lucide-react';
 
 interface Props {
@@ -18,8 +20,33 @@ export const PatientClinicalAnalytics: React.FC<Props> = ({ onStartBillingWithRe
   const patients = useSelector((state: RootState) => state.pos.patients);
   const storeSettings = useSelector((state: RootState) => state.pos.settings);
 
-  const [activeSubTab, setActiveSubTab] = useState<'ADHERENCE' | 'REFERRALS'>('ADHERENCE');
+  const [activeSubTab, setActiveSubTab] = useState<'ADHERENCE' | 'REFERRALS' | 'LIVE_AMR'>('ADHERENCE');
   const [adherenceFilter, setAdherenceFilter] = useState<'ALL' | 'HIGH_RISK' | 'MODERATE' | 'OPTIMAL'>('ALL');
+
+  // Live Patient Analytics State
+  const [selectedPatientId, setSelectedPatientId] = useState<string>('');
+  const [liveAnalytics, setLiveAnalytics] = useState<any | null>(null);
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState<boolean>(false);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
+  const [patientSearch, setPatientSearch] = useState<string>('');
+
+  const fetchLiveAnalytics = async (idOrPhone: string) => {
+    if (!idOrPhone) return;
+    setIsLoadingAnalytics(true);
+    setAnalyticsError(null);
+    try {
+      const res = await api.get(`/patients/${idOrPhone}/analytics`);
+      if (res.data?.success) {
+        setLiveAnalytics(res.data.data);
+      } else {
+        setAnalyticsError('Could not retrieve analytics for this patient.');
+      }
+    } catch (err: any) {
+      setAnalyticsError(err.response?.data?.message || 'Failed to load live clinical analytics.');
+    } finally {
+      setIsLoadingAnalytics(false);
+    }
+  };
 
   // Realistic mock adherence audit records (Task #54)
   const adherenceRecords: PatientAdherenceRecord[] = [
@@ -257,6 +284,26 @@ export const PatientClinicalAnalytics: React.FC<Props> = ({ onStartBillingWithRe
           >
             <Stethoscope className="w-3.5 h-3.5" />
             <span>Doctor &amp; Diagnostic Lab Referral Analytics</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveSubTab('LIVE_AMR');
+              if (!liveAnalytics && patients.length > 0) {
+                const p = patients[0];
+                const key = p.patientId || (p as any)._id || p.phone;
+                setSelectedPatientId(key);
+                fetchLiveAnalytics(key);
+              }
+            }}
+            className={`flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeSubTab === 'LIVE_AMR'
+                ? 'bg-purple-700 text-white shadow-xs'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5" />
+            <span>Live Patient AMR &amp; Adherence Audit (DB)</span>
           </button>
         </div>
 
@@ -562,6 +609,301 @@ export const PatientClinicalAnalytics: React.FC<Props> = ({ onStartBillingWithRe
           </div>
         </div>
       )}
+
+      {/* ── TAB 3: LIVE PATIENT AMR & ADHERENCE AUDIT (BACKEND API) ── */}
+      {activeSubTab === 'LIVE_AMR' && (
+        <div className="space-y-4">
+          {/* Patient Selector & Live Audit Bar */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div>
+                <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-purple-600" />
+                  <span>Real-Time Patient Antimicrobial &amp; Adherence Audit</span>
+                </h4>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Live aggregation from patient invoice dispensing logs, detecting antibiotic frequency, AMR risks, and prescriber attributions.
+                </p>
+              </div>
+
+              {/* Patient Selection Dropdown */}
+              <div className="flex items-center gap-2">
+                <select
+                  value={selectedPatientId}
+                  onChange={(e) => {
+                    setSelectedPatientId(e.target.value);
+                    fetchLiveAnalytics(e.target.value);
+                  }}
+                  className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer max-w-[220px]"
+                >
+                  <option value="">Select registered patient...</option>
+                  {patients.map(p => (
+                    <option key={p.patientId || p.phone} value={p.patientId || p.phone}>
+                      {p.name} ({p.phone})
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  onClick={() => selectedPatientId && fetchLiveAnalytics(selectedPatientId)}
+                  disabled={isLoadingAnalytics || !selectedPatientId}
+                  className="p-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl border border-purple-200 transition-colors cursor-pointer disabled:opacity-50"
+                  title="Refresh live analysis"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isLoadingAnalytics ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Search for Patients not in top list */}
+            <div className="mt-3 flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  placeholder="Or enter patient phone / name to audit..."
+                  value={patientSearch}
+                  onChange={(e) => setPatientSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && patientSearch.trim()) {
+                      const found = patients.find(p => p.phone.includes(patientSearch.trim()) || p.name.toLowerCase().includes(patientSearch.toLowerCase().trim()));
+                      const key = found ? (found.patientId || found.phone) : patientSearch.trim();
+                      setSelectedPatientId(key);
+                      fetchLiveAnalytics(key);
+                    }
+                  }}
+                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+              <button
+                onClick={() => {
+                  if (patientSearch.trim()) {
+                    const found = patients.find(p => p.phone.includes(patientSearch.trim()) || p.name.toLowerCase().includes(patientSearch.toLowerCase().trim()));
+                    const key = found ? (found.patientId || found.phone) : patientSearch.trim();
+                    setSelectedPatientId(key);
+                    fetchLiveAnalytics(key);
+                  }
+                }}
+                disabled={isLoadingAnalytics || !patientSearch.trim()}
+                className="px-3 py-1.5 bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+              >
+                Audit Patient
+              </button>
+            </div>
+          </div>
+
+          {/* Loading Indicator */}
+          {isLoadingAnalytics && (
+            <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-xs text-center">
+              <Loader2 className="w-8 h-8 text-purple-600 animate-spin mx-auto mb-2" />
+              <div className="text-sm font-bold text-slate-800">Calculating Live Clinical Metrics...</div>
+              <div className="text-xs text-slate-400 mt-1">Aggregating invoices, verifying antibiotic schedules &amp; doctor referrals</div>
+            </div>
+          )}
+
+          {/* Error Message */}
+          {analyticsError && !isLoadingAnalytics && (
+            <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-rose-800 text-xs flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{analyticsError}</span>
+              </div>
+              <button
+                onClick={() => selectedPatientId && fetchLiveAnalytics(selectedPatientId)}
+                className="px-2 py-1 bg-rose-200 hover:bg-rose-300 text-rose-900 rounded-lg font-bold text-[11px] cursor-pointer"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {/* Analytics Results Panel */}
+          {liveAnalytics && !isLoadingAnalytics && (
+            <div className="space-y-4">
+              {/* Patient Banner */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-base">
+                    {liveAnalytics.patient?.name?.charAt(0) || 'P'}
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-slate-900 font-heading">
+                      {liveAnalytics.patient?.name || 'Patient'}
+                    </h3>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-0.5">
+                      <span>Phone: <strong className="text-slate-700">{liveAnalytics.patient?.phone}</strong></span>
+                      <span>•</span>
+                      <span>Age: <strong className="text-slate-700">{liveAnalytics.patient?.age || 'N/A'}</strong></span>
+                      <span>•</span>
+                      <span>Gender: <strong className="text-slate-700">{liveAnalytics.patient?.gender || 'N/A'}</strong></span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    dispatch(setPatientDetails({
+                      patientName: liveAnalytics.patient?.name,
+                      phone: liveAnalytics.patient?.phone,
+                      age: liveAnalytics.patient?.age || '40',
+                      gender: liveAnalytics.patient?.gender || 'MALE'
+                    }));
+                    alert(`✓ Loaded ${liveAnalytics.patient?.name} into POS terminal!`);
+                    dispatch(navigateTo('POS_TERMINAL'));
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
+                >
+                  <ArrowRight className="w-4 h-4" />
+                  <span>Start Refill Billing</span>
+                </button>
+              </div>
+
+              {/* KPI Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="bg-white rounded-2xl border border-slate-200 p-3.5 shadow-xs">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lifetime Visits</span>
+                  <div className="text-xl font-black text-slate-900 font-heading mt-0.5">{liveAnalytics.totalVisits} Invoices</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">Counter dispensary transactions</div>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-slate-200 p-3.5 shadow-xs">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Patient Spend</span>
+                  <div className="text-xl font-black text-slate-900 font-heading mt-0.5">₹{Number(liveAnalytics.totalSpent || 0).toLocaleString('en-IN')}</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">Net bill revenue collected</div>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-slate-200 p-3.5 shadow-xs">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Medication Adherence</span>
+                  <div className="text-xl font-black text-emerald-700 font-heading mt-0.5">{liveAnalytics.adherenceRate}%</div>
+                  <div className="w-full bg-slate-100 rounded-full h-1.5 mt-2 overflow-hidden">
+                    <div
+                      className={`h-1.5 rounded-full ${liveAnalytics.adherenceRate >= 80 ? 'bg-emerald-500' : liveAnalytics.adherenceRate >= 60 ? 'bg-amber-500' : 'bg-rose-500'}`}
+                      style={{ width: `${liveAnalytics.adherenceRate}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-slate-200 p-3.5 shadow-xs">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">AMR Risk Level</span>
+                  <div className="mt-1">
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-black ${
+                      liveAnalytics.amrRisk?.level === 'HIGH'
+                        ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                        : liveAnalytics.amrRisk?.level === 'MODERATE'
+                        ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                        : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    }`}>
+                      {liveAnalytics.amrRisk?.level || 'LOW'} RISK
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-1">
+                    {liveAnalytics.amrRisk?.courseCount || 0} Antibiotic courses
+                  </div>
+                </div>
+              </div>
+
+              {/* AMR Warning Advisory Card */}
+              <div className={`rounded-2xl border p-4 shadow-xs ${
+                liveAnalytics.amrRisk?.level === 'HIGH'
+                  ? 'bg-rose-50/70 border-rose-200 text-rose-900'
+                  : liveAnalytics.amrRisk?.level === 'MODERATE'
+                  ? 'bg-amber-50/70 border-amber-200 text-amber-900'
+                  : 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
+              }`}>
+                <div className="flex items-start gap-3">
+                  <ShieldAlert className={`w-5 h-5 shrink-0 mt-0.5 ${
+                    liveAnalytics.amrRisk?.level === 'HIGH' ? 'text-rose-600' : liveAnalytics.amrRisk?.level === 'MODERATE' ? 'text-amber-600' : 'text-emerald-600'
+                  }`} />
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-wider">
+                      Antimicrobial Stewardship Assessment
+                    </h4>
+                    <p className="text-xs mt-1 leading-relaxed">
+                      {liveAnalytics.amrRisk?.warning}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Antibiotic Purchasing History Table */}
+              {liveAnalytics.amrRisk?.antibiotics && liveAnalytics.amrRisk.antibiotics.length > 0 && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                  <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                      <Pill className="w-3.5 h-3.5 text-purple-600" />
+                      <span>Dispensed Antibiotic Courses ({liveAnalytics.amrRisk.antibiotics.length})</span>
+                    </h4>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-200 bg-slate-100/50 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                          <th className="px-4 py-2.5">Date</th>
+                          <th className="px-4 py-2.5">Medicine Name</th>
+                          <th className="px-4 py-2.5">Salt / Active Agent</th>
+                          <th className="px-4 py-2.5">Prescriber Doctor</th>
+                          <th className="px-4 py-2.5">Clinic / Hospital</th>
+                          <th className="px-4 py-2.5 text-center">Qty</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {liveAnalytics.amrRisk.antibiotics.map((it: any, idx: number) => (
+                          <tr key={idx} className="hover:bg-slate-50/80">
+                            <td className="px-4 py-2.5 text-slate-600">
+                              {it.date ? new Date(it.date).toLocaleDateString('en-IN') : 'Recent'}
+                            </td>
+                            <td className="px-4 py-2.5 font-bold text-slate-900">
+                              {it.productName}
+                            </td>
+                            <td className="px-4 py-2.5 text-purple-700 font-semibold text-[11px]">
+                              {it.salt || 'Broad Spectrum'}
+                            </td>
+                            <td className="px-4 py-2.5 text-slate-700">
+                              {it.doctorName}
+                            </td>
+                            <td className="px-4 py-2.5 text-slate-500 text-[11px]">
+                              {it.clinic}
+                            </td>
+                            <td className="px-4 py-2.5 text-center font-black text-slate-800">
+                              {it.quantity}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Doctor Referral Attributions */}
+              {liveAnalytics.doctorAttributions && liveAnalytics.doctorAttributions.length > 0 && (
+                <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-3">
+                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                    <Stethoscope className="w-4 h-4 text-blue-600" />
+                    <span>Attributed Prescribing Doctors for this Patient</span>
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                    {liveAnalytics.doctorAttributions.map((doc: any, i: number) => (
+                      <div key={i} className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                        <div className="font-bold text-slate-900 text-xs">{doc.doctorName}</div>
+                        <div className="text-[10px] text-slate-500">{doc.clinic}</div>
+                        <div className="mt-2 flex items-center justify-between text-xs">
+                          <span className="font-semibold text-slate-700">{doc.count} Prescription{doc.count > 1 ? 's' : ''}</span>
+                          <span className="font-black text-emerald-700">₹{Number(doc.totalSpend || 0).toLocaleString('en-IN')}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            </div>
+          )}
+
+        </div>
+      )}
+
     </div>
   );
 };

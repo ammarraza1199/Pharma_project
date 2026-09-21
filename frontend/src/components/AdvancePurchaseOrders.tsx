@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { createPurchaseOrder, updatePurchaseOrderStatus, deletePurchaseOrder, navigateTo } from '../store/posSlice';
+import { createPurchaseOrder, updatePurchaseOrderStatus, deletePurchaseOrder, setPurchaseOrders, navigateTo } from '../store/posSlice';
 import type { PurchaseOrder, PurchaseOrderItem, DistributorScheme } from '../types/pos';
+import api from '../utils/api';
 import {
   FileText, Plus, Printer, MessageSquare, Truck, CheckCircle2,
   Clock, X, Trash2, Calendar, Building, CreditCard, ExternalLink,
@@ -23,6 +24,36 @@ export const AdvancePurchaseOrders: React.FC<Props> = ({
   const suppliers = useSelector((state: RootState) => state.pos.suppliers);
   const products = useSelector((state: RootState) => state.pos.products);
   const storeSettings = useSelector((state: RootState) => state.pos.settings);
+
+  // Sync purchase orders from backend on mount
+  useEffect(() => {
+    api.get('/purchase-orders?limit=100')
+      .then(res => {
+        if (res.data?.data && Array.isArray(res.data.data) && res.data.data.length > 0) {
+          const mapped: PurchaseOrder[] = res.data.data.map((po: any) => ({
+            poId: po.poId || po._id?.toString() || `po-${Date.now()}`,
+            poNumber: po.poNumber,
+            supplierId: po.supplierId || '',
+            supplierName: po.supplierName,
+            supplierGstin: po.supplierGstin || '',
+            supplierPhone: po.supplierPhone || '',
+            orderDate: typeof po.orderDate === 'string' ? po.orderDate.split('T')[0] : new Date(po.orderDate).toISOString().split('T')[0],
+            expectedDeliveryDate: typeof po.expectedDeliveryDate === 'string' ? po.expectedDeliveryDate.split('T')[0] : new Date(po.expectedDeliveryDate).toISOString().split('T')[0],
+            paymentTerms: po.paymentTerms || 'CREDIT_15_DAYS',
+            status: po.status || 'DRAFT',
+            items: po.items || [],
+            totalAmount: po.totalAmount || 0,
+            schemeNotes: po.schemeNotes || '',
+            notes: po.notes || '',
+            createdAt: po.createdAt ? new Date(po.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : new Date().toLocaleString('en-IN')
+          }));
+          dispatch(setPurchaseOrders(mapped));
+        }
+      })
+      .catch(err => {
+        console.warn('Could not fetch purchase orders from API, continuing with local store:', err);
+      });
+  }, [dispatch]);
 
   // Filter state
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'DRAFT' | 'PLACED' | 'CONVERTED_TO_GRN'>('ALL');
@@ -136,7 +167,7 @@ export const AdvancePurchaseOrders: React.FC<Props> = ({
   };
 
   // Submit Draft Purchase Order
-  const handleSavePurchaseOrder = (status: 'DRAFT' | 'PLACED') => {
+  const handleSavePurchaseOrder = async (status: 'DRAFT' | 'PLACED') => {
     const sup = suppliers.find(s => s.supplierId === selectedSupplierId) || suppliers[0];
     if (!sup) {
       alert('Please select a valid supplier.');
@@ -167,15 +198,45 @@ export const AdvancePurchaseOrders: React.FC<Props> = ({
       createdAt: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
     };
 
+    try {
+      const res = await api.post('/purchase-orders', {
+        poNumber: nextNumber,
+        supplierId: sup.supplierId,
+        supplierName: sup.name,
+        supplierGstin: sup.gstin || '',
+        supplierPhone: sup.phone || '',
+        orderDate: newPO.orderDate,
+        expectedDeliveryDate: newPO.expectedDeliveryDate,
+        paymentTerms: newPO.paymentTerms,
+        status,
+        items: newPO.items,
+        totalAmount: newPO.totalAmount,
+        schemeNotes: newPO.schemeNotes,
+        notes: newPO.notes
+      });
+      if (res.data?.data) {
+        if (res.data.data._id) newPO.poId = res.data.data._id.toString();
+        if (res.data.data.poNumber) newPO.poNumber = res.data.data.poNumber;
+      }
+    } catch (err) {
+      console.warn('Could not persist PO to backend, saving in local state:', err);
+    }
+
     dispatch(createPurchaseOrder(newPO));
-    alert(`✓ Purchase Order ${nextNumber} ${status === 'PLACED' ? 'placed' : 'saved as draft'} successfully!`);
+    alert(`✓ Purchase Order ${newPO.poNumber} ${status === 'PLACED' ? 'placed' : 'saved as draft'} successfully!`);
     setShowDraftModal(false);
     if (onClearInitialScheme) onClearInitialScheme();
   };
 
   // Convert PO to GRN
-  const handleConvertPOToGRN = (po: PurchaseOrder) => {
+  const handleConvertPOToGRN = async (po: PurchaseOrder) => {
     if (!window.confirm(`Convert PO "${po.poNumber}" into an active Goods Receipt Note (GRN)?`)) return;
+
+    try {
+      await api.put(`/purchase-orders/${po.poId || po.poNumber}/status`, { status: 'CONVERTED_TO_GRN' });
+    } catch (err) {
+      console.warn('Could not update PO status on backend:', err);
+    }
 
     dispatch(updatePurchaseOrderStatus({
       poId: po.poId,
@@ -184,6 +245,19 @@ export const AdvancePurchaseOrders: React.FC<Props> = ({
 
     alert(`✓ Purchase Order "${po.poNumber}" converted to GRN! Redirecting to Stock Purchase Intake...`);
     dispatch(navigateTo('PURCHASE_GRN'));
+  };
+
+  // Delete PO
+  const handleDeletePO = async (po: PurchaseOrder) => {
+    if (!window.confirm(`Are you sure you want to delete purchase order "${po.poNumber}"?`)) return;
+
+    try {
+      await api.delete(`/purchase-orders/${po.poId || po.poNumber}`);
+    } catch (err) {
+      console.warn('Could not delete PO from backend:', err);
+    }
+
+    dispatch(deletePurchaseOrder(po.poId));
   };
 
   // Share PO on WhatsApp
@@ -413,6 +487,15 @@ export const AdvancePurchaseOrders: React.FC<Props> = ({
                             <span>Inward GRN</span>
                           </button>
                         )}
+
+                        {/* Delete PO */}
+                        <button
+                          onClick={() => handleDeletePO(po)}
+                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                          title="Delete Purchase Order"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </td>
                   </tr>

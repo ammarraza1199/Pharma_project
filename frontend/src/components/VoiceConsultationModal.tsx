@@ -13,6 +13,7 @@ import {
 } from '../store/posSlice';
 import type { VoiceConsultationRecord, CustomerSentimentResult, ValueAddedServiceLink } from '../types/pos';
 import { analyzeCustomerSentiment } from '../utils/sentimentEngine';
+import api from '../utils/api';
 import {
   Mic,
   Square,
@@ -150,6 +151,44 @@ export const VoiceConsultationModal: React.FC = () => {
   const activePharmacist = pharmacists.find(p => p.id === activePharmacistId) || pharmacists[0];
 
   const [activeTab, setActiveTab] = useState<'RECORD' | 'HISTORY'>('RECORD');
+
+  // Sync consultations from backend on open
+  useEffect(() => {
+    if (modal.isOpen) {
+      api.get('/consultations?limit=50')
+        .then(res => {
+          if (res.data?.data && Array.isArray(res.data.data)) {
+            res.data.data.forEach((rec: any) => {
+              const mapped: VoiceConsultationRecord = {
+                id: rec.id || rec.consultationId || rec._id?.toString() || `consult-${Date.now()}`,
+                patientName: rec.patientName,
+                phone: rec.phone,
+                age: rec.age,
+                gender: rec.gender || 'MALE',
+                date: typeof rec.date === 'string' ? rec.date.split('T')[0] : new Date().toISOString().split('T')[0],
+                time: rec.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                durationSeconds: rec.durationSeconds || 30,
+                audioUrl: rec.audioUrl,
+                audioBlobBase64: rec.audioBlobBase64,
+                category: rec.category || 'GENERAL_ADVICE',
+                chiefDiscussion: rec.chiefDiscussion,
+                pharmacistAdvice: rec.pharmacistAdvice,
+                tags: rec.tags || [],
+                pharmacistName: rec.pharmacistName || 'Staff Pharmacist',
+                counterNumber: rec.counterNumber || 1,
+                sessionId: rec.sessionId,
+                sentimentResult: rec.sentimentResult,
+                linkedValueAddedServices: rec.linkedValueAddedServices
+              };
+              dispatch(saveConsultationRecord(mapped));
+            });
+          }
+        })
+        .catch(err => {
+          console.warn('Could not sync consultations from backend, using local records:', err);
+        });
+    }
+  }, [modal.isOpen, dispatch]);
 
   // Form State
   const [patientName, setPatientName] = useState<string>('');
@@ -674,6 +713,30 @@ export const VoiceConsultationModal: React.FC = () => {
 
     dispatch(saveConsultationRecord(newRecord));
     dispatch(setSessionSentiment(sentimentResult));
+
+    // Persist to backend database
+    api.post('/consultations', {
+      patientName: newRecord.patientName,
+      phone: newRecord.phone,
+      age: newRecord.age,
+      gender: newRecord.gender,
+      date: newRecord.date,
+      time: newRecord.time,
+      durationSeconds: newRecord.durationSeconds,
+      audioUrl: newRecord.audioUrl,
+      audioBlobBase64: newRecord.audioBlobBase64,
+      category: newRecord.category,
+      chiefDiscussion: newRecord.chiefDiscussion,
+      pharmacistAdvice: newRecord.pharmacistAdvice,
+      tags: newRecord.tags,
+      pharmacistName: newRecord.pharmacistName,
+      counterNumber: newRecord.counterNumber,
+      sessionId: newRecord.sessionId,
+      sentimentResult: newRecord.sentimentResult,
+      linkedValueAddedServices: newRecord.linkedValueAddedServices
+    }).catch(err => {
+      console.warn('Could not persist consultation to backend, saved in local state:', err);
+    });
 
     if (autoApplyToCart && linkedServices.length > 0) {
       const primaryService = linkedServices.find(s => s.discountPercent && s.discountPercent > 0) || linkedServices[0];
@@ -1993,8 +2056,13 @@ export const VoiceConsultationModal: React.FC = () => {
                             </button>
 
                             <button
-                              onClick={() => {
+                              onClick={async () => {
                                 if (window.confirm(`Delete consultation record for ${rec.patientName}?`)) {
+                                  try {
+                                    await api.delete(`/consultations/${rec.id}`);
+                                  } catch (err) {
+                                    console.warn('Could not delete consultation from backend:', err);
+                                  }
                                   dispatch(deleteConsultationRecord(rec.id));
                                 }
                               }}
