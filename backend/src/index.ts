@@ -25,6 +25,7 @@ import settingsRoutes from './routes/settings.routes';
 import drugInteractionRoutes from './routes/drugInteraction.routes';
 import purchaseOrderRoutes from './routes/purchaseOrder.routes';
 import consultationRoutes from './routes/consultation.routes';
+import deliveryRoutes from './routes/delivery.routes';
 
 const app = express();
 const httpServer = createServer(app);
@@ -67,6 +68,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/drug-interactions', drugInteractionRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/consultations', consultationRoutes);
+app.use('/api/delivery-orders', deliveryRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -3158,6 +3158,9 @@ export const posSlice = createSlice({
     },
 
     // Delivery Order Management
+    setDeliveryOrders: (state, action: PayloadAction<DeliveryOrder[]>) => {
+      state.deliveryOrders = action.payload;
+    },
     addDeliveryOrder: (state, action: PayloadAction<Omit<DeliveryOrder, 'orderId' | 'orderNumber' | 'createdAt' | 'updatedAt'>>) => {
       const newOrder: DeliveryOrder = {
         ...action.payload,
@@ -3391,6 +3394,7 @@ export const {
   reprintInvoice,
   deleteSavedInvoice,
   clearAllSavedInvoices,
+  setDeliveryOrders,
   addDeliveryOrder,
   updateDeliveryOrderStatus,
   deleteDeliveryOrder,
