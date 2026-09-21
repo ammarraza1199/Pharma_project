@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import {
@@ -30,6 +30,35 @@ export const ReturnsPage: React.FC = () => {
   const returnNotes = useSelector((state: RootState) => state.pos.returnNotes);
   const putAwayTasks = useSelector((state: RootState) => state.pos.putAwayTasks || []);
   const currentUser = useSelector((state: RootState) => state.pos.currentUser);
+
+  const [fetchedReturnNotes, setFetchedReturnNotes] = useState<any[]>([]);
+
+  // Fetch returns history from API on mount
+  useEffect(() => {
+    const fetchReturnNotes = async () => {
+      try {
+        const res = await api.get('/returns?limit=50');
+        if (res.data.success && Array.isArray(res.data.data)) {
+          setFetchedReturnNotes(res.data.data);
+        }
+      } catch (err) {
+        console.error('[ReturnsPage] Failed to fetch return credit notes from API:', err);
+      }
+    };
+    fetchReturnNotes();
+  }, []);
+
+  // Combined returns list (API history + Redux state)
+  const allReturnNotes = useMemo(() => {
+    const map = new Map<string, any>();
+    fetchedReturnNotes.forEach((note: any) => {
+      if (note.creditNoteNo) map.set(note.creditNoteNo, note);
+    });
+    returnNotes.forEach(note => {
+      if (note.creditNoteNo) map.set(note.creditNoteNo, note);
+    });
+    return Array.from(map.values());
+  }, [fetchedReturnNotes, returnNotes]);
 
   // Tab State
   const [activeTab, setActiveTab] = useState<'RETURN_FORM' | 'PUTAWAY_QUEUE'>('RETURN_FORM');
@@ -192,6 +221,7 @@ export const ReturnsPage: React.FC = () => {
       console.warn('[ReturnsPage] Server offline or endpoint simulated; processed locally in Redux store.');
     }
 
+    setFetchedReturnNotes(prev => [creditNote, ...prev]);
     dispatch(processReturnCreditNote(creditNote));
     setGeneratedNote(creditNote);
     setActivePrintNote(creditNote);
@@ -806,16 +836,16 @@ export const ReturnsPage: React.FC = () => {
           )}
 
           {/* Processed Return Credit Notes Log */}
-          {returnNotes.length > 0 && (
+          {allReturnNotes.length > 0 && (
             <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold text-slate-900 font-heading">
-                  Processed Return Credit Notes ({returnNotes.length})
+                  Processed Return Credit Notes ({allReturnNotes.length})
                 </h3>
                 <span className="text-[10px] text-slate-400">Click 'Print Voucher' to print thermal slip</span>
               </div>
               <div className="space-y-2">
-                {returnNotes.map((note) => (
+                {allReturnNotes.map((note) => (
                   <div
                     key={note.creditNoteNo}
                     className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex justify-between items-center text-xs flex-wrap gap-2 hover:bg-slate-100/70 transition-colors"

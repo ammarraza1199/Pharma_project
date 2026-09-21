@@ -60,6 +60,15 @@ export const ReportsPage: React.FC = () => {
   const [hsnReport, setHsnReport] = useState(MOCK_HSN_TAX_REPORT);
   const [topMeds, setTopMeds] = useState(MOCK_TOP_MEDICINES);
   const [paymentSplit, setPaymentSplit] = useState(MOCK_PAYMENT_SPLIT);
+  const [dailyRevenue, setDailyRevenue] = useState<{ day: string; date: string; value: number }[]>([
+    { day: 'Mon', date: '2026-08-08', value: 12400 },
+    { day: 'Tue', date: '2026-08-09', value: 14200 },
+    { day: 'Wed', date: '2026-08-10', value: 11800 },
+    { day: 'Thu', date: '2026-08-11', value: 16500 },
+    { day: 'Fri', date: '2026-08-12', value: 13900 },
+    { day: 'Sat', date: '2026-08-13', value: 18200 },
+    { day: 'Sun', date: '2026-08-14', value: 15400 },
+  ]);
 
   // Task #52: Substitute Intelligence State & Filtering
   const substituteEvents = useSelector((state: RootState) => state.pos.substituteEvents || []);
@@ -81,17 +90,21 @@ export const ReportsPage: React.FC = () => {
     const fetchReports = async () => {
       try {
         const query = `?from=${fromDate}&to=${toDate}`;
-        const [salesRes, hsnRes, medsRes, paymentRes] = await Promise.all([
+        const [salesRes, hsnRes, medsRes, paymentRes, dailyRes] = await Promise.all([
           api.get(`/reports/sales-summary${query}`),
           api.get(`/reports/hsn-tax${query}`),
           api.get(`/reports/top-medicines${query}`),
-          api.get(`/reports/payment-split${query}`)
+          api.get(`/reports/payment-split${query}`),
+          api.get(`/reports/daily-revenue?days=7`)
         ]);
 
         if (salesRes.data.success) setSalesSummary(salesRes.data.data);
         if (hsnRes.data.success) setHsnReport(hsnRes.data.data);
         if (medsRes.data.success) setTopMeds(medsRes.data.data);
         if (paymentRes.data.success) setPaymentSplit(paymentRes.data.data);
+        if (dailyRes.data.success && Array.isArray(dailyRes.data.data) && dailyRes.data.data.length > 0) {
+          setDailyRevenue(dailyRes.data.data);
+        }
       } catch (err) {
         console.error('Failed to fetch reports', err);
       }
@@ -343,6 +356,41 @@ export const ReportsPage: React.FC = () => {
               <p className="text-xl font-black text-slate-900 font-heading mt-0.5">₹{salesSummary.avgBillValue.toLocaleString('en-IN')}</p>
             </div>
           </div>
+
+          {/* 7-Day Revenue Trend Card */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xs font-extrabold text-slate-900 font-heading flex items-center space-x-1.5">
+                  <TrendingUp className="w-4 h-4 text-emerald-600" />
+                  <span>7-Day Daily Revenue Trend</span>
+                </h3>
+                <p className="text-[11px] text-slate-500 font-medium">Daily collections based on finalized customer invoices</p>
+              </div>
+              <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+                Total: ₹{dailyRevenue.reduce((s, d) => s + d.value, 0).toLocaleString('en-IN')}
+              </span>
+            </div>
+            <div className="grid grid-cols-7 gap-2 pt-2">
+              {dailyRevenue.map((d, i) => {
+                const maxVal = Math.max(...dailyRevenue.map(x => x.value), 1);
+                const heightPct = Math.min(100, Math.max(15, Math.round((d.value / maxVal) * 100)));
+                return (
+                  <div key={d.date || i} className="flex flex-col items-center space-y-1.5">
+                    <span className="text-[10px] font-bold text-slate-700">₹{d.value >= 1000 ? `${(d.value / 1000).toFixed(1)}k` : d.value}</span>
+                    <div className="w-full bg-slate-100 rounded-lg h-24 flex items-end p-1">
+                      <div
+                        className="w-full bg-emerald-600 hover:bg-emerald-500 rounded-md transition-all cursor-pointer"
+                        style={{ height: `${heightPct}%` }}
+                        title={`${d.date} (${d.day}): ₹${d.value.toFixed(2)}`}
+                      />
+                    </div>
+                    <span className="text-[10px] font-semibold text-slate-500">{d.day}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
 
@@ -375,7 +423,7 @@ export const ReportsPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {MOCK_HSN_TAX_REPORT.map(row => (
+                {hsnReport.map(row => (
                   <tr key={row.hsnCode} className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-2.5 font-mono font-bold text-slate-900">{row.hsnCode}</td>
                     <td className="px-3 py-2.5 font-semibold text-slate-800">{row.description}</td>

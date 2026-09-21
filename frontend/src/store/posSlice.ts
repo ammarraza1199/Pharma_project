@@ -3125,6 +3125,9 @@ export const posSlice = createSlice({
     clearFinalizedInvoice: (state) => {
       state.latestFinalizedInvoice = null;
     },
+    setLatestFinalizedInvoice: (state, action: PayloadAction<FinalizedInvoice>) => {
+      state.latestFinalizedInvoice = action.payload;
+    },
     setInvoiceHistoryModalOpen: (state, action: PayloadAction<boolean>) => {
       state.invoiceHistoryModal.isOpen = action.payload;
     },
@@ -3371,6 +3374,7 @@ export const {
   clearActiveSession,
   finalizeEmergencyInvoice,
   clearFinalizedInvoice,
+  setLatestFinalizedInvoice,
   setInvoiceHistoryModalOpen,
   reprintInvoice,
   deleteSavedInvoice,

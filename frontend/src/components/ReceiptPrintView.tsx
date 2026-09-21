@@ -3,9 +3,10 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import { clearFinalizedInvoice, setInvoiceHistoryModalOpen, navigateTo } from '../store/posSlice';
 import { useReactToPrint } from 'react-to-print';
-import { Printer, CheckCircle, X, FileText, History, Package, Shield, Lock } from 'lucide-react';
+import { Printer, CheckCircle, X, FileText, History, Package, Shield, Lock, MessageSquare } from 'lucide-react';
 import { numberToWords } from '../utils/numberToWords';
 import { getMedicineDetails } from '../utils/medicineDetails';
+import { shareInvoiceViaWhatsApp } from '../utils/whatsappShare';
 
 const isSensitiveProduct = (name: string = '', salt: string = '', category: string = ''): boolean => {
   const str = `${name} ${salt} ${category}`.toLowerCase();
@@ -764,6 +765,15 @@ export const ReceiptPrintView: React.FC = () => {
               className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
             >
               Done &amp; Start New Bill
+            </button>
+
+            <button
+              onClick={() => shareInvoiceViaWhatsApp(invoice)}
+              className="flex items-center space-x-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs cursor-pointer active:scale-95 transition-all"
+              title="Share tax invoice receipt directly via WhatsApp"
+            >
+              <MessageSquare className="w-4 h-4 text-white" />
+              <span>Share WhatsApp</span>
             </button>
 
             <button

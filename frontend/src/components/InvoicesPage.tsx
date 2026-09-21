@@ -4,6 +4,7 @@ import type { RootState } from '../store';
 import {
   navigateTo,
   reprintInvoice,
+  setLatestFinalizedInvoice,
   deleteSavedInvoice
 } from '../store/posSlice';
 import api from '../utils/api';
@@ -77,7 +78,16 @@ export const InvoicesPage: React.FC = () => {
   const totalGstCollected = invoices.reduce((sum, inv) => sum + inv.totalCGST + inv.totalSGST, 0);
 
   // ── Actions ───────────────────────────────────────────────────────────────
-  const handleReprint = (invoiceNumber: string) => {
+  const handleReprint = async (invoiceNumber: string) => {
+    try {
+      const res = await api.get(`/invoices/${invoiceNumber}`);
+      if (res.data.success && res.data.data) {
+        dispatch(setLatestFinalizedInvoice(res.data.data));
+        return;
+      }
+    } catch (err) {
+      console.warn('[InvoicesPage] Live invoice fetch fallback to local:', err);
+    }
     dispatch(reprintInvoice(invoiceNumber));
   };
 

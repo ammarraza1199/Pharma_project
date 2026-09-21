@@ -1,51 +1,96 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import {
   setInvoiceHistoryModalOpen,
   reprintInvoice,
+  setLatestFinalizedInvoice,
   deleteSavedInvoice,
   clearAllSavedInvoices
 } from '../store/posSlice';
 import {
   X, Search, FileText, Printer, Download, Trash2,
-  Calendar, CreditCard, DollarSign, Filter, RefreshCw, CheckCircle2, History
+  Calendar, CreditCard, DollarSign, Filter, RefreshCw, CheckCircle2, History,
+  Loader2
 } from 'lucide-react';
 import type { FinalizedInvoice } from '../types/pos';
+import api from '../utils/api';
 
 export const InvoiceHistoryModal: React.FC = () => {
   const dispatch = useDispatch();
   const isOpen = useSelector((state: RootState) => state.pos.invoiceHistoryModal?.isOpen);
   const invoices = useSelector((state: RootState) => state.pos.invoices || []);
 
+  const [apiInvoices, setApiInvoices] = useState<FinalizedInvoice[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [paymentFilter, setPaymentFilter] = useState<'ALL' | 'CASH' | 'UPI' | 'CARD' | 'SPLIT'>('ALL');
   const [selectedInvoiceForDelete, setSelectedInvoiceForDelete] = useState<string | null>(null);
 
+  // Fetch invoices from backend on open
+  useEffect(() => {
+    if (!isOpen) return;
+    const fetchInvoices = async () => {
+      setIsLoading(true);
+      try {
+        const res = await api.get('/invoices?limit=50&sortBy=date_desc');
+        if (res.data.success && Array.isArray(res.data.data)) {
+          setApiInvoices(res.data.data);
+        }
+      } catch (err) {
+        console.error('[InvoiceHistoryModal] Failed to fetch invoices:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchInvoices();
+  }, [isOpen]);
+
+  // Combine API invoices with Redux store invoices (avoid duplicates by invoiceNumber)
+  const combinedInvoices = useMemo(() => {
+    const map = new Map<string, FinalizedInvoice>();
+    apiInvoices.forEach(inv => {
+      if (inv.invoiceNumber) map.set(inv.invoiceNumber, inv);
+    });
+    invoices.forEach(inv => {
+      if (inv.invoiceNumber) map.set(inv.invoiceNumber, inv);
+    });
+    return Array.from(map.values());
+  }, [apiInvoices, invoices]);
+
   if (!isOpen) return null;
 
   // Filter invoices based on search query & payment method
-  const filteredInvoices = invoices.filter(inv => {
+  const filteredInvoices = combinedInvoices.filter(inv => {
     const matchesSearch =
       inv.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (inv.billingSession.patientDetails?.patientName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (inv.billingSession.patientDetails?.phone || '').includes(searchQuery) ||
-      (inv.billingSession.doctorDetails?.doctorName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inv.billingSession.items.some(item => item.product.name.toLowerCase().includes(searchQuery.toLowerCase()));
+      (inv.billingSession?.patientDetails?.patientName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (inv.billingSession?.patientDetails?.phone || '').includes(searchQuery) ||
+      (inv.billingSession?.doctorDetails?.doctorName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (inv.billingSession?.items || []).some(item => (item.product?.name || (item as any).productSnapshot?.name || '').toLowerCase().includes(searchQuery.toLowerCase()));
 
-    const matchesPayment = paymentFilter === 'ALL' || inv.payment.method === paymentFilter;
+    const matchesPayment = paymentFilter === 'ALL' || inv.payment?.method === paymentFilter;
 
     return matchesSearch && matchesPayment;
   });
 
   // Calculate summary metrics
-  const totalInvoicesCount = invoices.length;
-  const totalRevenue = invoices.reduce((sum, inv) => sum + inv.grandTotal, 0);
-  const cashRevenue = invoices.filter(inv => inv.payment.method === 'CASH').reduce((sum, inv) => sum + inv.grandTotal, 0);
-  const upiRevenue = invoices.filter(inv => inv.payment.method === 'UPI').reduce((sum, inv) => sum + inv.grandTotal, 0);
+  const totalInvoicesCount = combinedInvoices.length;
+  const totalRevenue = combinedInvoices.reduce((sum, inv) => sum + (inv.grandTotal || 0), 0);
+  const cashRevenue = combinedInvoices.filter(inv => inv.payment?.method === 'CASH').reduce((sum, inv) => sum + (inv.grandTotal || 0), 0);
+  const upiRevenue = combinedInvoices.filter(inv => inv.payment?.method === 'UPI').reduce((sum, inv) => sum + (inv.grandTotal || 0), 0);
 
-  const handleReprint = (invoiceNumber: string) => {
-    dispatch(reprintInvoice(invoiceNumber));
+  const handleReprint = async (invoiceNumber: string) => {
+    try {
+      const res = await api.get(`/invoices/${invoiceNumber}`);
+      if (res.data.success && res.data.data) {
+        dispatch(setLatestFinalizedInvoice(res.data.data));
+      } else {
+        dispatch(reprintInvoice(invoiceNumber));
+      }
+    } catch {
+      dispatch(reprintInvoice(invoiceNumber));
+    }
     dispatch(setInvoiceHistoryModalOpen(false));
   };
 
@@ -296,9 +341,15 @@ export const InvoiceHistoryModal: React.FC = () => {
 
                           {/* Delete Invoice */}
                           <button
-                            onClick={() => {
+                            onClick={async () => {
                               if (window.confirm(`Are you sure you want to remove invoice ${inv.invoiceNumber} from saved history?`)) {
+                                try {
+                                  await api.delete(`/invoices/${inv.invoiceNumber}`);
+                                } catch (err) {
+                                  console.warn('[InvoiceHistoryModal] Backend delete skipped or unauthorized');
+                                }
                                 dispatch(deleteSavedInvoice(inv.invoiceNumber));
+                                setApiInvoices(prev => prev.filter(i => i.invoiceNumber !== inv.invoiceNumber));
                               }
                             }}
                             className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"

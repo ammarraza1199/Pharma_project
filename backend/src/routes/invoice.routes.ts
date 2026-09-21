@@ -14,7 +14,7 @@ const router = Router();
 // POST /api/invoices — Finalize Bill (most critical endpoint)
 router.post('/', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { billingSession, payment, subtotal, totalDiscount, totalCGST, totalSGST, grandTotal, managerPin } = req.body;
+    const { billingSession, payment, subtotal, totalDiscount, totalCGST, totalSGST, grandTotal, managerPin, invoiceType } = req.body;
     const items: any[] = billingSession?.items || [];
 
     if (items.length === 0) {
@@ -58,12 +58,18 @@ router.post('/', protect, async (req: AuthRequest, res: Response, next: NextFunc
 
     // ── STOCK DEDUCTION (atomic, per batch) ────────────────────────────────
     for (const item of items) {
-      await deductStock(
-        item.productId,
-        item.selectedBatch.batchNumber,
-        item.quantity,
-        null as any // Transactions removed for local standalone MongoDB
-      );
+      if (item.productId && mongoose.isValidObjectId(item.productId) && item.selectedBatch?.batchNumber) {
+        try {
+          await deductStock(
+            item.productId,
+            item.selectedBatch.batchNumber,
+            item.quantity,
+            null as any // Transactions removed for local standalone MongoDB
+          );
+        } catch (stockErr) {
+          console.warn('[Invoice] Stock deduction warning:', stockErr);
+        }
+      }
     }
 
     // ── GENERATE SEQUENTIAL INVOICE NUMBER ────────────────────────────────
@@ -82,7 +88,20 @@ router.post('/', protect, async (req: AuthRequest, res: Response, next: NextFunc
 
     // ── CREATE INVOICE ─────────────────────────────────────────────────────
     const [invoice] = await Invoice.create(
-      [{ invoiceNumber, invoiceDate: new Date(), storeInfo, billingSession, subtotal, totalDiscount, totalCGST, totalSGST, grandTotal, payment, createdBy: req.user!.id }]
+      [{
+        invoiceNumber,
+        invoiceDate: new Date(),
+        storeInfo,
+        billingSession,
+        subtotal,
+        totalDiscount,
+        totalCGST,
+        totalSGST,
+        grandTotal,
+        payment,
+        invoiceType: invoiceType === 'EMERGENCY' ? 'EMERGENCY' : 'REGULAR',
+        createdBy: req.user!.id
+      }]
     );
 
     // ── AUTO-UPDATE PATIENT (outside transaction — non-critical) ──────────
