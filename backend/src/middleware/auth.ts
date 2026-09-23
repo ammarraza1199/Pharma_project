@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 import { config } from '../config/env';
 import { User } from '../models/User';
+import { inMemoryUsers } from '../routes/auth.routes';
 
 export interface AuthRequest extends Request {
   user?: { id: string; email: string; role: string };
@@ -18,7 +20,16 @@ export const protect = async (req: AuthRequest, res: Response, next: NextFunctio
     }
 
     const decoded = jwt.verify(token, config.jwtSecret) as { id: string; email: string; role: string };
-    const user = await User.findById(decoded.id).select('-passwordHash');
+    let user: any = null;
+
+    if (mongoose.connection.readyState === 1) {
+      user = await User.findById(decoded.id).select('-passwordHash');
+    }
+
+    if (!user) {
+      user = inMemoryUsers.find(u => u.id === decoded.id || u._id === decoded.id);
+    }
+
     if (!user || !user.isActive) {
       return res.status(401).json({ success: false, message: 'User not found or deactivated.' });
     }

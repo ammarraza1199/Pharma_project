@@ -2,12 +2,41 @@ import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import mongoose from 'mongoose';
 import { User } from '../models/User';
 import { StoreSettings } from '../models/StoreSettings';
 import { config } from '../config/env';
 import { protect, AuthRequest } from '../middleware/auth';
 
 const router = Router();
+
+export interface InMemoryUser {
+  id: string;
+  _id: string;
+  pharmacistName: string;
+  pharmacyName: string;
+  licenseNo: string;
+  email: string;
+  passwordHash: string;
+  role: string;
+  isActive: boolean;
+  loginAttempts?: number;
+  lockUntil?: Date;
+}
+
+export const inMemoryUsers: InMemoryUser[] = [
+  {
+    id: 'demo-admin-1',
+    _id: 'demo-admin-1',
+    pharmacistName: 'Ramesh Kumar (Lead Pharmacist)',
+    pharmacyName: 'GENQUANTAA MedPlus Pharmacy',
+    licenseNo: 'DL-2024/HYD/889201',
+    email: 'admin@genquantaa.com',
+    passwordHash: '$2a$10$16ReGELrOsnmFWq9A4wgieXVLVsZAwelbmSGPiBcAbISekm9/Dp6S', // '1234'
+    role: 'PHARMACIST',
+    isActive: true,
+  }
+];
 
 const signToken = (id: string, email: string, role: string) =>
   jwt.sign({ id, email, role }, config.jwtSecret, { expiresIn: config.jwtExpiresIn as any });
@@ -19,11 +48,40 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
     if (!pharmacistName || !email || !password) {
       return res.status(400).json({ success: false, message: 'Name, email and password are required.' });
     }
-    const exists = await User.findOne({ email: email.toLowerCase() });
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // In-memory fallback if MongoDB is not connected
+    if (mongoose.connection.readyState !== 1) {
+      const exists = inMemoryUsers.find(u => u.email === normalizedEmail);
+      if (exists) return res.status(409).json({ success: false, message: 'Email already registered.' });
+
+      const passwordHash = await bcrypt.hash(password, 12);
+      const newUser: InMemoryUser = {
+        id: `mem-${Date.now()}`,
+        _id: `mem-${Date.now()}`,
+        pharmacistName: pharmacistName.trim(),
+        pharmacyName: pharmacyName || 'GENQUANTAA MedPlus Pharmacy',
+        licenseNo: licenseNo || 'DL-2024/HYD/889201',
+        email: normalizedEmail,
+        passwordHash,
+        role: 'PHARMACIST',
+        isActive: true,
+      };
+      inMemoryUsers.push(newUser);
+      const token = signToken(newUser.id, newUser.email, newUser.role);
+      return res.status(201).json({
+        success: true,
+        token,
+        user: { id: newUser.id, pharmacistName: newUser.pharmacistName, pharmacyName: newUser.pharmacyName, email: newUser.email, role: newUser.role }
+      });
+    }
+
+    const exists = await User.findOne({ email: normalizedEmail });
     if (exists) return res.status(409).json({ success: false, message: 'Email already registered.' });
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const user = await User.create({ pharmacistName, pharmacyName: pharmacyName || '', licenseNo: licenseNo || '', email: email.toLowerCase(), passwordHash });
+    const user = await User.create({ pharmacistName, pharmacyName: pharmacyName || '', licenseNo: licenseNo || '', email: normalizedEmail, passwordHash });
     const token = signToken(user._id.toString(), user.email, user.role);
     res.status(201).json({ success: true, token, user: { id: user._id, pharmacistName: user.pharmacistName, pharmacyName: user.pharmacyName, email: user.email, role: user.role } });
   } catch (err) { next(err); }
@@ -35,7 +93,32 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ success: false, message: 'Email and password required.' });
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // In-memory fallback if MongoDB is not connected
+    if (mongoose.connection.readyState !== 1) {
+      const user = inMemoryUsers.find(u => u.email === normalizedEmail);
+      if (!user || !user.isActive) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid credentials. Please register first or use admin@genquantaa.com with password 1234.'
+        });
+      }
+
+      const isMatch = await bcrypt.compare(password, user.passwordHash);
+      if (!isMatch) {
+        return res.status(401).json({ success: false, message: 'Invalid credentials.' });
+      }
+
+      const token = signToken(user.id, user.email, user.role);
+      return res.json({
+        success: true,
+        token,
+        user: { id: user.id, pharmacistName: user.pharmacistName, pharmacyName: user.pharmacyName, licenseNo: user.licenseNo, email: user.email, role: user.role }
+      });
+    }
+
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user || !user.isActive) return res.status(401).json({ success: false, message: 'Invalid credentials.' });
 
     // Check lockout

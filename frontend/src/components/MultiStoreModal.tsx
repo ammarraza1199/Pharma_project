@@ -95,9 +95,6 @@ export const MultiStoreModal: React.FC = () => {
             <div>
               <h2 className="text-lg font-bold tracking-tight text-white flex items-center gap-2">
                 Multi-Store & Borrowed Stock Hub
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 font-medium border border-sky-500/30">
-                  Tasks #31 - #36
-                </span>
               </h2>
               <p className="text-xs text-slate-400">
                 Check stock across branch stores, reserve pickups, & log inter-pharmacy/godown borrowed stock.
@@ -124,7 +121,7 @@ export const MultiStoreModal: React.FC = () => {
               }`}
             >
               <Store className="w-4 h-4 text-sky-600" />
-              <span>Inter-Branch Stock Lookup (Tasks 31 & 33)</span>
+              <span>Inter-Branch Stock Lookup</span>
             </button>
             <button
               onClick={() => setActiveTab('BORROWED_LOG')}
@@ -135,7 +132,7 @@ export const MultiStoreModal: React.FC = () => {
               }`}
             >
               <ArrowRightLeft className="w-4 h-4 text-emerald-600" />
-              <span>Borrowed Stock & Godown Pricing (Tasks 34-36)</span>
+              <span>Borrowed Stock & Godown Pricing</span>
             </button>
           </div>
 
@@ -361,7 +358,7 @@ export const MultiStoreModal: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">New Display Price (Task #35) (₹)</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">New Display Price (₹)</label>
                     <input
                       type="number"
                       value={newDisplayPrice}

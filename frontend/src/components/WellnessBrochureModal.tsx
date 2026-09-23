@@ -392,9 +392,6 @@ export const WellnessBrochureModal: React.FC = () => {
             <div>
               <h2 className="text-lg font-bold tracking-tight text-white flex items-center gap-2">
                 Health & Wellness Plan Brochure
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-medium border border-emerald-500/30">
-                  Task #29 Module
-                </span>
               </h2>
               <p className="text-xs text-slate-400">
                 Generate clinical brochures, diet advice, and 1-click WhatsApp care plans for patients.

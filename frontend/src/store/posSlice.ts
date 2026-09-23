@@ -30,12 +30,27 @@ import type {
   BranchStore,
   BorrowedMedicineRecord,
   AgeRecommendationCoupon,
-  InterStoreChatMessage
+  InterStoreChatMessage,
+  VoiceConsultationRecord,
+  PatientInstructionModalState,
+  ClearanceGiftModalState,
+  PILLanguage,
+  CustomerSentimentResult,
+  PurchaseOrder,
+  PurchaseOrderItem,
+  ReorderPushAlert,
+  DoctorIntimationRecord,
+  PutAwayTask,
+  SupplierDebitNote,
+  RackRoboModalState,
+  ValueAddedServiceLink,
+  SubstituteEvent,
+  SubstituteDailyInsight
 } from '../types/pos';
 import { MOCK_PRODUCTS } from '../mock/products';
 import { calculateItemGST } from '../utils/gstCalculator';
 import { getMedicineDetails } from '../utils/medicineDetails';
-import { getEarliestExpiringBatch } from '../utils/fefoHelper';
+import { getEarliestExpiringBatch, getSortedBatchesFEFO } from '../utils/fefoHelper';
 import { analyzeDrugInteractions } from '../utils/drugInteractionEngine';
 
 export const DEFAULT_PHARMACISTS: PharmacistCounter[] = [
@@ -58,6 +73,13 @@ interface PosState {
   supplierBills: SupplierBill[];
   supplierPaymentLogs: SupplierPaymentLog[];
   distributorSchemes: DistributorScheme[];
+  purchaseOrders: PurchaseOrder[];
+  reorderPushAlerts: ReorderPushAlert[];
+  doctorIntimations: DoctorIntimationRecord[];
+  activeReorderToast: ReorderPushAlert | null;
+  putAwayTasks: PutAwayTask[];
+  supplierDebitNotes: SupplierDebitNote[];
+  rackRoboModal: RackRoboModalState;
   pharmacists: PharmacistCounter[];
   activePharmacistId: string;
   sessions: BillingSession[];
@@ -80,6 +102,7 @@ interface PosState {
     isOpen: boolean;
     originalProduct?: Product;
     alternatives: Product[];
+    originalCartItemId?: string; // set when substituting an item already in cart
   };
   complianceModal: {
     isOpen: boolean;
@@ -129,11 +152,25 @@ interface PosState {
   interStoreChatbotModal: {
     isOpen: boolean;
   };
+  voiceConsultationModal: {
+    isOpen: boolean;
+    patientName?: string;
+    phone?: string;
+    age?: string;
+    gender?: 'MALE' | 'FEMALE' | 'OTHER';
+    sessionId?: string;
+  };
+  patientInstructionModal: PatientInstructionModalState;
+  clearanceGiftModal: ClearanceGiftModalState;
+  consultationRecords: VoiceConsultationRecord[];
 
   // Printing & Finalization
   invoices: FinalizedInvoice[];
   latestFinalizedInvoice: FinalizedInvoice | null;
   isSubmittingBill: boolean;
+
+  // Substitute Intelligence & Conversion Analytics (Task #52)
+  substituteEvents: SubstituteEvent[];
 }
 
 const createInitialSession = (index: number, pharmacistId: string = 'pharm-1'): BillingSession => ({
@@ -739,6 +776,294 @@ const initialState: PosState = {
       }
     }
   ],
+  purchaseOrders: [
+    {
+      poId: 'po-2026-001',
+      poNumber: 'PO-2026-001',
+      supplierId: 'sup-001',
+      supplierName: 'MedLife Distributors Pvt Ltd',
+      supplierGstin: '36AAACM8890A1Z2',
+      supplierPhone: '+91 98490 12345',
+      orderDate: '2026-09-08',
+      expectedDeliveryDate: '2026-09-14',
+      paymentTerms: 'CREDIT_15_DAYS',
+      status: 'PLACED',
+      totalAmount: 18450,
+      schemeNotes: 'Montek-LC Super Rebate (Flat 30% Off) applied',
+      notes: 'Urgent replenishment for respiratory and chronic care counter',
+      createdAt: '2026-09-08 10:30 AM',
+      items: [
+        {
+          productId: 'prod-003',
+          productName: 'Montek-LC Tablet',
+          packType: 'Strip of 10 Tablets',
+          quantity: 20,
+          estimatedRate: 110,
+          gstRate: 12,
+          totalAmount: 2464
+        },
+        {
+          productId: 'prod-001',
+          productName: 'Augmentin 625 Duo Tablet',
+          packType: 'Strip of 10 Tablets',
+          quantity: 50,
+          estimatedRate: 155,
+          gstRate: 12,
+          totalAmount: 8680
+        },
+        {
+          productId: 'prod-002',
+          productName: 'Dolo 650 Tablet',
+          packType: 'Strip of 15 Tablets',
+          quantity: 200,
+          estimatedRate: 24,
+          gstRate: 12,
+          totalAmount: 5376
+        }
+      ]
+    },
+    {
+      poId: 'po-2026-002',
+      poNumber: 'PO-2026-002',
+      supplierId: 'sup-002',
+      supplierName: 'Sun Pharma Wholesale Depot',
+      supplierGstin: '36AAACS5512B1Z5',
+      supplierPhone: '+91 94401 56789',
+      orderDate: '2026-09-10',
+      expectedDeliveryDate: '2026-09-15',
+      paymentTerms: 'CREDIT_10_DAYS',
+      status: 'DRAFT',
+      totalAmount: 7246.4,
+      schemeNotes: 'Pantocid 10+2 Free Scheme eligible',
+      notes: 'Verify batch expiry is > 18 months before dispatch',
+      createdAt: '2026-09-10 03:15 PM',
+      items: [
+        {
+          productId: 'prod-004',
+          productName: 'Pantocid 40mg Tablet',
+          packType: 'Strip of 10 Tablets',
+          quantity: 40,
+          estimatedRate: 98,
+          gstRate: 12,
+          totalAmount: 4390.4
+        },
+        {
+          productId: 'prod-005',
+          productName: 'Azithral 500 Tablet',
+          packType: 'Strip of 5 Tablets',
+          quantity: 30,
+          estimatedRate: 85,
+          gstRate: 12,
+          totalAmount: 2856
+        }
+      ]
+    },
+    {
+      poId: 'po-2026-003',
+      poNumber: 'PO-2026-003',
+      supplierId: 'sup-003',
+      supplierName: 'Cipla Regional Depot',
+      supplierGstin: '36AAACC4412C1Z8',
+      supplierPhone: '+91 98850 99887',
+      orderDate: '2026-08-25',
+      expectedDeliveryDate: '2026-08-29',
+      paymentTerms: 'CREDIT_15_DAYS',
+      status: 'CONVERTED_TO_GRN',
+      totalAmount: 11760,
+      schemeNotes: 'Foracort Inhaler 200 Combo Deal',
+      notes: 'Delivered and checked in via GRN #GRN-2026-0829',
+      createdAt: '2026-08-25 11:00 AM',
+      items: [
+        {
+          productId: 'prod-007',
+          productName: 'Foracort 200 Inhaler',
+          packType: 'Inhaler Canister',
+          quantity: 15,
+          estimatedRate: 380,
+          gstRate: 12,
+          totalAmount: 6384
+        },
+        {
+          productId: 'prod-008',
+          productName: 'Asthalin Inhaler 100mcg',
+          packType: 'Inhaler Canister',
+          quantity: 40,
+          estimatedRate: 120,
+          gstRate: 12,
+          totalAmount: 5376
+        }
+      ]
+    }
+  ],
+  reorderPushAlerts: [
+    {
+      id: 'alert-1',
+      productId: '64f1a2b3c4d5e6f7a8b9c003',
+      productName: 'Telma 40mg Tablet (Telmisartan)',
+      batchNumber: 'TLM-4421',
+      currentStock: 4,
+      minThreshold: 10,
+      timestamp: 'Just now',
+      dismissed: false,
+      status: 'PENDING',
+      suggestedReorderQty: 50,
+      supplierName: 'MedLife Distributors Pvt Ltd'
+    },
+    {
+      id: 'alert-2',
+      productId: '64f1a2b3c4d5e6f7a8b9c007',
+      productName: 'Glycomet GP2 Tablet',
+      batchNumber: 'GLY-9901',
+      currentStock: 6,
+      minThreshold: 10,
+      timestamp: '6 mins ago',
+      dismissed: false,
+      status: 'PENDING',
+      suggestedReorderQty: 40,
+      supplierName: 'Sun Pharma Wholesale Depot'
+    },
+    {
+      id: 'alert-3',
+      productId: '64f1a2b3c4d5e6f7a8b9c012',
+      productName: 'Pan 40mg Injection',
+      batchNumber: 'PAN-1082',
+      currentStock: 2,
+      minThreshold: 10,
+      timestamp: '15 mins ago',
+      dismissed: false,
+      status: 'PENDING',
+      suggestedReorderQty: 30,
+      supplierName: 'Cipla Regional Depot'
+    }
+  ],
+  doctorIntimations: [
+    {
+      id: 'doc-int-001',
+      productId: '64f1a2b3c4d5e6f7a8b9c003',
+      productName: 'Telma 40mg Tablet (Telmisartan)',
+      batchNumber: 'TLM-4421',
+      expiryDate: '2026-10-15',
+      daysLeft: 29,
+      stockQuantity: 15,
+      doctorId: 'doc-1',
+      doctorName: 'Dr. Rajesh Sharma',
+      clinicName: 'Apollo Health Clinic',
+      doctorPhone: '9848011223',
+      memoText: 'Prioritize Telma 40mg for eligible hypertensive patients before batch expiry.',
+      intimatedAt: '2026-09-14 10:30 AM',
+      channel: 'WHATSAPP'
+    }
+  ],
+  activeReorderToast: null,
+  putAwayTasks: [
+    {
+      id: 'putaway-001',
+      creditNoteNo: 'CN-2026-0042',
+      originalInvoiceNo: 'INV-2026-841201',
+      productId: '64f1a2b3c4d5e6f7a8b9c002',
+      productName: 'Augmentin 625 Duo Tablet',
+      batchNumber: 'AUG-2024-88',
+      quantity: 2,
+      rackLocation: 'Rack B-14',
+      shelfTier: 'Tier 3 (Eye Level)',
+      binNumber: 'Bin 12',
+      status: 'PENDING',
+      returnedAt: '12 mins ago'
+    },
+    {
+      id: 'putaway-002',
+      creditNoteNo: 'CN-2026-0041',
+      originalInvoiceNo: 'INV-2026-841198',
+      productId: '64f1a2b3c4d5e6f7a8b9c003',
+      productName: 'Telma 40mg Tablet (Telmisartan)',
+      batchNumber: 'TLM-4421',
+      quantity: 1,
+      rackLocation: 'Rack A-04',
+      shelfTier: 'Tier 2 (Mid)',
+      binNumber: 'Bin 05',
+      status: 'PENDING',
+      returnedAt: '45 mins ago'
+    },
+    {
+      id: 'putaway-003',
+      creditNoteNo: 'CN-2026-0038',
+      originalInvoiceNo: 'INV-2026-841142',
+      productId: '64f1a2b3c4d5e6f7a8b9c008',
+      productName: 'Pan 40mg Tablet',
+      batchNumber: 'PAN-1082',
+      quantity: 3,
+      rackLocation: 'Rack C-02',
+      shelfTier: 'Tier 1 (Top)',
+      binNumber: 'Bin 08',
+      status: 'COMPLETED',
+      returnedAt: 'Yesterday 4:15 PM',
+      completedAt: 'Yesterday 4:45 PM',
+      restockedBy: 'Priya Sharma'
+    }
+  ],
+  supplierDebitNotes: [
+    {
+      id: 's-dn-001',
+      debitNoteNumber: 'DN-2026-0089',
+      supplierId: 'sup-001',
+      supplierName: 'MedPlus Wholesale Distributors',
+      supplierContact: '+91 98480 12345',
+      gstin: '36AAACM8891P1Z4',
+      createdDate: '2026-09-02',
+      cutoffWindowDays: 60,
+      status: 'DISPATCHED',
+      items: [
+        {
+          productId: '64f1a2b3c4d5e6f7a8b9c003',
+          productName: 'Telma 40mg Tablet',
+          batchNumber: 'TLM-4421',
+          expiryDate: '2026-10-15',
+          quantity: 15,
+          purchaseRate: 110.00,
+          totalAmount: 1650.00
+        },
+        {
+          productId: '64f1a2b3c4d5e6f7a8b9c007',
+          productName: 'Glycomet GP2 Tablet',
+          batchNumber: 'GLY-9901',
+          expiryDate: '2026-10-20',
+          quantity: 20,
+          purchaseRate: 135.00,
+          totalAmount: 2700.00
+        }
+      ],
+      totalAmount: 4350.00,
+      creditNoteRef: 'CRN-MED-9921',
+      remarks: 'Returned 45 days prior to expiry under distributor 60-day replacement policy'
+    },
+    {
+      id: 's-dn-002',
+      debitNoteNumber: 'DN-2026-0090',
+      supplierId: 'sup-002',
+      supplierName: 'Apex Healthcare Logistics',
+      supplierContact: '+91 98480 54321',
+      gstin: '36AAACA1122Q1Z9',
+      createdDate: '2026-09-08',
+      cutoffWindowDays: 90,
+      status: 'ACKNOWLEDGED',
+      items: [
+        {
+          productId: '64f1a2b3c4d5e6f7a8b9c010',
+          productName: 'Pantocid DSR Capsule',
+          batchNumber: 'PNT-3301',
+          expiryDate: '2026-11-10',
+          quantity: 12,
+          purchaseRate: 140.00,
+          totalAmount: 1680.00
+        }
+      ],
+      totalAmount: 1680.00,
+      remarks: 'Near expiry batch return shipment via dispatch van #AP-09-BX-2210'
+    }
+  ],
+  rackRoboModal: {
+    isOpen: false
+  },
   pharmacists: DEFAULT_PHARMACISTS,
   activePharmacistId: 'pharm-1',
   sessions: [initialSession],
@@ -752,7 +1077,8 @@ const initialState: PosState = {
   transferNotification: null,
   substitutionModal: {
     isOpen: false,
-    alternatives: []
+    alternatives: [],
+    originalCartItemId: undefined
   },
   complianceModal: {
     isOpen: false,
@@ -879,9 +1205,263 @@ const initialState: PosState = {
     isOpen: false
   },
 
+  voiceConsultationModal: {
+    isOpen: false
+  },
+
+  clearanceGiftModal: {
+    isOpen: false
+  },
+  patientInstructionModal: {
+    isOpen: false,
+    selectedProduct: null,
+    selectedLanguage: 'en',
+    patientName: '',
+    doctorName: ''
+  },
+
+  consultationRecords: [
+    {
+      id: 'consult-101',
+      patientName: 'Ramesh Kumar',
+      phone: '9876543210',
+      age: '54',
+      gender: 'MALE',
+      date: '2026-09-07',
+      time: '11:45 AM',
+      durationSeconds: 42,
+      category: 'CHRONIC_CARE',
+      chiefDiscussion: 'Patient inquired about fasting vs post-meal Metformin dosage and reported minor gastrointestinal discomfort.',
+      pharmacistAdvice: 'Advised to take Metformin strictly with or immediately after major meals to reduce GI irritation. Highlighted routine HbA1c testing in 3 months.',
+      tags: ['#Diabetes', '#Metformin', '#WithFood', '#RoutineRefill'],
+      pharmacistName: 'Ramesh Kumar',
+      counterNumber: 1
+    },
+    {
+      id: 'consult-102',
+      patientName: 'Sunita Reddy',
+      phone: '9876543220',
+      age: '62',
+      gender: 'FEMALE',
+      date: '2026-09-06',
+      time: '04:15 PM',
+      durationSeconds: 58,
+      category: 'DOSAGE_ADMIN',
+      chiefDiscussion: 'Clarified inhaler technique for Budesonide + Formoterol turbohaler and mouth rinsing protocol.',
+      pharmacistAdvice: 'Demonstrated deep inhalation hold for 10 seconds. Emphasized gargling warm water post-use to prevent oral candidiasis.',
+      tags: ['#AsthmaInhaler', '#MouthRinsing', '#SeniorCare'],
+      pharmacistName: 'Priya Sharma',
+      counterNumber: 2
+    }
+  ],
+
   invoices: getInitialInvoices(),
   latestFinalizedInvoice: null,
-  isSubmittingBill: false
+  isSubmittingBill: false,
+
+  // Task #52: Substitute Intelligence & Conversion Analytics State
+  substituteEvents: [
+    {
+      id: 'sub-evt-001',
+      timestamp: '2026-09-16T10:14:22.000Z',
+      date: '2026-09-16',
+      originalProductId: 'prod-001',
+      originalProductName: 'Augmentin 625 Duo Tablet',
+      originalBrand: 'GSK Pharmaceuticals',
+      saltComposition: 'Amoxicillin (500mg) + Clavulanic Acid (125mg)',
+      substitutedProductId: 'prod-002',
+      substitutedProductName: 'Moxikind-CV 625 Tablet',
+      substitutedBrand: 'Mankind Pharma',
+      status: 'ACCEPTED',
+      marginGain: 42.50,
+      customerSavings: 38.00,
+      originalPrice: 223.50,
+      substitutedPrice: 185.50,
+      pharmacistName: 'Ramesh Kumar',
+      counterNumber: 1,
+      patientResponseNote: 'Patient accepted immediately when 15% out-of-stock discount and identical CDSCO bioequivalence were explained.'
+    },
+    {
+      id: 'sub-evt-002',
+      timestamp: '2026-09-16T11:32:05.000Z',
+      date: '2026-09-16',
+      originalProductId: 'prod-003',
+      originalProductName: 'Crocin 650 Advance Tablet',
+      originalBrand: 'Haleon / GSK',
+      saltComposition: 'Paracetamol (650mg)',
+      substitutedProductId: 'prod-004',
+      substitutedProductName: 'Dolo 650 Tablet',
+      substitutedBrand: 'Micro Labs',
+      status: 'ACCEPTED',
+      marginGain: 8.20,
+      customerSavings: 6.50,
+      originalPrice: 34.00,
+      substitutedPrice: 27.50,
+      pharmacistName: 'Priya Sharma',
+      counterNumber: 2,
+      patientResponseNote: 'Customer familiar with Dolo 650 brand, happily accepted substitute.'
+    },
+    {
+      id: 'sub-evt-003',
+      timestamp: '2026-09-16T13:05:40.000Z',
+      date: '2026-09-16',
+      originalProductId: 'prod-005',
+      originalProductName: 'Azithral 500 Tablet',
+      originalBrand: 'Alembic',
+      saltComposition: 'Azithromycin (500mg)',
+      substitutedProductId: 'prod-006',
+      substitutedProductName: 'Zady 500 Tablet',
+      substitutedBrand: 'Mankind Pharma',
+      status: 'REJECTED',
+      marginGain: 0,
+      customerSavings: 0,
+      originalPrice: 128.00,
+      substitutedPrice: 104.00,
+      pharmacistName: 'Anand Verma',
+      counterNumber: 3,
+      patientResponseNote: 'Patient insisted strictly on doctor written Azithral brand, opted to wait.'
+    },
+    {
+      id: 'sub-evt-004',
+      timestamp: '2026-09-15T15:20:10.000Z',
+      date: '2026-09-15',
+      originalProductId: 'prod-007',
+      originalProductName: 'Pan-D Capsule',
+      originalBrand: 'Alkem Laboratories',
+      saltComposition: 'Pantoprazole (40mg) + Domperidone (30mg)',
+      substitutedProductId: 'prod-008',
+      substitutedProductName: 'Pantocid DSR Capsule',
+      substitutedBrand: 'Sun Pharma',
+      status: 'ACCEPTED',
+      marginGain: 31.40,
+      customerSavings: 24.00,
+      originalPrice: 198.00,
+      substitutedPrice: 174.00,
+      pharmacistName: 'Ramesh Kumar',
+      counterNumber: 1,
+      patientResponseNote: 'Sun Pharma trusted quality recognized by chronic patient.'
+    },
+    {
+      id: 'sub-evt-005',
+      timestamp: '2026-09-15T16:45:00.000Z',
+      date: '2026-09-15',
+      originalProductId: 'prod-009',
+      originalProductName: 'Montair-LC Tablet',
+      originalBrand: 'Cipla Ltd',
+      saltComposition: 'Montelukast (10mg) + Levocetirizine (5mg)',
+      substitutedProductId: 'prod-010',
+      substitutedProductName: 'Telekast-L Tablet',
+      substitutedBrand: 'Lupin Ltd',
+      status: 'ACCEPTED',
+      marginGain: 36.80,
+      customerSavings: 29.50,
+      originalPrice: 215.00,
+      substitutedPrice: 185.50,
+      pharmacistName: 'Priya Sharma',
+      counterNumber: 2,
+      patientResponseNote: 'Regular seasonal allergy customer, satisfied with Lupin formulation.'
+    },
+    {
+      id: 'sub-evt-006',
+      timestamp: '2026-09-15T18:10:22.000Z',
+      date: '2026-09-15',
+      originalProductId: 'prod-011',
+      originalProductName: 'Lipitor 20mg Tablet',
+      originalBrand: 'Pfizer',
+      saltComposition: 'Atorvastatin (20mg)',
+      substitutedProductId: 'prod-012',
+      substitutedProductName: 'Atorva 20 Tablet',
+      substitutedBrand: 'Zydus Cadila',
+      status: 'ACCEPTED',
+      marginGain: 54.00,
+      customerSavings: 86.00,
+      originalPrice: 310.00,
+      substitutedPrice: 224.00,
+      pharmacistName: 'Ramesh Kumar',
+      counterNumber: 1,
+      patientResponseNote: 'Substantial cost savings on monthly maintenance pack convinced patient.'
+    },
+    {
+      id: 'sub-evt-007',
+      timestamp: '2026-09-14T11:00:30.000Z',
+      date: '2026-09-14',
+      originalProductId: 'prod-013',
+      originalProductName: 'Concor 5mg Tablet',
+      originalBrand: 'Merck Ltd',
+      saltComposition: 'Bisoprolol Fumarate (5mg)',
+      substitutedProductId: 'prod-014',
+      substitutedProductName: 'Bisoheart 5 Tablet',
+      substitutedBrand: 'Mankind Pharma',
+      status: 'REJECTED',
+      marginGain: 0,
+      customerSavings: 0,
+      originalPrice: 145.00,
+      substitutedPrice: 92.00,
+      pharmacistName: 'Anand Verma',
+      counterNumber: 3,
+      patientResponseNote: 'Cardiac patient stated cardiologist specifically cautioned against switching beta-blocker brands.'
+    },
+    {
+      id: 'sub-evt-008',
+      timestamp: '2026-09-14T14:40:12.000Z',
+      date: '2026-09-14',
+      originalProductId: 'prod-015',
+      originalProductName: 'Glucophage 500mg',
+      originalBrand: 'Sanofi',
+      saltComposition: 'Metformin Hydrochloride (500mg)',
+      substitutedProductId: 'prod-016',
+      substitutedProductName: 'Glycomet 500 Tablet',
+      substitutedBrand: 'USV Ltd',
+      status: 'ACCEPTED',
+      marginGain: 12.50,
+      customerSavings: 9.00,
+      originalPrice: 42.00,
+      substitutedPrice: 33.00,
+      pharmacistName: 'Ramesh Kumar',
+      counterNumber: 1,
+      patientResponseNote: 'USV is gold standard for Metformin in India, accepted without hesitation.'
+    },
+    {
+      id: 'sub-evt-009',
+      timestamp: '2026-09-13T12:20:45.000Z',
+      date: '2026-09-13',
+      originalProductId: 'prod-017',
+      originalProductName: 'Telma 40 Tablet',
+      originalBrand: 'Glenmark',
+      saltComposition: 'Telmisartan (40mg)',
+      substitutedProductId: 'prod-018',
+      substitutedProductName: 'Telmikind 40 Tablet',
+      substitutedBrand: 'Mankind Pharma',
+      status: 'ACCEPTED',
+      marginGain: 28.00,
+      customerSavings: 31.00,
+      originalPrice: 132.00,
+      substitutedPrice: 101.00,
+      pharmacistName: 'Priya Sharma',
+      counterNumber: 2,
+      patientResponseNote: 'Appreciated 3-month supply savings.'
+    },
+    {
+      id: 'sub-evt-010',
+      timestamp: '2026-09-12T16:15:00.000Z',
+      date: '2026-09-12',
+      originalProductId: 'prod-019',
+      originalProductName: 'Allegra 120mg Tablet',
+      originalBrand: 'Sanofi India',
+      saltComposition: 'Fexofenadine (120mg)',
+      substitutedProductId: 'prod-020',
+      substitutedProductName: 'Fexova 120 Tablet',
+      substitutedBrand: 'Lupin Ltd',
+      status: 'ACCEPTED',
+      marginGain: 34.20,
+      customerSavings: 36.00,
+      originalPrice: 188.00,
+      substitutedPrice: 152.00,
+      pharmacistName: 'Ramesh Kumar',
+      counterNumber: 1,
+      patientResponseNote: 'Customer accepted 15% discount benefit on Lupin Fexova.'
+    }
+  ]
 };
 
 export const checkIsScheduleXOrNarcotic = (product: Product): boolean => {
@@ -997,7 +1577,7 @@ export const posSlice = createSlice({
     setAuthMode: (state, action: PayloadAction<AuthMode>) => {
       state.authMode = action.payload;
     },
-    loginUser: (state, action: PayloadAction<{ email: string; password?: string; pharmacistName?: string; pharmacyName?: string; licenseNo?: string }>) => {
+    loginUser: (state, action: PayloadAction<{ email: string; password?: string; pharmacistName?: string; pharmacyName?: string; licenseNo?: string; role?: any }>) => {
       const email = action.payload.email || '';
       const emailPrefixName = email ? email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'User';
       state.currentUser = {
@@ -1005,6 +1585,7 @@ export const posSlice = createSlice({
         pharmacyName: action.payload.pharmacyName || 'GENQUANTAA POS Store',
         licenseNo: action.payload.licenseNo || 'DL-2024/HYD/889201',
         email: email || 'user@genquantaa.com',
+        role: action.payload.role || 'STAFF',
         isLoggedIn: true
       };
       state.currentView = 'DASHBOARD';
@@ -1072,12 +1653,157 @@ export const posSlice = createSlice({
 
     processReturnCreditNote: (state, action: PayloadAction<ReturnCreditNote>) => {
       const note = action.payload;
-      // Set initial shelf status
-      note.items = note.items.map(item => ({
-        ...item,
-        shelfStatus: item.restocked ? 'PENDING_SHELF_CONFIRMATION' : 'MARKED_DAMAGED'
-      }));
+      note.items = note.items.map(item => {
+        const prod = state.products.find(p => p._id === item.productId);
+        const batch = prod?.batches.find(b => b.batchNumber === item.batchNumber) || prod?.batches[0];
+        const rackLocation = item.rackLocation || batch?.location || 'Rack B-01';
+
+        // If item is restocked, auto-create a PutAwayTask for shelf put-away queue
+        if (item.restocked) {
+          if (!state.putAwayTasks) state.putAwayTasks = [];
+          state.putAwayTasks.unshift({
+            id: `putaway-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            creditNoteNo: note.creditNoteNo,
+            originalInvoiceNo: note.originalInvoiceNo,
+            productId: item.productId,
+            productName: item.productName,
+            batchNumber: item.batchNumber,
+            quantity: item.quantityReturned,
+            rackLocation: rackLocation,
+            shelfTier: item.shelfTier || 'Tier 2 (Eye Level)',
+            binNumber: item.binNumber || 'Bin 04',
+            status: 'PENDING',
+            returnedAt: 'Just now'
+          });
+
+          // Also increment product stock
+          if (prod && batch) {
+            batch.stockQuantity += item.quantityReturned;
+            prod.totalStock = prod.batches.reduce((sum, b) => sum + b.stockQuantity, 0);
+            prod.stockStatus = prod.totalStock > 20 ? 'IN_STOCK' : prod.totalStock > 0 ? 'LOW_STOCK' : 'OUT_OF_STOCK';
+          }
+        }
+
+        return {
+          ...item,
+          rackLocation,
+          shelfStatus: item.restocked ? 'PENDING_SHELF_CONFIRMATION' : 'MARKED_DAMAGED'
+        };
+      });
       state.returnNotes.unshift(note);
+    },
+
+    completePutAwayTask: (state, action: PayloadAction<{ taskId: string; restockedBy?: string }>) => {
+      if (!state.putAwayTasks) state.putAwayTasks = [];
+      const task = state.putAwayTasks.find(t => t.id === action.payload.taskId);
+      if (task) {
+        task.status = 'COMPLETED';
+        task.completedAt = 'Just now';
+        task.restockedBy = action.payload.restockedBy || state.currentUser?.pharmacistName || 'Active Pharmacist';
+      }
+    },
+
+    createSupplierDebitNote: (state, action: PayloadAction<SupplierDebitNote>) => {
+      if (!state.supplierDebitNotes) state.supplierDebitNotes = [];
+      const debitNote = action.payload;
+      state.supplierDebitNotes.unshift(debitNote);
+
+      // Deduct returned near-expiry quantities from active batches
+      debitNote.items.forEach(item => {
+        const prod = state.products.find(p => p._id === item.productId || p.name.toLowerCase() === item.productName.toLowerCase());
+        if (prod) {
+          const batch = prod.batches.find(b => b.batchNumber === item.batchNumber) || prod.batches[0];
+          if (batch) {
+            batch.stockQuantity = Math.max(0, batch.stockQuantity - item.quantity);
+            prod.totalStock = prod.batches.reduce((sum, b) => sum + b.stockQuantity, 0);
+            prod.stockStatus = prod.totalStock > 20 ? 'IN_STOCK' : prod.totalStock > 0 ? 'LOW_STOCK' : 'OUT_OF_STOCK';
+          }
+        }
+      });
+    },
+
+    updateSupplierDebitNoteStatus: (state, action: PayloadAction<{
+      id: string;
+      status: 'DISPATCHED' | 'ACKNOWLEDGED' | 'CREDIT_RECEIVED';
+      creditReceivedAmount?: number;
+      settlementDate?: string;
+    }>) => {
+      if (!state.supplierDebitNotes) return;
+      const note = state.supplierDebitNotes.find(n => n.id === action.payload.id);
+      if (note) {
+        note.status = action.payload.status;
+        if (action.payload.creditReceivedAmount !== undefined) {
+          note.creditReceivedAmount = action.payload.creditReceivedAmount;
+        }
+        if (action.payload.settlementDate) {
+          note.settlementDate = action.payload.settlementDate;
+        }
+        if (action.payload.status === 'CREDIT_RECEIVED') {
+          note.settlementDate = note.settlementDate || new Date().toISOString().split('T')[0];
+          note.creditReceivedAmount = note.creditReceivedAmount || note.totalAmount;
+        }
+      }
+    },
+
+    batchCreateSupplierDebitNotes: (state, action: PayloadAction<SupplierDebitNote[]>) => {
+      if (!state.supplierDebitNotes) state.supplierDebitNotes = [];
+      action.payload.forEach(debitNote => {
+        state.supplierDebitNotes.unshift(debitNote);
+        debitNote.items.forEach(item => {
+          const prod = state.products.find(p => p._id === item.productId || p.name.toLowerCase() === item.productName.toLowerCase());
+          if (prod) {
+            const batch = prod.batches.find(b => b.batchNumber === item.batchNumber) || prod.batches[0];
+            if (batch) {
+              batch.stockQuantity = Math.max(0, batch.stockQuantity - item.quantity);
+              prod.totalStock = prod.batches.reduce((sum, b) => sum + b.stockQuantity, 0);
+              prod.stockStatus = prod.totalStock > 20 ? 'IN_STOCK' : prod.totalStock > 0 ? 'LOW_STOCK' : 'OUT_OF_STOCK';
+            }
+          }
+        });
+      });
+    },
+
+    linkValueAddedServiceToSession: (state, action: PayloadAction<{
+      sessionId?: string;
+      service: ValueAddedServiceLink;
+      consultationId: string;
+    }>) => {
+      const targetSessionId = action.payload.sessionId || state.activeSessionId;
+      const session = state.sessions.find(s => s.id === targetSessionId);
+      if (session) {
+        session.linkedVoiceConsultationId = action.payload.consultationId;
+        session.appliedValueAddedService = action.payload.service;
+        if (action.payload.service.discountPercent && action.payload.service.discountPercent > 0) {
+          const disc = action.payload.service.discountPercent;
+          session.items.forEach(item => {
+            item.discountPercent = Math.max(item.discountPercent, disc);
+            const gst = calculateItemGST(item.unitPrice, item.quantity, item.discountPercent, item.product.gstRate);
+            item.taxableAmount = gst.taxableAmount;
+            item.cgstAmount = gst.cgstAmount;
+            item.sgstAmount = gst.sgstAmount;
+            item.totalGst = gst.totalGst;
+            item.lineTotal = gst.lineTotal;
+          });
+        }
+      }
+    },
+
+    unlinkValueAddedServiceFromSession: (state, action: PayloadAction<{ sessionId?: string } | undefined>) => {
+      const targetSessionId = action?.payload?.sessionId || state.activeSessionId;
+      const session = state.sessions.find(s => s.id === targetSessionId);
+      if (session) {
+        session.appliedValueAddedService = undefined;
+        session.linkedVoiceConsultationId = undefined;
+      }
+    },
+
+    setRackRoboModalOpen: (state, action: PayloadAction<{
+      isOpen: boolean;
+      targetProductName?: string;
+      targetLocation?: string;
+      highlightCoordinates?: { aisle: number; rack: string; tier: number; bin: number };
+    }>) => {
+      state.rackRoboModal = action.payload;
     },
 
     confirmRestockToShelf: (state, action: PayloadAction<{ creditNoteNo: string; itemIndex: number }>) => {
@@ -1226,6 +1952,21 @@ export const posSlice = createSlice({
           supplier.pendingBalance += newBill.pendingAmount;
         }
       }
+    },
+
+    createPurchaseOrder: (state, action: PayloadAction<PurchaseOrder>) => {
+      state.purchaseOrders.unshift(action.payload);
+    },
+
+    updatePurchaseOrderStatus: (state, action: PayloadAction<{ poId: string; status: 'DRAFT' | 'PLACED' | 'CONVERTED_TO_GRN' | 'CANCELLED' }>) => {
+      const po = state.purchaseOrders.find(p => p.poId === action.payload.poId);
+      if (po) {
+        po.status = action.payload.status;
+      }
+    },
+
+    deletePurchaseOrder: (state, action: PayloadAction<string>) => {
+      state.purchaseOrders = state.purchaseOrders.filter(p => p.poId !== action.payload);
     },
 
     addNewBatchToProduct: (state, action: PayloadAction<{
@@ -1635,6 +2376,33 @@ export const posSlice = createSlice({
       }
     },
 
+    applySentimentDiscount: (state, action: PayloadAction<number>) => {
+      const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
+      if (currentSession) {
+        const discountPct = action.payload;
+        currentSession.appliedSentimentDiscount = discountPct;
+        currentSession.items.forEach(item => {
+          if ((item.discountPercent || 0) < discountPct) {
+            item.discountPercent = discountPct;
+            item.sentimentDiscountApplied = discountPct;
+            const gst = calculateItemGST(item.unitPrice, item.quantity, discountPct, item.product.gstRate);
+            item.taxableAmount = gst.taxableAmount;
+            item.cgstAmount = gst.cgstAmount;
+            item.sgstAmount = gst.sgstAmount;
+            item.totalGst = gst.totalGst;
+            item.lineTotal = gst.lineTotal;
+          }
+        });
+      }
+    },
+
+    setSessionSentiment: (state, action: PayloadAction<CustomerSentimentResult>) => {
+      const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
+      if (currentSession) {
+        currentSession.detectedSentiment = action.payload;
+      }
+    },
+
     // Compliance & Patient Details
     setDoctorDetails: (state, action: PayloadAction<DoctorDetails>) => {
       const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
@@ -1647,6 +2415,153 @@ export const posSlice = createSlice({
       if (currentSession) {
         currentSession.patientDetails = action.payload;
       }
+    },
+    toggleDiscreetPackaging: (state, action: PayloadAction<{ sessionId?: string; isDiscreet?: boolean } | undefined>) => {
+      const targetSessionId = action?.payload?.sessionId || state.activeSessionId;
+      const session = state.sessions.find(s => s.id === targetSessionId);
+      if (session) {
+        session.isDiscreetPackaging = action?.payload?.isDiscreet !== undefined
+          ? action.payload.isDiscreet
+          : !session.isDiscreetPackaging;
+      }
+    },
+    addReorderPushAlert: (state, action: PayloadAction<Omit<ReorderPushAlert, 'id' | 'timestamp'> & { id?: string; timestamp?: string }>) => {
+      if (!state.reorderPushAlerts) state.reorderPushAlerts = [];
+      const existing = state.reorderPushAlerts.find(a => a.productId === action.payload.productId && a.batchNumber === action.payload.batchNumber);
+      if (existing) {
+        existing.currentStock = action.payload.currentStock;
+        existing.dismissed = false;
+        existing.status = existing.status || 'PENDING';
+      } else {
+        const newAlert: ReorderPushAlert = {
+          id: action.payload.id || `alert-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          productId: action.payload.productId,
+          productName: action.payload.productName,
+          batchNumber: action.payload.batchNumber,
+          currentStock: action.payload.currentStock,
+          minThreshold: action.payload.minThreshold || 10,
+          safetyThreshold: action.payload.safetyThreshold || action.payload.minThreshold || 10,
+          saltComposition: action.payload.saltComposition,
+          timestamp: action.payload.timestamp || 'Just now',
+          dismissed: false,
+          status: 'PENDING',
+          suggestedReorderQty: action.payload.suggestedReorderQty || 50,
+          supplierName: action.payload.supplierName
+        };
+        state.reorderPushAlerts.unshift(newAlert);
+        state.activeReorderToast = newAlert;
+      }
+    },
+    dismissReorderPushAlert: (state, action: PayloadAction<string>) => {
+      if (state.reorderPushAlerts) {
+        state.reorderPushAlerts = state.reorderPushAlerts.filter(a => a.id !== action.payload);
+      }
+      if (state.activeReorderToast?.id === action.payload) {
+        state.activeReorderToast = null;
+      }
+    },
+    dismissReorderToast: (state) => {
+      state.activeReorderToast = null;
+    },
+    clearAllReorderPushAlerts: (state) => {
+      state.reorderPushAlerts = [];
+      state.activeReorderToast = null;
+    },
+    convertReorderAlertToPO: (state, action: PayloadAction<{ alertId: string; reorderQty?: number }>) => {
+      if (!state.reorderPushAlerts) return;
+      const alert = state.reorderPushAlerts.find(a => a.id === action.payload.alertId);
+      if (!alert) return;
+      alert.status = 'ADDED_TO_PO';
+
+      const qty = action.payload.reorderQty || alert.suggestedReorderQty || 50;
+      let draftPo = state.purchaseOrders.find(p => p.status === 'DRAFT');
+      const supplier = state.suppliers[0] || {
+        supplierId: 'sup-001',
+        name: 'MedLife Distributors Pvt Ltd',
+        gstin: '36AABCM4411D1ZP',
+        phone: '+91 98490 12345'
+      };
+
+      if (!draftPo) {
+        draftPo = {
+          poId: `po-${Date.now()}`,
+          poNumber: `PO-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
+          supplierId: supplier.supplierId,
+          supplierName: supplier.name,
+          supplierGstin: supplier.gstin,
+          supplierPhone: supplier.phone,
+          orderDate: new Date().toISOString().split('T')[0],
+          expectedDeliveryDate: new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0],
+          paymentTerms: 'CREDIT_15_DAYS',
+          status: 'DRAFT',
+          totalAmount: 0,
+          notes: 'Auto-generated from Pharmacist Safety Reorder Intimations',
+          createdAt: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+          items: []
+        };
+        state.purchaseOrders.unshift(draftPo);
+      }
+
+      const existingItem = draftPo.items.find(i => i.productId === alert.productId);
+      if (existingItem) {
+        existingItem.quantity += qty;
+        existingItem.totalAmount = existingItem.quantity * existingItem.estimatedRate;
+      } else {
+        const prod = state.products.find(p => p._id === alert.productId);
+        const estRate = prod ? Number((prod.sellingPrice * 0.75).toFixed(2)) : 50;
+        draftPo.items.push({
+          productId: alert.productId,
+          productName: alert.productName,
+          packType: prod?.packType || 'Strip',
+          quantity: qty,
+          estimatedRate: estRate,
+          gstRate: prod?.gstRate || 12,
+          totalAmount: Number((qty * estRate).toFixed(2))
+        });
+      }
+      draftPo.totalAmount = draftPo.items.reduce((sum, item) => sum + item.totalAmount, 0);
+    },
+    triggerLowStockIntimation: (state, action: PayloadAction<{
+      productId: string;
+      productName: string;
+      batchNumber: string;
+      remainingStock: number;
+      minThreshold?: number;
+      saltComposition?: string;
+    }>) => {
+      if (!state.reorderPushAlerts) state.reorderPushAlerts = [];
+      const { productId, productName, batchNumber, remainingStock, minThreshold = 10, saltComposition } = action.payload;
+
+      let alertObj = state.reorderPushAlerts.find(a => a.productId === productId && a.batchNumber === batchNumber);
+      if (alertObj) {
+        alertObj.currentStock = remainingStock;
+        alertObj.dismissed = false;
+        alertObj.timestamp = 'Just now';
+      } else {
+        alertObj = {
+          id: `alert-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          productId,
+          productName,
+          batchNumber,
+          currentStock: remainingStock,
+          minThreshold,
+          safetyThreshold: minThreshold,
+          saltComposition,
+          timestamp: 'Just now',
+          dismissed: false,
+          status: 'PENDING',
+          suggestedReorderQty: 50
+        };
+        state.reorderPushAlerts.unshift(alertObj);
+      }
+      state.activeReorderToast = alertObj;
+    },
+    recordDoctorIntimation: (state, action: PayloadAction<DoctorIntimationRecord>) => {
+      if (!state.doctorIntimations) state.doctorIntimations = [];
+      state.doctorIntimations = state.doctorIntimations.filter(
+        d => !(d.productId === action.payload.productId && d.batchNumber === action.payload.batchNumber)
+      );
+      state.doctorIntimations.unshift(action.payload);
     },
     saveScheduleHCompliance: (state, action: PayloadAction<{ doctorDetails: DoctorDetails; patientDetails: PatientDetails }>) => {
       const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
@@ -1739,6 +2654,20 @@ export const posSlice = createSlice({
       currentSession.patientDetails = { patientName: '', phone: '', age: '', gender: 'MALE' };
     },
 
+    setHeldBills: (state, action: PayloadAction<HeldBill[]>) => {
+      state.heldBills = action.payload;
+    },
+
+    clearActiveSession: (state) => {
+      const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
+      if (currentSession) {
+        currentSession.items = [];
+        currentSession.doctorDetails = { doctorName: '', regNo: '' };
+        currentSession.patientDetails = { patientName: '', phone: '', age: '', gender: 'MALE' };
+        currentSession.pharmacistSignatureAcknowledged = false;
+      }
+    },
+
     restoreHeldBill: (state, action: PayloadAction<string>) => {
       const heldIndex = state.heldBills.findIndex(h => h.id === action.payload);
       if (heldIndex !== -1) {
@@ -1758,9 +2687,29 @@ export const posSlice = createSlice({
       state.heldBills = state.heldBills.filter(h => h.id !== action.payload);
     },
 
-    // UI Modals Control
+    openSubstitutionModalForProduct: (state, action: PayloadAction<{ product: Product; cartItemId?: string }>) => {
+      const product = action.payload.product;
+      const cartItemId = action.payload.cartItemId;
+      const targetSalt = product.saltComposition ? product.saltComposition.toLowerCase().trim() : '';
+      const firstSaltPart = targetSalt.split('+')[0]?.trim() || targetSalt;
+
+      const alternatives = state.products.filter(p => {
+        if (p._id === product._id) return false;
+        if (!p.saltComposition) return false;
+        const pSalt = p.saltComposition.toLowerCase().trim();
+        return pSalt === targetSalt || (firstSaltPart.length > 3 && pSalt.includes(firstSaltPart));
+      });
+
+      state.substitutionModal = {
+        isOpen: true,
+        originalProduct: product,
+        alternatives: alternatives.length > 0 ? alternatives : state.products.filter(p => p._id !== product._id).slice(0, 6),
+        originalCartItemId: cartItemId
+      };
+    },
     closeSubstitutionModal: (state) => {
       state.substitutionModal.isOpen = false;
+      state.substitutionModal.originalCartItemId = undefined;
     },
     closeComplianceModal: (state) => {
       state.complianceModal.isOpen = false;
@@ -1818,6 +2767,74 @@ export const posSlice = createSlice({
 
     setInterStoreChatbotModalOpen: (state, action: PayloadAction<boolean>) => {
       state.interStoreChatbotModal.isOpen = action.payload;
+    },
+
+    setVoiceConsultationModalOpen: (
+      state,
+      action: PayloadAction<{
+        isOpen: boolean;
+        patientName?: string;
+        phone?: string;
+        age?: string;
+        gender?: 'MALE' | 'FEMALE' | 'OTHER';
+        sessionId?: string;
+      }>
+    ) => {
+      state.voiceConsultationModal.isOpen = action.payload.isOpen;
+      if (action.payload.patientName !== undefined) {
+        state.voiceConsultationModal.patientName = action.payload.patientName;
+      }
+      if (action.payload.phone !== undefined) {
+        state.voiceConsultationModal.phone = action.payload.phone;
+      }
+      if (action.payload.age !== undefined) {
+        state.voiceConsultationModal.age = action.payload.age;
+      }
+      if (action.payload.gender !== undefined) {
+        state.voiceConsultationModal.gender = action.payload.gender;
+      }
+      if (action.payload.sessionId !== undefined) {
+        state.voiceConsultationModal.sessionId = action.payload.sessionId;
+      }
+    },
+
+    saveConsultationRecord: (state, action: PayloadAction<VoiceConsultationRecord>) => {
+      state.consultationRecords.unshift(action.payload);
+    },
+
+    deleteConsultationRecord: (state, action: PayloadAction<string>) => {
+      state.consultationRecords = state.consultationRecords.filter(r => r.id !== action.payload);
+    },
+
+    setPatientInstructionModalOpen: (
+      state,
+      action: PayloadAction<{
+        isOpen: boolean;
+        product?: Product | null;
+        patientName?: string;
+        doctorName?: string;
+        language?: PILLanguage;
+      }>
+    ) => {
+      state.patientInstructionModal.isOpen = action.payload.isOpen;
+      if (action.payload.isOpen) {
+        if (action.payload.product !== undefined) {
+          state.patientInstructionModal.selectedProduct = action.payload.product;
+        }
+        if (action.payload.patientName !== undefined) {
+          state.patientInstructionModal.patientName = action.payload.patientName;
+        }
+        if (action.payload.doctorName !== undefined) {
+          state.patientInstructionModal.doctorName = action.payload.doctorName;
+        }
+        if (action.payload.language) {
+          state.patientInstructionModal.selectedLanguage = action.payload.language;
+        }
+      }
+    },
+
+    setPILLanguage: (state, action: PayloadAction<PILLanguage>) => {
+      state.patientInstructionModal.selectedLanguage = action.payload;
     },
 
     sendInterStoreChatMessage: (state, action: PayloadAction<string>) => {
@@ -1901,6 +2918,106 @@ export const posSlice = createSlice({
       });
     },
 
+    setClearanceGiftModalOpen: (state, action: PayloadAction<{ isOpen: boolean; targetCartItemId?: string }>) => {
+      state.clearanceGiftModal = {
+        isOpen: action.payload.isOpen,
+        targetCartItemId: action.payload.targetCartItemId
+      };
+    },
+
+    applyNearExpiryClearanceDiscount: (state, action: PayloadAction<{ discountPerUnit: number; targetCartItemId?: string }>) => {
+      const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
+      if (!currentSession) return;
+
+      const itemsToUpdate = action.payload.targetCartItemId
+        ? currentSession.items.filter(i => i.cartItemId === action.payload.targetCartItemId)
+        : currentSession.items.filter(i => {
+          if (i.isClearanceGift) return false;
+          const expTime = new Date(i.selectedBatch.expiryDate).getTime();
+          const now = new Date().getTime();
+          const daysLeft = Math.ceil((expTime - now) / (1000 * 60 * 60 * 24));
+          return daysLeft <= 90;
+        });
+
+      itemsToUpdate.forEach(item => {
+        const currentDiscAmt = (item.unitPrice * item.quantity * item.discountPercent) / 100;
+        const additionalDiscAmt = action.payload.discountPerUnit * item.quantity;
+        const totalDiscAmt = Math.min(item.unitPrice * item.quantity, currentDiscAmt + additionalDiscAmt);
+        const newPercent = Number(((totalDiscAmt / (item.unitPrice * item.quantity)) * 100).toFixed(2));
+
+        item.discountPercent = Math.min(100, Math.max(item.discountPercent, newPercent));
+        item.clearanceDiscountApplied = (item.clearanceDiscountApplied || 0) + action.payload.discountPerUnit;
+
+        const gst = calculateItemGST(item.unitPrice, item.quantity, item.discountPercent, item.product.gstRate);
+        item.taxableAmount = gst.taxableAmount;
+        item.cgstAmount = gst.cgstAmount;
+        item.sgstAmount = gst.sgstAmount;
+        item.totalGst = gst.totalGst;
+        item.lineTotal = gst.lineTotal;
+      });
+    },
+
+    addClearanceGiftToCart: (state, action: PayloadAction<{ giftName: string; giftValue: number; giftCategory?: string; giftIcon?: string }>) => {
+      const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
+      if (!currentSession) return;
+
+      const existing = currentSession.items.find(i => i.isClearanceGift && i.product.name.includes(action.payload.giftName));
+      if (existing) {
+        existing.quantity += 1;
+        return;
+      }
+
+      const giftProduct: Product = {
+        _id: 'gift-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+        name: '🎁 Free Gift: ' + action.payload.giftName,
+        brand: 'Clearance Promo',
+        saltComposition: 'Complimentary Patient Wellness Gift (Near-Expiry Clearance Offer)',
+        barcode: 'GIFT-' + Math.floor(100000 + Math.random() * 900000),
+        hsnCode: '30049099',
+        gstRate: 0,
+        unitMRP: action.payload.giftValue,
+        sellingPrice: 0,
+        grossMarginPercent: 100,
+        scheduleCategory: 'REGULAR',
+        stockStatus: 'IN_STOCK',
+        totalStock: 100,
+        batches: [{
+          batchNumber: 'PROMO-FREE',
+          expiryDate: '2027-12-31',
+          stockQuantity: 100,
+          location: 'Promo Counter',
+          mrp: action.payload.giftValue
+        }]
+      };
+
+      const giftItem: CartItem = {
+        cartItemId: 'cart-gift-' + Date.now(),
+        productId: giftProduct._id,
+        product: giftProduct,
+        selectedBatch: giftProduct.batches[0],
+        quantity: 1,
+        unitMode: 'PACK',
+        unitPrice: 0,
+        discountPercent: 100,
+        taxableAmount: 0,
+        cgstAmount: 0,
+        sgstAmount: 0,
+        totalGst: 0,
+        lineTotal: 0,
+        isClearanceGift: true,
+        giftOriginalPrice: action.payload.giftValue
+      };
+
+      currentSession.items.push(giftItem);
+    },
+
+    removeClearanceGiftFromCart: (state, action: PayloadAction<string>) => {
+      const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
+      if (currentSession) {
+        currentSession.items = currentSession.items.filter(i => i.cartItemId !== action.payload);
+      }
+    },
+
     openScheduleHDetailsPrompt: (state) => {
       state.complianceModal = {
         isOpen: true,
@@ -1911,6 +3028,9 @@ export const posSlice = createSlice({
     // Bill Finalization & Printing
     startSubmittingBill: (state) => {
       state.isSubmittingBill = true;
+    },
+    stopSubmittingBill: (state) => {
+      state.isSubmittingBill = false;
     },
     finalizeBillSuccess: (state, action: PayloadAction<PaymentDetails>) => {
       const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
@@ -1935,6 +3055,7 @@ export const posSlice = createSlice({
         payment: action.payload,
         pharmacistName: currentPharm?.name || 'Ramesh Kumar',
         counterNumber: currentPharm?.counterNumber || 1,
+        isDiscreetPackaging: Boolean(currentSession.isDiscreetPackaging),
         storeInfo: {
           name: 'GENQUANTAA MEDPLUS PHARMACY',
           dlNo: 'DL-2024/HYD/889201',
@@ -1955,14 +3076,14 @@ export const posSlice = createSlice({
           const medDetails = getMedicineDetails(prod);
           const unitsPerPack = medDetails.unitsPerPack || prod.unitsPerPack || 10;
           const isLoose = (item.unitMode || 'PACK') === 'LOOSE';
-          
+
           // Calculate reduction in pack units (e.g. 5 loose tabs from 10-tab strip = 0.5 pack)
           const packDeduction = isLoose ? item.quantity / unitsPerPack : item.quantity;
-          
+
           if (batch) {
             batch.stockQuantity = Math.max(0, Number((batch.stockQuantity - packDeduction).toFixed(2)));
           }
-          
+
           // Recalculate total product stock & stock status
           prod.totalStock = Math.max(0, Number(prod.batches.reduce((sum, b) => sum + b.stockQuantity, 0).toFixed(2)));
           prod.stockStatus = prod.totalStock > 20 ? 'IN_STOCK' : prod.totalStock > 0 ? 'LOW_STOCK' : 'OUT_OF_STOCK';
@@ -2103,13 +3224,17 @@ export const posSlice = createSlice({
         billingSession: {
           id: `sess-dlv-${order.orderId}`,
           tabTitle: `Order ${order.orderNumber}`,
+          assignedPharmacistId: 'pharm-1',
           items: cartItems,
           patientDetails: {
             patientName: order.customerName,
             phone: order.customerPhone,
-            gender: 'MALE'
+            gender: 'MALE',
+            age: '30'
           },
           doctorDetails: { doctorName: 'Online Order Rx', regNo: 'ONLINE' },
+          scheduleXVerified: false,
+          pharmacistSignatureAcknowledged: true,
           createdAt: order.createdAt
         },
         subtotal,
@@ -2118,14 +3243,18 @@ export const posSlice = createSlice({
         totalSGST,
         grandTotal,
         payment: {
-          mode: (action.payload.paymentMode || 'UPI') as any,
-          receivedAmount: grandTotal,
+          method: (action.payload.paymentMode || 'UPI') as any,
+          cashAmount: 0,
+          upiAmount: grandTotal,
+          cardAmount: 0,
+          totalPaid: grandTotal,
           changeDue: 0,
           digitalTransactionRef: order.orderNumber,
-          splitAmounts: { cash: 0, card: 0, upi: grandTotal }
+          paymentStatus: 'SUCCESS'
         },
         pharmacistName: state.currentUser?.pharmacistName || 'Lead Pharmacist',
         counterNumber: 1,
+        isDiscreetPackaging: Boolean(order.isDiscreetPackaging),
         storeInfo: {
           name: 'GENQUANTAA MEDPLUS PHARMACY',
           dlNo: 'DL-2024/HYD/889201',
@@ -2144,6 +3273,21 @@ export const posSlice = createSlice({
       order.status = 'DELIVERED';
       order.actualDeliveryTime = new Date().toISOString();
       order.updatedAt = new Date().toISOString();
+    },
+
+    // Task #52: Record live substitute prompt & conversion acceptance/rejection
+    recordSubstituteEvent: (
+      state,
+      action: PayloadAction<Omit<SubstituteEvent, 'id' | 'timestamp' | 'date'>>
+    ) => {
+      const now = new Date();
+      const newEvent: SubstituteEvent = {
+        id: `sub-evt-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        timestamp: now.toISOString(),
+        date: now.toISOString().split('T')[0],
+        ...action.payload
+      };
+      state.substituteEvents.unshift(newEvent);
     }
   }
 });
@@ -2182,6 +3326,8 @@ export const {
   removeFromCart,
   clearActiveCart,
   applyBulkDiscount,
+  applySentimentDiscount,
+  setSessionSentiment,
   setDoctorDetails,
   setPatientDetails,
   saveScheduleHCompliance,
@@ -2191,6 +3337,7 @@ export const {
   holdActiveBill,
   restoreHeldBill,
   discardHeldBill,
+  openSubstitutionModalForProduct,
   closeSubstitutionModal,
   closeComplianceModal,
   closeDrugInteractionModal,
@@ -2202,14 +3349,26 @@ export const {
   setWellnessBrochureModalOpen,
   setMultiStoreModalOpen,
   setInterStoreChatbotModalOpen,
+  setVoiceConsultationModalOpen,
+  setPatientInstructionModalOpen,
+  setPILLanguage,
+  saveConsultationRecord,
+  deleteConsultationRecord,
   sendInterStoreChatMessage,
   recordBorrowedStock,
   attachPrescriptionToSession,
   removePrescriptionFromSession,
   refillChronicMedicationsToCart,
+  setClearanceGiftModalOpen,
+  applyNearExpiryClearanceDiscount,
+  addClearanceGiftToCart,
+  removeClearanceGiftFromCart,
   openScheduleHDetailsPrompt,
   startSubmittingBill,
+  stopSubmittingBill,
   finalizeBillSuccess,
+  setHeldBills,
+  clearActiveSession,
   finalizeEmergencyInvoice,
   clearFinalizedInvoice,
   setInvoiceHistoryModalOpen,
@@ -2225,9 +3384,28 @@ export const {
   applyBulk30DayDumpClearance,
   recordSupplierPayment,
   addSupplierBill,
+  createPurchaseOrder,
+  updatePurchaseOrderStatus,
+  deletePurchaseOrder,
+  toggleDiscreetPackaging,
+  addReorderPushAlert,
+  dismissReorderPushAlert,
+  dismissReorderToast,
+  clearAllReorderPushAlerts,
+  convertReorderAlertToPO,
+  triggerLowStockIntimation,
+  recordDoctorIntimation,
   addNewBatchToProduct,
   updateBatchDetails,
-  quickUpdateProductPriceAndShelf
+  quickUpdateProductPriceAndShelf,
+  completePutAwayTask,
+  createSupplierDebitNote,
+  updateSupplierDebitNoteStatus,
+  batchCreateSupplierDebitNotes,
+  linkValueAddedServiceToSession,
+  unlinkValueAddedServiceFromSession,
+  setRackRoboModalOpen,
+  recordSubstituteEvent
 } = posSlice.actions;
 
 export default posSlice.reducer;

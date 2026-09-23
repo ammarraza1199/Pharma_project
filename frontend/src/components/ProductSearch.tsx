@@ -1,65 +1,75 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { addItemToCart, setPrescriptionUploadModalOpen, setChronicRefillModalOpen, setMultiStoreModalOpen } from '../store/posSlice';
+import {
+  addItemToCart,
+  setPrescriptionUploadModalOpen,
+  setChronicRefillModalOpen,
+  setMultiStoreModalOpen,
+  setPatientInstructionModalOpen,
+  openSubstitutionModalForProduct,
+  setRackRoboModalOpen
+} from '../store/posSlice';
 import { getMedicineDetails } from '../utils/medicineDetails';
 import { getSortedBatchesFEFO, getEarliestExpiringBatch } from '../utils/fefoHelper';
 import type { Product, BatchInfo, ScheduleCategory, SellingUnitMode } from '../types/pos';
 import {
   Search, ScanBarcode, AlertCircle, Plus, Zap,
   X, ArrowUpDown, PackageX, TrendingUp, ChevronDown,
-  FileText, Repeat, Building2
+  FileText, Repeat, Building2, Volume2, PackageOpen, BadgeAlert,
+  Compass, MapPin
 } from 'lucide-react';
 
 // ── Filter & Sort Types ──────────────────────────────────────────────────────
-type FilterTab = 'ALL' | 'PREVIOUSLY_ORDERED' | 'REGULAR' | 'SCHEDULE_H' | 'SCHEDULE_H1' | 'SCHEDULE_X' | 'LOW_STOCK' | 'NEAR_EXPIRY' | 'OUT_OF_STOCK';
-type SortKey   = 'name' | 'price_asc' | 'price_desc' | 'stock' | 'margin';
+type FilterTab = 'ALL' | 'MARGIN_MAXIMIZER' | 'PREVIOUSLY_ORDERED' | 'REGULAR' | 'SCHEDULE_H' | 'SCHEDULE_H1' | 'SCHEDULE_X' | 'LOW_STOCK' | 'NEAR_EXPIRY' | 'OUT_OF_STOCK';
+type SortKey = 'name' | 'price_asc' | 'price_desc' | 'stock' | 'margin';
 
 const FILTER_TABS: { key: FilterTab; label: string; color: string }[] = [
-  { key: 'ALL',                label: 'All',                color: 'text-slate-700 bg-slate-100 border-slate-300'    },
+  { key: 'ALL', label: 'All', color: 'text-slate-700 bg-slate-100 border-slate-300' },
+  { key: 'MARGIN_MAXIMIZER', label: '💎 Margin Maximizer', color: 'text-emerald-950 bg-emerald-100 border-emerald-400 font-extrabold shadow-2xs' },
   { key: 'PREVIOUSLY_ORDERED', label: '🕒 Previously Ordered', color: 'text-purple-700 bg-purple-50 border-purple-300 font-bold' },
-  { key: 'REGULAR',            label: 'Regular',            color: 'text-emerald-700 bg-emerald-50 border-emerald-300' },
-  { key: 'SCHEDULE_H',         label: 'Sch-H',              color: 'text-amber-700 bg-amber-50 border-amber-300'    },
-  { key: 'SCHEDULE_H1',        label: 'Sch-H1',             color: 'text-orange-700 bg-orange-50 border-orange-300' },
-  { key: 'SCHEDULE_X',         label: 'Sch-X',              color: 'text-rose-700 bg-rose-50 border-rose-300'       },
-  { key: 'LOW_STOCK',          label: 'Low Stock',          color: 'text-yellow-700 bg-yellow-50 border-yellow-300' },
-  { key: 'NEAR_EXPIRY',        label: 'Near Expiry',        color: 'text-amber-900 bg-amber-100 border-amber-400 font-extrabold' },
-  { key: 'OUT_OF_STOCK',       label: 'Out of Stock',       color: 'text-red-700 bg-red-50 border-red-300'          },
+  { key: 'REGULAR', label: 'Regular', color: 'text-emerald-700 bg-emerald-50 border-emerald-300' },
+  { key: 'SCHEDULE_H', label: 'Sch-H', color: 'text-amber-700 bg-amber-50 border-amber-300' },
+  { key: 'SCHEDULE_H1', label: 'Sch-H1', color: 'text-orange-700 bg-orange-50 border-orange-300' },
+  { key: 'SCHEDULE_X', label: 'Sch-X', color: 'text-rose-700 bg-rose-50 border-rose-300' },
+  { key: 'LOW_STOCK', label: 'Low Stock', color: 'text-yellow-700 bg-yellow-50 border-yellow-300' },
+  { key: 'NEAR_EXPIRY', label: 'Near Expiry', color: 'text-amber-900 bg-amber-100 border-amber-400 font-extrabold' },
+  { key: 'OUT_OF_STOCK', label: 'Out of Stock', color: 'text-red-700 bg-red-50 border-red-300' },
 ];
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  { key: 'name',       label: 'Name A–Z'       },
-  { key: 'price_asc',  label: 'Price: Low–High' },
+  { key: 'name', label: 'Name A–Z' },
+  { key: 'price_asc', label: 'Price: Low–High' },
   { key: 'price_desc', label: 'Price: High–Low' },
-  { key: 'stock',      label: 'Stock: High'     },
-  { key: 'margin',     label: 'Margin: High'    },
+  { key: 'stock', label: 'Stock: High' },
+  { key: 'margin', label: 'Margin: High' },
 ];
 
 const SCHEDULE_BADGE: Record<ScheduleCategory, { label: string; cls: string } | null> = {
-  REGULAR:     null,
-  SCHEDULE_H:  { label: 'Sch-H',  cls: 'bg-amber-500 text-white'       },
-  SCHEDULE_H1: { label: 'Sch-H1', cls: 'bg-orange-500 text-white'      },
-  SCHEDULE_X:  { label: 'Sch-X ⚠', cls: 'bg-rose-600 text-white animate-pulse' },
+  REGULAR: null,
+  SCHEDULE_H: { label: 'Sch-H', cls: 'bg-amber-500 text-white' },
+  SCHEDULE_H1: { label: 'Sch-H1', cls: 'bg-orange-500 text-white' },
+  SCHEDULE_X: { label: 'Sch-X ⚠', cls: 'bg-rose-600 text-white animate-pulse' },
 };
 
 // ────────────────────────────────────────────────────────────────────────────
 export const ProductSearch: React.FC = () => {
-  const dispatch    = useDispatch();
-  const products    = useSelector((state: RootState) => state.pos.products);
-  const invoices    = useSelector((state: RootState) => state.pos.invoices || []);
-  const patients    = useSelector((state: RootState) => state.pos.patients || []);
+  const dispatch = useDispatch();
+  const products = useSelector((state: RootState) => state.pos.products);
+  const invoices = useSelector((state: RootState) => state.pos.invoices || []);
+  const patients = useSelector((state: RootState) => state.pos.patients || []);
 
-  const [searchTerm,       setSearchTerm]       = useState<string>('');
-  const [activeFilter,     setActiveFilter]     = useState<FilterTab>('ALL');
-  const [sortKey,          setSortKey]          = useState<SortKey>('name');
-  const [showSortMenu,     setShowSortMenu]     = useState<boolean>(false);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [activeFilter, setActiveFilter] = useState<FilterTab>('ALL');
+  const [sortKey, setSortKey] = useState<SortKey>('name');
+  const [showSortMenu, setShowSortMenu] = useState<boolean>(false);
   const [selectedBatchMap, setSelectedBatchMap] = useState<Record<string, BatchInfo>>({});
-  const [qtyMap,           setQtyMap]           = useState<Record<string, number>>({});
-  const [unitModeMap,      setUnitModeMap]      = useState<Record<string, SellingUnitMode>>({});
-  const [barcodeFlash,     setBarcodeFlash]     = useState<string | null>(null);  // product._id flashing
+  const [qtyMap, setQtyMap] = useState<Record<string, number>>({});
+  const [unitModeMap, setUnitModeMap] = useState<Record<string, SellingUnitMode>>({});
+  const [barcodeFlash, setBarcodeFlash] = useState<string | null>(null);  // product._id flashing
 
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const sortMenuRef    = useRef<HTMLDivElement>(null);
+  const sortMenuRef = useRef<HTMLDivElement>(null);
 
   // Set of product IDs that have been previously ordered or prescribed
   const previouslyOrderedProdIds = React.useMemo(() => {
@@ -124,9 +134,10 @@ export const ProductSearch: React.FC = () => {
       if (!textMatch) return false;
     }
     // Category filter
+    if (activeFilter === 'MARGIN_MAXIMIZER') return p.grossMarginPercent >= 35;
     if (activeFilter === 'PREVIOUSLY_ORDERED') return previouslyOrderedProdIds.has(p._id);
-    if (activeFilter === 'LOW_STOCK')          return p.stockStatus === 'LOW_STOCK' || (p.totalStock > 0 && p.totalStock <= 20);
-    if (activeFilter === 'OUT_OF_STOCK')       return p.stockStatus === 'OUT_OF_STOCK' || p.totalStock === 0;
+    if (activeFilter === 'LOW_STOCK') return p.stockStatus === 'LOW_STOCK' || (p.totalStock > 0 && p.totalStock <= 20);
+    if (activeFilter === 'OUT_OF_STOCK') return p.stockStatus === 'OUT_OF_STOCK' || p.totalStock === 0;
     if (activeFilter === 'NEAR_EXPIRY') {
       const thirtyDays = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
       return p.batches.some(b => {
@@ -134,18 +145,18 @@ export const ProductSearch: React.FC = () => {
         return exp < thirtyDays && exp > new Date();
       });
     }
-    if (activeFilter !== 'ALL')                return p.scheduleCategory === (activeFilter as ScheduleCategory);
+    if (activeFilter !== 'ALL') return p.scheduleCategory === (activeFilter as ScheduleCategory);
     return true;
   });
 
   // ── Sorting ────────────────────────────────────────────────────────────────
   const sorted = [...filtered].sort((a, b) => {
     switch (sortKey) {
-      case 'price_asc':  return a.sellingPrice - b.sellingPrice;
+      case 'price_asc': return a.sellingPrice - b.sellingPrice;
       case 'price_desc': return b.sellingPrice - a.sellingPrice;
-      case 'stock':      return b.totalStock - a.totalStock;
-      case 'margin':     return b.grossMarginPercent - a.grossMarginPercent;
-      default:           return a.name.localeCompare(b.name);
+      case 'stock': return b.totalStock - a.totalStock;
+      case 'margin': return b.grossMarginPercent - a.grossMarginPercent;
+      default: return a.name.localeCompare(b.name);
     }
   });
 
@@ -155,7 +166,7 @@ export const ProductSearch: React.FC = () => {
     if (!searchTerm.trim()) return;
     const exact = products.find(
       p => p.barcode === searchTerm.trim() ||
-           p.name.toLowerCase() === searchTerm.trim().toLowerCase()
+        p.name.toLowerCase() === searchTerm.trim().toLowerCase()
     );
     const target = exact || (sorted.length === 1 ? sorted[0] : null);
     if (target) {
@@ -170,7 +181,7 @@ export const ProductSearch: React.FC = () => {
     setTimeout(() => setBarcodeFlash(null), 600);
     const defaultBatch = getEarliestExpiringBatch(product.batches) || product.batches[0];
     const batch = selectedBatchMap[product._id] || defaultBatch;
-    const qty   = qtyMap[product._id] || 1;
+    const qty = qtyMap[product._id] || 1;
     const unitMode = unitModeMap[product._id] || 'PACK';
     dispatch(addItemToCart({ product, selectedBatch: batch, quantity: qty, unitMode }));
   }, [selectedBatchMap, qtyMap, unitModeMap, dispatch]);
@@ -188,13 +199,15 @@ export const ProductSearch: React.FC = () => {
   // ── Tab counts ─────────────────────────────────────────────────────────────
   const thirtyDaysAhead = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   const tabCounts: Record<FilterTab, number> = {
-    ALL:          products.length,
-    REGULAR:      products.filter(p => p.scheduleCategory === 'REGULAR').length,
-    SCHEDULE_H:   products.filter(p => p.scheduleCategory === 'SCHEDULE_H').length,
-    SCHEDULE_H1:  products.filter(p => p.scheduleCategory === 'SCHEDULE_H1').length,
-    SCHEDULE_X:   products.filter(p => p.scheduleCategory === 'SCHEDULE_X').length,
-    LOW_STOCK:    products.filter(p => p.stockStatus === 'LOW_STOCK' || (p.totalStock > 0 && p.totalStock <= 20)).length,
-    NEAR_EXPIRY:  products.filter(p => p.batches.some(b => { const exp = new Date(b.expiryDate); return exp < thirtyDaysAhead && exp > new Date(); })).length,
+    ALL: products.length,
+    MARGIN_MAXIMIZER: products.filter(p => p.grossMarginPercent >= 35).length,
+    PREVIOUSLY_ORDERED: products.filter(p => previouslyOrderedProdIds.has(p._id)).length,
+    REGULAR: products.filter(p => p.scheduleCategory === 'REGULAR').length,
+    SCHEDULE_H: products.filter(p => p.scheduleCategory === 'SCHEDULE_H').length,
+    SCHEDULE_H1: products.filter(p => p.scheduleCategory === 'SCHEDULE_H1').length,
+    SCHEDULE_X: products.filter(p => p.scheduleCategory === 'SCHEDULE_X').length,
+    LOW_STOCK: products.filter(p => p.stockStatus === 'LOW_STOCK' || (p.totalStock > 0 && p.totalStock <= 20)).length,
+    NEAR_EXPIRY: products.filter(p => p.batches.some(b => { const exp = new Date(b.expiryDate); return exp < thirtyDaysAhead && exp > new Date(); })).length,
     OUT_OF_STOCK: products.filter(p => p.stockStatus === 'OUT_OF_STOCK' || p.totalStock === 0).length,
   };
 
@@ -224,10 +237,20 @@ export const ProductSearch: React.FC = () => {
           type="button"
           onClick={() => dispatch(setMultiStoreModalOpen({ isOpen: true }))}
           className="flex-1 flex items-center justify-center space-x-1.5 bg-sky-50 hover:bg-sky-100 text-sky-900 border border-sky-300 px-2 py-1.5 rounded-xl text-[11px] font-extrabold transition-all shadow-2xs cursor-pointer active:scale-98"
-          title="Multi-Store & Inter-Branch Stock Lookup (Tasks #31-36)"
+          title="Multi-Store & Inter-Branch Stock Lookup"
         >
           <Building2 className="w-3.5 h-3.5 text-sky-700" />
-          <span>Branch Stock (Tasks 31-36)</span>
+          <span>Branch Stock</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => dispatch(setRackRoboModalOpen({ isOpen: true }))}
+          className="flex-1 flex items-center justify-center space-x-1.5 bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-cyan-500/40 px-2 py-1.5 rounded-xl text-[11px] font-extrabold transition-all shadow-2xs cursor-pointer active:scale-98"
+          title="Open 2D Pharmacy Shelf & Bin Picking Map"
+        >
+          <Compass className="w-3.5 h-3.5 text-cyan-400" />
+          <span>Shelf Robo 📍</span>
         </button>
       </div>
 
@@ -269,16 +292,14 @@ export const ProductSearch: React.FC = () => {
             <button
               key={tab.key}
               onClick={() => setActiveFilter(tab.key)}
-              className={`flex-shrink-0 flex items-center space-x-1 text-[10px] font-bold px-1.5 py-0.5 rounded-lg border transition-all cursor-pointer ${
-                activeFilter === tab.key
+              className={`flex-shrink-0 flex items-center space-x-1 text-[10px] font-bold px-1.5 py-0.5 rounded-lg border transition-all cursor-pointer ${activeFilter === tab.key
                   ? tab.color + ' shadow-xs font-extrabold'
                   : 'text-slate-500 bg-white border-slate-200 hover:bg-slate-50'
-              }`}
+                }`}
             >
               <span>{tab.label}</span>
-              <span className={`text-[9px] px-1 rounded-full font-black ${
-                activeFilter === tab.key ? 'bg-white/60' : 'bg-slate-100'
-              }`}>
+              <span className={`text-[9px] px-1 rounded-full font-black ${activeFilter === tab.key ? 'bg-white/60' : 'bg-slate-100'
+                }`}>
                 {tabCounts[tab.key]}
               </span>
             </button>
@@ -311,11 +332,10 @@ export const ProductSearch: React.FC = () => {
                   <button
                     key={opt.key}
                     onClick={() => { setSortKey(opt.key); setShowSortMenu(false); }}
-                    className={`w-full text-left px-3 py-1.5 text-[11px] font-semibold cursor-pointer transition-colors ${
-                      sortKey === opt.key
+                    className={`w-full text-left px-3 py-1.5 text-[11px] font-semibold cursor-pointer transition-colors ${sortKey === opt.key
                         ? 'bg-emerald-50 text-emerald-700'
                         : 'text-slate-600 hover:bg-slate-50'
-                    }`}
+                      }`}
                   >
                     {opt.label}
                   </button>
@@ -344,32 +364,45 @@ export const ProductSearch: React.FC = () => {
           </div>
         ) : (
           sorted.map(product => {
-            const isOut      = product.stockStatus === 'OUT_OF_STOCK' || product.totalStock === 0;
-            const isLow      = !isOut && (product.stockStatus === 'LOW_STOCK' || product.totalStock <= 20);
+            const isOut = product.stockStatus === 'OUT_OF_STOCK' || product.totalStock === 0;
+            const isLow = !isOut && (product.stockStatus === 'LOW_STOCK' || product.totalStock <= 20);
             const hasNearExpiry = product.batches.some(b => {
               const exp = new Date(b.expiryDate);
               const thirtyDays = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
               return exp < thirtyDays && exp > new Date();
             });
-            const badge      = SCHEDULE_BADGE[product.scheduleCategory];
+            // Dump stock: any batch expiring within 60 days
+            const dumpBatch = product.batches.find(b => {
+              const exp = new Date(b.expiryDate);
+              const now = new Date();
+              const daysLeft = Math.ceil((exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+              return daysLeft > 0 && daysLeft <= 60;
+            });
+            const dumpDaysLeft = dumpBatch ? Math.ceil((new Date(dumpBatch.expiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
+            const isDumpCard = Boolean(dumpBatch);
+            const isCriticalDump = dumpDaysLeft !== null && dumpDaysLeft <= 30;
+            const badge = SCHEDULE_BADGE[product.scheduleCategory];
             const sortedBatches = getSortedBatchesFEFO(product.batches);
-            const fefoBatch  = getEarliestExpiringBatch(product.batches) || sortedBatches[0];
-            const selBatch   = selectedBatchMap[product._id] || fefoBatch;
-            const qty        = qtyMap[product._id] || 1;
+            const fefoBatch = getEarliestExpiringBatch(product.batches) || sortedBatches[0];
+            const selBatch = selectedBatchMap[product._id] || fefoBatch;
+            const qty = qtyMap[product._id] || 1;
             const isFlashing = barcodeFlash === product._id;
 
             return (
               <div
                 key={product._id}
-                className={`group border rounded-xl p-3 transition-all duration-150 relative ${
-                  isFlashing
+                className={`group border rounded-xl p-3 transition-all duration-150 relative ${isFlashing
                     ? 'border-emerald-500 bg-emerald-50 shadow-md scale-[1.01]'
                     : isOut
-                    ? 'bg-rose-50/40 border-rose-200 hover:border-rose-300'
-                    : isLow || hasNearExpiry
-                    ? 'bg-amber-50/40 border-amber-300 hover:border-amber-400'
-                    : 'bg-white border-slate-200 hover:border-emerald-400 hover:shadow-sm'
-                }`}
+                      ? 'bg-rose-50/40 border-rose-200 hover:border-rose-300'
+                      : isDumpCard && isCriticalDump
+                        ? 'bg-orange-50/50 border-orange-400 hover:border-orange-500'
+                        : isDumpCard
+                          ? 'bg-amber-50/40 border-amber-400 hover:border-amber-500'
+                          : isLow || hasNearExpiry
+                            ? 'bg-amber-50/40 border-amber-300 hover:border-amber-400'
+                            : 'bg-white border-slate-200 hover:border-emerald-400 hover:shadow-sm'
+                  }`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
@@ -404,9 +437,20 @@ export const ProductSearch: React.FC = () => {
                       )}
 
                       {/* Near Expiry Amber Warning Badge */}
-                      {hasNearExpiry && (
+                      {hasNearExpiry && !isDumpCard && (
                         <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-amber-500 text-white border border-amber-600 shadow-2xs animate-pulse">
                           ⚠ Near Expiry (&lt;30d)
+                        </span>
+                      )}
+
+                      {/* 🔥 Dump Stock Badge (overrides near expiry badge) */}
+                      {isDumpCard && (
+                        <span className={`flex items-center space-x-0.5 text-[10px] font-extrabold px-1.5 py-0.5 rounded-full border shadow-2xs ${isCriticalDump
+                            ? 'bg-orange-500 text-white border-orange-600 animate-pulse'
+                            : 'bg-amber-400 text-amber-950 border-amber-500'
+                          }`}>
+                          <PackageOpen className="w-2.5 h-2.5" />
+                          <span>🔥 DUMP — {dumpDaysLeft}d left</span>
                         </span>
                       )}
 
@@ -414,6 +458,13 @@ export const ProductSearch: React.FC = () => {
                       {badge && (
                         <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${badge.cls}`}>
                           {badge.label}
+                        </span>
+                      )}
+
+                      {/* 💎 High-Margin Profit Booster Badge */}
+                      {product.grossMarginPercent >= 35 && (
+                        <span className="flex items-center space-x-0.5 text-[9.5px] font-black px-1.5 py-0.5 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-2xs">
+                          <span>💎 Profit Booster ({product.grossMarginPercent}%)</span>
                         </span>
                       )}
                     </div>
@@ -428,7 +479,11 @@ export const ProductSearch: React.FC = () => {
                       <span>Brand: <strong className="text-slate-700">{product.brand}</strong></span>
                       <span>HSN: <strong className="text-slate-700">{product.hsnCode}</strong></span>
                       <span>GST: <strong className="text-slate-700">{product.gstRate}%</strong></span>
-                      <span className="text-emerald-700 font-semibold flex items-center space-x-0.5">
+                      <span className={`flex items-center space-x-0.5 ${
+                        product.grossMarginPercent >= 35
+                          ? 'text-emerald-900 font-black bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-300'
+                          : 'text-emerald-700 font-semibold'
+                      }`}>
                         <TrendingUp className="w-2.5 h-2.5" />
                         <span>Margin {product.grossMarginPercent}%</span>
                       </span>
@@ -455,22 +510,20 @@ export const ProductSearch: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => setUnitModeMap(prev => ({ ...prev, [product._id]: 'PACK' }))}
-                                className={`text-[9px] font-bold px-2 py-0.5 rounded-md transition-all cursor-pointer ${
-                                  currentUnitMode === 'PACK'
+                                className={`text-[9px] font-bold px-2 py-0.5 rounded-md transition-all cursor-pointer ${currentUnitMode === 'PACK'
                                     ? 'bg-emerald-600 text-white shadow-2xs'
                                     : 'text-slate-600 hover:text-slate-900'
-                                }`}
+                                  }`}
                               >
                                 📦 Full Strip
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setUnitModeMap(prev => ({ ...prev, [product._id]: 'LOOSE' }))}
-                                className={`text-[9px] font-bold px-2 py-0.5 rounded-md transition-all cursor-pointer ${
-                                  currentUnitMode === 'LOOSE'
+                                className={`text-[9px] font-bold px-2 py-0.5 rounded-md transition-all cursor-pointer ${currentUnitMode === 'LOOSE'
                                     ? 'bg-emerald-600 text-white shadow-2xs'
                                     : 'text-slate-600 hover:text-slate-900'
-                                }`}
+                                  }`}
                                 title={`Sell loose tablets at ₹${perTabletPrice.toFixed(2)} per tablet`}
                               >
                                 💊 Loose (₹{perTabletPrice.toFixed(2)}/tab)
@@ -492,7 +545,7 @@ export const ProductSearch: React.FC = () => {
                         >
                           {sortedBatches.map((b, idx) => {
                             const near = new Date(b.expiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-                            const exp  = new Date(b.expiryDate) <= new Date();
+                            const exp = new Date(b.expiryDate) <= new Date();
                             const isFefo = b.batchNumber === fefoBatch?.batchNumber && sortedBatches.length > 1;
                             return (
                               <option key={b.batchNumber} value={b.batchNumber} disabled={exp}>
@@ -517,6 +570,21 @@ export const ProductSearch: React.FC = () => {
                             className="px-1.5 py-0.5 text-slate-500 hover:bg-slate-100 text-xs font-bold cursor-pointer"
                           >+</button>
                         </div>
+
+                        {/* Task #44: Rack Robo Locator Button */}
+                        <button
+                          type="button"
+                          onClick={() => dispatch(setRackRoboModalOpen({
+                            isOpen: true,
+                            targetProductName: product.name,
+                            targetLocation: selBatch?.location || 'Rack B-01'
+                          }))}
+                          className="text-[10px] font-bold text-cyan-800 hover:text-cyan-950 bg-cyan-50 hover:bg-cyan-100 border border-cyan-300 px-2 py-0.5 rounded-lg flex items-center space-x-1 cursor-pointer shadow-2xs transition-all"
+                          title="Locate shelf position on 2D Pharmacy Floor Plan"
+                        >
+                          <MapPin className="w-2.5 h-2.5 text-cyan-600" />
+                          <span>{selBatch?.location || 'Rack'}</span>
+                        </button>
                       </div>
                     )}
                   </div>
@@ -548,11 +616,10 @@ export const ProductSearch: React.FC = () => {
 
                     <button
                       onClick={() => handleAddToCart(product)}
-                      className={`mt-2 flex items-center space-x-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all shadow-sm cursor-pointer active:scale-95 ${
-                        isOut
+                      className={`mt-2 flex items-center space-x-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all shadow-sm cursor-pointer active:scale-95 ${isOut
                           ? 'bg-amber-500 hover:bg-amber-600 text-white'
                           : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                      }`}
+                        }`}
                     >
                       {isOut ? (
                         <>
@@ -566,6 +633,37 @@ export const ProductSearch: React.FC = () => {
                         </>
                       )}
                     </button>
+
+                    <div className="mt-1.5 flex items-center space-x-1.5 flex-wrap gap-y-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          dispatch(openSubstitutionModalForProduct({ product }));
+                        }}
+                        className="flex items-center space-x-1 text-[10px] font-bold text-amber-900 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-2 py-0.5 rounded cursor-pointer transition-all shadow-2xs"
+                        title="View Salt-Matched Substitutes (5 Criteria)"
+                      >
+                        <Zap className="w-2.5 h-2.5 text-amber-600" />
+                        <span>Substitutes</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          dispatch(setPatientInstructionModalOpen({
+                            isOpen: true,
+                            product
+                          }));
+                        }}
+                        className="flex items-center space-x-1 text-[10px] font-bold text-teal-800 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-2 py-0.5 rounded cursor-pointer transition-all shadow-2xs"
+                        title="View Patient Instruction Leaflet & Voice Clips"
+                      >
+                        <Volume2 className="w-2.5 h-2.5 text-teal-600" />
+                        <span>PIL &amp; Audio</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

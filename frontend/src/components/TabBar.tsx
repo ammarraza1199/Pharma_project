@@ -31,7 +31,8 @@ import {
   ArrowRightCircle,
   AlertCircle,
   CheckCircle2,
-  Clock
+  Clock,
+  Box
 } from 'lucide-react';
 
 export const TabBar: React.FC = () => {
@@ -42,6 +43,8 @@ export const TabBar: React.FC = () => {
   const activeSessionId = useSelector((state: RootState) => state.pos.activeSessionId);
   const heldBills = useSelector((state: RootState) => state.pos.heldBills);
   const transferNotification = useSelector((state: RootState) => state.pos.transferNotification);
+  const putAwayTasks = useSelector((state: RootState) => state.pos.putAwayTasks || []);
+  const pendingPutAwayCount = putAwayTasks.filter(t => t.status === 'PENDING').length;
 
   const [holdCustomerName, setHoldCustomerName] = useState<string>('');
   const [holdCustomerPhone, setHoldCustomerPhone] = useState<string>('');
@@ -294,6 +297,18 @@ export const TabBar: React.FC = () => {
 
         {/* Right: Delegation, Hold Bill & Customer Display Actions */}
         <div className="flex items-center space-x-2 pb-1.5">
+          {/* Task #23: Idle Counter Staff Put-Away Notification Pill */}
+          {pendingPutAwayCount > 0 && (
+            <button
+              onClick={() => dispatch(navigateTo('RETURNS'))}
+              className="flex items-center space-x-1.5 bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-300 hover:border-purple-400 text-xs font-bold px-3 py-1.5 rounded-lg transition-all shadow-2xs cursor-pointer active:scale-95"
+              title="Medicines returned by patients waiting for idle counter staff to place on shelves"
+            >
+              <Box className="w-3.5 h-3.5 text-purple-600" />
+              <span>📦 {pendingPutAwayCount} Put-Away</span>
+            </button>
+          )}
+
           {/* Quick Delegate / Assign Button */}
           <button
             onClick={() => dispatch(openAssignBillModal({ sessionId: activeSessionId }))}

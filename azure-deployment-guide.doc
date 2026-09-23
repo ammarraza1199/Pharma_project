@@ -1,0 +1,127 @@
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8"><title>Deployment Guide</title></head>
+<body><h1>Genquantaa Pharmacy - Azure Free Tier Deployment Guide</h1>
+<p>This guide provides step-by-step instructions on how to deploy the Genquantaa Pharmacy POS System (MERN stack) entirely for <strong>FREE</strong> using Microsoft Azure services and MongoDB Atlas.</p>
+<h2>Architecture Overview</h2>
+<ul>
+<li><strong>Database:</strong> MongoDB Atlas (M0 Free Cluster)</li>
+<li><strong>Backend (Node.js API):</strong> Azure App Service (F1 Free Tier)</li>
+<li><strong>Frontend (Vite/React):</strong> Azure Static Web Apps (Free Plan)</li>
+</ul>
+<hr />
+<h2>Step 1: Set up the Database (MongoDB Atlas)</h2>
+<p>While Azure offers Cosmos DB, <strong>MongoDB Atlas</strong> provides a far more generous and reliable "Free Forever" tier that natively supports MERN apps.</p>
+<ol>
+<li>Go to <a href="https://www.mongodb.com/cloud/atlas/register">MongoDB Atlas</a> and create a free account.</li>
+<li>Click <strong>Build a Database</strong> and select the <strong>M0 FREE</strong> cluster.</li>
+<li>Choose <strong>Azure</strong> as your cloud provider and select a region closest to you. Click <strong>Create</strong>.</li>
+<li><strong>Security Setup:</strong></li>
+<li>Create a Database User (e.g., username: <code>admin</code>, password: <code>your_password</code>). <strong>Save this password!</strong></li>
+<li>Under <strong>Network Access</strong>, click <strong>Add IP Address</strong> and choose <strong>Allow Access From Anywhere</strong> (<code>0.0.0.0/0</code>). <em>(Note: Azure server IPs change dynamically, so this is required for the free tier).</em></li>
+<li><strong>Get the Connection String:</strong></li>
+<li>Click <strong>Connect</strong> -&gt; <strong>Connect your application</strong>.</li>
+<li>Copy the connection string. It will look like this:
+     <code>mongodb+srv://admin:&lt;password&gt;@cluster0.xxxxx.mongodb.net/?retryWrites=true&amp;w=majority</code></li>
+<li>Replace <code>&lt;password&gt;</code> with the password you created in step 4. Add <code>genquantaa_pharmacy</code> before the <code>?</code> to specify the database name:
+     <code>mongodb+srv://admin:&lt;password&gt;@cluster0.xxxxx.mongodb.net/genquantaa_pharmacy?retryWrites=true&amp;w=majority</code></li>
+</ol>
+<hr />
+<h2>Step 2: Prepare the Backend for Azure</h2>
+<p>Azure App Service requires a specific startup configuration for Node.js apps.</p>
+<ol>
+<li>Open your <code>backend/package.json</code>. Ensure the <code>scripts</code> section has a <code>start</code> command that runs the compiled code:
+   <code>json
+   "scripts": {
+     "start": "node dist/index.js",
+     "build": "tsc",
+     "dev": "nodemon src/index.ts"
+   }</code></li>
+<li>Make sure your GitHub repository (<code>Pharma_project</code>) is completely up to date with your latest local code.</li>
+</ol>
+<hr />
+<h2>Step 3: Deploy Backend to Azure App Service (Free Tier)</h2>
+<ol>
+<li>Sign in to the <a href="https://portal.azure.com/">Azure Portal</a>.</li>
+<li>In the search bar, search for <strong>App Services</strong> and click on it.</li>
+<li>Click <strong>+ Create</strong> -&gt; <strong>Web App</strong>.</li>
+<li><strong>Basics Tab:</strong></li>
+<li><strong>Subscription:</strong> Azure subscription 1 (or Free Trial).</li>
+<li><strong>Resource Group:</strong> Click <em>Create new</em>, name it <code>Genquantaa-RG</code>.</li>
+<li><strong>Name:</strong> Choose a unique name (e.g., <code>genquantaa-api</code>). This will be your URL: <code>genquantaa-api.azurewebsites.net</code>.</li>
+<li><strong>Publish:</strong> Select <strong>Code</strong>.</li>
+<li><strong>Runtime stack:</strong> Select <strong>Node 18 LTS</strong> (or Node 20 LTS).</li>
+<li><strong>Operating System:</strong> Select <strong>Linux</strong>.</li>
+<li><strong>Region:</strong> Choose the same region as your MongoDB cluster.</li>
+<li><strong>Pricing Plan:</strong> Click <em>Explore pricing plans</em>, and select <strong>Free F1</strong> (Shared infrastructure, 60 minutes/day compute). Click <em>Select</em>.</li>
+<li><strong>Deployment Tab:</strong></li>
+<li>Enable <strong>Continuous Deployment</strong>.</li>
+<li>Link your GitHub account.</li>
+<li>Select your Organization, Repository (<code>Pharma_project</code>), and Branch (<code>main</code>).</li>
+<li>Click <strong>Review + Create</strong>, then click <strong>Create</strong>. Azure will now provision the server.</li>
+</ol>
+<h3>Add Backend Environment Variables</h3>
+<ol>
+<li>Once the deployment is complete, click <strong>Go to resource</strong>.</li>
+<li>On the left sidebar, scroll down to <strong>Settings</strong> and click <strong>Environment variables</strong> (or <strong>Configuration</strong> in older Azure UI).</li>
+<li>Add the following <strong>App settings</strong> (click <em>+ Add</em> for each):</li>
+<li><code>PORT</code> : <code>8080</code> <em>(Azure Linux containers default to 8080)</em></li>
+<li><code>MONGO_URI</code> : <em>(Paste your MongoDB Atlas connection string from Step 1)</em></li>
+<li><code>JWT_SECRET</code> : <code>any_random_long_secure_string_here</code></li>
+<li><code>JWT_EXPIRES_IN</code> : <code>8h</code></li>
+<li><code>NODE_ENV</code> : <code>production</code></li>
+<li>Click <strong>Save</strong> at the top. Azure will restart your backend.</li>
+<li><strong>Test Backend:</strong> Open your browser and go to <code>https://&lt;your-app-name&gt;.azurewebsites.net/api/reports/dashboard-stats</code> (or any public route) to verify it is running.</li>
+</ol>
+<hr />
+<h2>Step 4: Prepare the Frontend for Azure</h2>
+<ol>
+<li>Open your frontend <code>.env</code> file (or <code>frontend/.env.production</code>).</li>
+<li>Update the API URL to point to your new Azure backend:
+   <code>env
+   VITE_API_URL=https://&lt;your-backend-app-name&gt;.azurewebsites.net/api</code>
+   <em>(Ensure you commit and push this change to GitHub).</em></li>
+</ol>
+<hr />
+<h2>Step 5: Deploy Frontend to Azure Static Web Apps (Free Tier)</h2>
+<p>Azure Static Web Apps is completely free for frontend frameworks like React/Vite and includes free SSL.</p>
+<ol>
+<li>In the <a href="https://portal.azure.com/">Azure Portal</a>, search for <strong>Static Web Apps</strong> and click it.</li>
+<li>Click <strong>+ Create</strong>.</li>
+<li><strong>Basics Tab:</strong></li>
+<li><strong>Resource Group:</strong> Select the <code>Genquantaa-RG</code> you created earlier.</li>
+<li><strong>Name:</strong> Choose a name (e.g., <code>genquantaa-frontend</code>).</li>
+<li><strong>Plan type:</strong> Select <strong>Free</strong> (For hobby/personal projects).</li>
+<li><strong>Region:</strong> Choose a region close to you.</li>
+<li><strong>Source:</strong> Select <strong>GitHub</strong>.</li>
+<li><strong>GitHub Details:</strong></li>
+<li>Sign in to GitHub and select the <code>Pharma_project</code> repository and <code>main</code> branch.</li>
+<li><strong>Build Details:</strong></li>
+<li><strong>Build Presets:</strong> Select <strong>React</strong>.</li>
+<li><strong>App location:</strong> <code>/frontend</code> <em>(This tells Azure where your React code lives inside the repo).</em></li>
+<li><strong>Api location:</strong> Leave blank.</li>
+<li><strong>Output location:</strong> <code>dist</code> <em>(This is the folder Vite creates when it builds).</em></li>
+<li>Click <strong>Review + Create</strong>, then <strong>Create</strong>.</li>
+</ol>
+<p>Azure will automatically create a GitHub Action in your repository. This action will build your Vite app and deploy it.</p>
+<h3>Fix Frontend Routing (Vite SPA Fallback)</h3>
+<p>Because Vite creates a Single Page Application (SPA), if a user refreshes the page on <code>/invoices</code>, Azure will throw a 404 error. You must tell Azure to route all traffic to <code>index.html</code>.</p>
+<ol>
+<li>In your local code, go to the <code>frontend/public</code> folder.</li>
+<li>Create a new file named <code>staticwebapp.config.json</code>.</li>
+<li>Add the following code:
+   <code>json
+   {
+     "navigationFallback": {
+       "rewrite": "/index.html"
+     }
+   }</code></li>
+<li>Commit and push this file to GitHub. Azure will automatically redeploy the frontend with the fix!</li>
+</ol>
+<hr />
+<h2>🎉 Deployment Complete!</h2>
+<ul>
+<li>Your <strong>Frontend</strong> is live at the auto-generated Azure Static Web Apps URL (e.g., <code>https://purple-sky-12345.azurestaticapps.net</code>).</li>
+<li>Your <strong>Backend</strong> is live on Azure App Service.</li>
+<li>Your <strong>Database</strong> is safely hosted on MongoDB Atlas.</li>
+</ul>
+<p>Every time you push new code to your <code>main</code> branch on GitHub, Azure will automatically detect the changes and rebuild both your frontend and backend.</p></body></html>

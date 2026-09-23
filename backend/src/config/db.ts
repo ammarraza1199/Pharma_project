@@ -1,9 +1,19 @@
 import mongoose from 'mongoose';
+import dns from 'dns';
 import { config } from './env';
+
+// Set public DNS to resolve MongoDB Atlas SRV records reliably on Windows
+try {
+  dns.setServers(['8.8.8.8', '1.1.1.1']);
+} catch {
+  // Ignore if not permitted
+}
 
 export const connectDB = async (): Promise<void> => {
   try {
-    const conn = await mongoose.connect(config.mongoUri);
+    const conn = await mongoose.connect(config.mongoUri, {
+      serverSelectionTimeoutMS: 5000,
+    });
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
 
     // Initialize store settings if none exist
@@ -65,8 +75,13 @@ export const connectDB = async (): Promise<void> => {
       ]);
       console.log('✅ Default drug interactions seeded');
     }
-  } catch (error) {
-    console.error('❌ MongoDB Connection Failed:', error);
-    process.exit(1);
+  } catch (error: any) {
+    console.error('\n❌ MongoDB Connection Failed!');
+    console.error(`Attempted URI: ${config.mongoUri}`);
+    console.error(`Error details: ${error?.message || error}`);
+    console.error('\n👉 How to fix:');
+    console.error(`   2. Set MONGO_URI in backend/.env to a free MongoDB Atlas cloud URI:\n      MONGO_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/genquantaa_pharmacy\n`);
+    console.log('🔄 The server is running with in-memory auth fallback. Retrying MongoDB connection in 15s...\n');
+    setTimeout(connectDB, 15000);
   }
 };

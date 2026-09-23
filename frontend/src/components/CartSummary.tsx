@@ -1,18 +1,43 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { setPaymentModalOpen, openScheduleHDetailsPrompt, addItemToCart } from '../store/posSlice';
+import {
+  setPaymentModalOpen,
+  openScheduleHDetailsPrompt,
+  addItemToCart,
+  setClearanceGiftModalOpen,
+  applyNearExpiryClearanceDiscount,
+  addClearanceGiftToCart,
+  toggleDiscreetPackaging,
+  unlinkValueAddedServiceFromSession,
+  setVoiceConsultationModalOpen
+} from '../store/posSlice';
 import { getMedicineDetails } from '../utils/medicineDetails';
-import { CreditCard, ShieldAlert, Loader2, ArrowRight, Sparkles, Tag, ShieldCheck, Stethoscope, TestTube, CheckCircle2, Plus } from 'lucide-react';
+import {
+  CreditCard, ShieldAlert, Loader2, ArrowRight, Sparkles, Tag,
+  ShieldCheck, Stethoscope, TestTube, CheckCircle2, Plus, Gift,
+  Clock, Package, PackageCheck, Layers, Mic, Volume2, X
+} from 'lucide-react';
+import {
+  detectRelevantClinicalBundles,
+  bundleItemToProduct,
+  CLINICAL_CARE_BUNDLES,
+  type ClinicalBundle,
+  type BundleItem
+} from '../utils/clinicalBundlesEngine';
+import { ClinicalBundleModal } from './ClinicalBundleModal';
 
 export const CartSummary: React.FC = () => {
   const dispatch = useDispatch();
   const sessions = useSelector((state: RootState) => state.pos.sessions);
   const products = useSelector((state: RootState) => state.pos.products);
+  const consultationRecords = useSelector((state: RootState) => state.pos.consultationRecords || []);
   const activeSessionId = useSelector((state: RootState) => state.pos.activeSessionId);
   const isSubmittingBill = useSelector((state: RootState) => state.pos.isSubmittingBill);
 
   const currentSession = sessions.find(s => s.id === activeSessionId);
+  const linkedConsultation = consultationRecords.find(c => c.id === currentSession?.linkedVoiceConsultationId);
+  const appliedVAS = currentSession?.appliedValueAddedService;
   const items = currentSession ? currentSession.items : [];
   const doctorDetails = currentSession?.doctorDetails;
 
@@ -20,6 +45,31 @@ export const CartSummary: React.FC = () => {
   const [insuranceTagged, setInsuranceTagged] = useState<boolean>(false);
   const [doctorReferred, setDoctorReferred] = useState<boolean>(false);
   const [labTestsAdded, setLabTestsAdded] = useState<string[]>([]);
+
+  // Smart Clinical Combo Bundles State
+  const [isBundleModalOpen, setIsBundleModalOpen] = useState<boolean>(false);
+  const [selectedBundleModalId, setSelectedBundleModalId] = useState<string | undefined>(undefined);
+  const [addedBundleSuccess, setAddedBundleSuccess] = useState<string | null>(null);
+
+  // Detect clinical care bundle opportunities based on cart items
+  const detectedBundles = detectRelevantClinicalBundles(items);
+  const topBundleRec = detectedBundles.length > 0 ? detectedBundles[0] : null;
+
+  const handleCompleteBundle = (bundleRec: typeof detectedBundles[0]) => {
+    bundleRec.missingItems.forEach(item => {
+      const prod = bundleItemToProduct(item, bundleRec.bundle.title);
+      dispatch(
+        addItemToCart({
+          product: prod,
+          selectedBatch: item.sampleBatch,
+          quantity: 1,
+          unitMode: 'PACK'
+        })
+      );
+    });
+    setAddedBundleSuccess(bundleRec.bundle.title);
+    setTimeout(() => setAddedBundleSuccess(null), 2200);
+  };
 
   // Financial calculations
   const subtotal = items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
@@ -34,6 +84,21 @@ export const CartSummary: React.FC = () => {
     return sum + ((item.unitPrice * item.quantity * item.discountPercent) / 100);
   }, 0);
   const hasSubstituteSavings = totalSubstituteSavings > 0;
+
+  // Near-expiry clearance items & gift calculations (Task #16)
+  const now = new Date().getTime();
+  const nearExpiryItems = items.filter(item => {
+    if (item.isClearanceGift) return false;
+    const exp = new Date(item.selectedBatch.expiryDate).getTime();
+    const daysLeft = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
+    return daysLeft > 0 && daysLeft <= 90;
+  });
+  const hasNearExpiry = nearExpiryItems.length > 0;
+
+  const clearanceGiftItems = items.filter(item => item.isClearanceGift);
+  const hasClearanceGift = clearanceGiftItems.length > 0;
+  const totalGiftValue = clearanceGiftItems.reduce((sum, item) => sum + (item.giftOriginalPrice || 30) * item.quantity, 0);
+  const totalClearanceDiscounts = items.reduce((sum, item) => sum + ((item.clearanceDiscountApplied || 0) * item.quantity), 0);
   
   const totalPacksCount = items
     .filter(item => (item.unitMode || 'PACK') === 'PACK')
@@ -96,6 +161,83 @@ export const CartSummary: React.FC = () => {
           </span>
         </h2>
 
+        {/* ── 🎁 TASK #16: NEAR-EXPIRY CLEARANCE INCENTIVE CARDS ── */}
+        {hasNearExpiry && (
+          <div className="bg-white border border-rose-200 rounded-xl p-3 mb-3 shadow-xs animate-fadeIn">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className="p-1.5 bg-rose-50 border border-rose-200 rounded-lg">
+                  <Gift className="w-4 h-4 text-rose-600" />
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-rose-700">
+                    Clearance Incentive
+                  </div>
+                  <div className="text-xs font-bold leading-tight text-slate-900">
+                    Near-Expiry Batch in Cart
+                  </div>
+                </div>
+              </div>
+              <span className="bg-rose-50 text-rose-700 border border-rose-200 text-[9.5px] font-extrabold px-2 py-0.5 rounded-full">
+                {nearExpiryItems.length} Batch{nearExpiryItems.length > 1 ? 'es' : ''}
+              </span>
+            </div>
+
+            <p className="text-[10.5px] text-slate-500 mt-1.5 leading-snug">
+              Apply extra ₹5–₹10 clearance discount or add free promotional gift item:
+            </p>
+
+            <div className="grid grid-cols-3 gap-1.5 mt-2">
+              <button
+                type="button"
+                onClick={() => dispatch(applyNearExpiryClearanceDiscount({ discountPerUnit: 5 }))}
+                className="py-1 px-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-800 font-bold text-[10px] border border-slate-200 transition-all cursor-pointer text-center shadow-2xs hover:scale-[1.02]"
+                title="Apply flat ₹5 clearance discount per unit"
+              >
+                -₹5 Disc
+              </button>
+
+              <button
+                type="button"
+                onClick={() => dispatch(applyNearExpiryClearanceDiscount({ discountPerUnit: 10 }))}
+                className="py-1 px-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold text-[10px] border border-emerald-200 transition-all cursor-pointer text-center shadow-2xs hover:scale-[1.02]"
+                title="Apply flat ₹10 clearance discount per unit"
+              >
+                -₹10 Disc
+              </button>
+
+              <button
+                type="button"
+                onClick={() => dispatch(setClearanceGiftModalOpen({ isOpen: true }))}
+                className="py-1 px-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-[10px] transition-all cursor-pointer text-center shadow-2xs flex items-center justify-center space-x-1 hover:scale-[1.02]"
+                title="Open Free Promotional Gifts Selection"
+              >
+                <Gift className="w-2.5 h-2.5 text-rose-300" />
+                <span>Free Gift...</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {hasClearanceGift && (
+          <div className="bg-rose-50/70 border border-rose-200 text-slate-900 rounded-xl p-2.5 mb-3 shadow-2xs flex items-center justify-between animate-fadeIn">
+            <div className="flex items-center space-x-2">
+              <div className="p-1 bg-white/20 rounded-lg">
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              </div>
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-rose-700">Clearance Gift Applied</div>
+                <div className="text-[11px] font-bold leading-tight text-slate-900 truncate max-w-[170px]">
+                  🎁 {clearanceGiftItems.map(g => g.product.name.replace('🎁 Free Gift: ', '')).join(', ')}
+                </div>
+              </div>
+            </div>
+            <span className="text-[10px] font-black bg-white text-rose-700 px-2 py-0.5 rounded-full">
+              Worth ₹{totalGiftValue} FREE
+            </span>
+          </div>
+        )}
+
         {/* 🎉 Substitute Savings Banner */}
         {hasSubstituteSavings && (
           <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl p-3 mb-3 shadow-sm">
@@ -129,6 +271,67 @@ export const CartSummary: React.FC = () => {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {/* ── 🎙️ LINKED VOICE CONSULTATION & VALUE BENEFIT BANNER (Task #48) ── */}
+        {(appliedVAS || linkedConsultation) && (
+          <div className="bg-gradient-to-r from-indigo-900 to-purple-900 text-white rounded-xl p-3 mb-3 shadow-sm space-y-2 border border-indigo-700/60 animate-fadeIn">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center space-x-2">
+                <div className="p-1.5 bg-rose-500/30 text-rose-300 rounded-lg border border-rose-400/40">
+                  <Mic className="w-4 h-4 animate-pulse" />
+                </div>
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-wider text-indigo-200 flex items-center space-x-1.5">
+                    <span>Voice Consultation Linked</span>
+                    {linkedConsultation?.durationSeconds && (
+                      <span className="font-mono text-[9px] bg-white/20 px-1.5 py-0.2 rounded text-white">
+                        {linkedConsultation.durationSeconds}s Audio
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs font-bold text-white leading-tight">
+                    {appliedVAS?.name || linkedConsultation?.chiefDiscussion?.slice(0, 45) || 'Audio Consultation Note'}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => dispatch(unlinkValueAddedServiceFromSession({ sessionId: currentSession?.id }))}
+                className="text-slate-400 hover:text-rose-300 p-0.5 rounded cursor-pointer"
+                title="Unlink consultation service from this bill"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {appliedVAS && (
+              <div className="flex items-center justify-between bg-white/10 px-2.5 py-1.5 rounded-lg border border-white/10 text-[10.5px]">
+                <span className="text-indigo-100 flex items-center space-x-1 font-medium">
+                  <Gift className="w-3 h-3 text-amber-300" />
+                  <span>Benefit: <strong>{appliedVAS.type.replace(/_/g, ' ')}</strong></span>
+                </span>
+                <span className="font-black px-1.5 py-0.2 rounded bg-amber-300 text-indigo-950 text-[10px]">
+                  {appliedVAS.discountPercent ? `${appliedVAS.discountPercent}% OFF APPLIED` : 'FREE SERVICE TOKEN'}
+                </span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-1 border-t border-indigo-800 text-[10.5px]">
+              <span className="text-indigo-300 text-[10px] truncate max-w-[150px]">
+                Patient: {linkedConsultation?.patientName || currentSession?.patientDetails?.patientName || 'Customer'}
+              </span>
+              <button
+                type="button"
+                onClick={() => dispatch(setVoiceConsultationModalOpen({ isOpen: true }))}
+                className="text-amber-300 hover:text-amber-200 font-bold underline cursor-pointer flex items-center space-x-1"
+              >
+                <Volume2 className="w-3 h-3" />
+                <span>Play Voice Note</span>
+              </button>
             </div>
           </div>
         )}
@@ -186,7 +389,7 @@ export const CartSummary: React.FC = () => {
             </span>
           </div>
 
-          <div className="grid grid-cols-3 gap-1.5 text-[10.5px]">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[10.5px]">
             {/* 1. Insurance */}
             <button
               type="button"
@@ -243,6 +446,26 @@ export const CartSummary: React.FC = () => {
                 {labTestsAdded.length > 0 ? '🧪 Lab Added' : '🧪 Add Lab Test'}
               </span>
             </button>
+
+            {/* 4. Discreet Packaging (Task #57) */}
+            <button
+              type="button"
+              onClick={() => dispatch(toggleDiscreetPackaging({ sessionId: currentSession?.id }))}
+              className={`p-2 rounded-lg border text-left font-bold transition-all cursor-pointer flex flex-col justify-between ${
+                currentSession?.isDiscreetPackaging
+                  ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
+                  : 'bg-white text-slate-700 border-slate-200 hover:border-indigo-400'
+              }`}
+              title="Discreet packaging (opaque sealed brown bag for customer privacy)"
+            >
+              <div className="flex items-center justify-between">
+                <Package className={`w-3.5 h-3.5 ${currentSession?.isDiscreetPackaging ? 'text-white' : 'text-indigo-600'}`} />
+                {currentSession?.isDiscreetPackaging && <CheckCircle2 className="w-3 h-3 text-white" />}
+              </div>
+              <span className="mt-1 text-[10px] leading-tight">
+                {currentSession?.isDiscreetPackaging ? '📦 Discreet ON' : '📦 Discreet Pack'}
+              </span>
+            </button>
           </div>
 
           {/* ── TASK #30: AGE-BASED RECOMMENDATIONS & PARENT COUPON BOOKING ── */}
@@ -251,7 +474,7 @@ export const CartSummary: React.FC = () => {
               <div className="flex items-center justify-between">
                 <span className="font-bold text-amber-900 flex items-center gap-1 text-[11px]">
                   <Tag className="w-3 h-3 text-amber-600" />
-                  <span>Age-Based Care Coupon (Task #30)</span>
+                  <span>Age-Based Care Coupon</span>
                 </span>
                 <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-amber-200 text-amber-900">
                   {Number(currentSession.patientDetails.age) <= 12
@@ -280,6 +503,155 @@ export const CartSummary: React.FC = () => {
                 className="w-full py-1 text-[11px] font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-300 rounded-lg transition-colors cursor-pointer"
               >
                 🎟️ Book & Apply Coupon Discount
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* ── SMART CLINICAL CARE BUNDLE RECOMMENDATIONS ── */}
+        <div className="mt-3 bg-gradient-to-br from-teal-50/80 via-emerald-50/40 to-indigo-50/50 p-3 rounded-xl border border-teal-200/90 space-y-2">
+          {topBundleRec ? (
+            topBundleRec.isComplete ? (
+              /* Case 1: All items for this clinical kit are present */
+              <div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-1.5 bg-emerald-100 border border-emerald-300 rounded-lg text-lg">
+                      {topBundleRec.bundle.iconEmoji}
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-wider text-emerald-800">
+                        Complete Care Kit Active
+                      </div>
+                      <div className="text-xs font-black text-slate-900 leading-tight">
+                        {topBundleRec.bundle.title}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="bg-emerald-600 text-white text-[9.5px] font-black px-2 py-0.5 rounded-full">
+                    Saved ₹{topBundleRec.bundle.totalSavings.toFixed(2)}
+                  </span>
+                </div>
+                <p className="text-[10.5px] text-emerald-900/90 font-medium mt-1">
+                  🎉 All {topBundleRec.bundle.items.length} kit medicines included with pre-configured bundle discount ({topBundleRec.bundle.savingsPercent}% OFF).
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedBundleModalId(undefined);
+                    setIsBundleModalOpen(true);
+                  }}
+                  className="mt-2 w-full py-1 text-[10.5px] font-bold text-teal-800 bg-white hover:bg-teal-50 rounded-lg border border-teal-200 transition-colors cursor-pointer text-center shadow-2xs"
+                >
+                  Browse Other Care Kits...
+                </button>
+              </div>
+            ) : (
+              /* Case 2: Partial kit detected, prompt 1-click completion */
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-1.5 bg-white border border-teal-200 rounded-lg text-lg shadow-2xs">
+                      {topBundleRec.bundle.iconEmoji}
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-wider text-teal-800">
+                        Clinical Care Kit Recommendation
+                      </div>
+                      <div className="text-xs font-black text-slate-900 leading-tight">
+                        {topBundleRec.bundle.title}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="bg-amber-400 text-amber-950 font-black text-[9.5px] px-2 py-0.5 rounded-full">
+                    Save ₹{topBundleRec.completionSavings.toFixed(2)}
+                  </span>
+                </div>
+
+                <p className="text-[10px] text-slate-600 leading-snug">
+                  💡 {topBundleRec.bundle.clinicalRationale}
+                </p>
+
+                {/* Missing items breakdown */}
+                <div className="bg-white/90 rounded-lg p-2 border border-teal-100 space-y-1">
+                  <div className="text-[9.5px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                    <span>Add to complete kit ({topBundleRec.missingItems.length} missing):</span>
+                    <span className="text-emerald-700 font-mono font-bold">+₹{topBundleRec.completionPrice.toFixed(2)}</span>
+                  </div>
+                  <div className="space-y-0.5">
+                    {topBundleRec.missingItems.map(m => (
+                      <div key={m.productId} className="flex items-center justify-between text-[10px] text-slate-700">
+                        <span className="truncate max-w-[170px]">• {m.name}</span>
+                        <span className="font-bold text-emerald-800 font-mono">₹{m.bundlePrice.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 1-Click Action & Explore Button */}
+                <div className="flex items-center space-x-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleCompleteBundle(topBundleRec)}
+                    disabled={addedBundleSuccess === topBundleRec.bundle.title}
+                    className={`flex-1 py-1.5 px-2 rounded-lg text-[10.5px] font-black transition-all cursor-pointer flex items-center justify-center space-x-1 shadow-2xs ${
+                      addedBundleSuccess === topBundleRec.bundle.title
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-teal-700 hover:bg-teal-800 text-white active:scale-98'
+                    }`}
+                  >
+                    {addedBundleSuccess === topBundleRec.bundle.title ? (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-white animate-pulse" />
+                        <span>Kit Completed! ✓</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-3.5 h-3.5 text-amber-300" />
+                        <span>+ Complete Kit (+₹{topBundleRec.completionPrice.toFixed(2)})</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedBundleModalId(topBundleRec.bundle.id);
+                      setIsBundleModalOpen(true);
+                    }}
+                    className="py-1.5 px-2.5 rounded-lg text-[10.5px] font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer"
+                    title="View all 4 clinical care kits catalog"
+                  >
+                    All Kits...
+                  </button>
+                </div>
+              </div>
+            )
+          ) : (
+            /* Case 3: No specific bundle match yet */
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className="p-1 bg-white border border-teal-200 rounded-lg text-base">
+                  🩺
+                </div>
+                <div>
+                  <div className="text-[10.5px] font-black text-slate-800 leading-tight">
+                    Smart Clinical Care Bundles
+                  </div>
+                  <div className="text-[9.5px] text-slate-500">
+                    Pre-configured kits with 14%–16% bundle savings
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedBundleModalId(undefined);
+                  setIsBundleModalOpen(true);
+                }}
+                className="py-1 px-2 text-[10px] font-black text-teal-800 bg-white hover:bg-teal-100 border border-teal-300 rounded-lg transition-colors cursor-pointer shadow-2xs"
+              >
+                Browse 4 Kits...
               </button>
             </div>
           )}
@@ -321,6 +693,13 @@ export const CartSummary: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* ── CLINICAL CARE BUNDLE CATALOG MODAL ── */}
+      <ClinicalBundleModal
+        isOpen={isBundleModalOpen}
+        onClose={() => setIsBundleModalOpen(false)}
+        highlightBundleId={selectedBundleModalId}
+      />
     </div>
   );
 };

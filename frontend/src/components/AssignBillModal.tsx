@@ -3,7 +3,8 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import {
   closeAssignBillModal,
-  assignBillToPharmacist
+  assignBillToPharmacist,
+  toggleDiscreetPackaging
 } from '../store/posSlice';
 import {
   Users,
@@ -14,7 +15,10 @@ import {
   ArrowRight,
   CheckSquare,
   Square,
-  Layers
+  Layers,
+  Sparkles,
+  HeartHandshake,
+  Package
 } from 'lucide-react';
 
 export const AssignBillModal: React.FC = () => {
@@ -24,6 +28,7 @@ export const AssignBillModal: React.FC = () => {
   const activePharmacistId = useSelector((state: RootState) => state.pos.activePharmacistId);
   const sessions = useSelector((state: RootState) => state.pos.sessions);
   const activeSessionId = useSelector((state: RootState) => state.pos.activeSessionId);
+  const patients = useSelector((state: RootState) => state.pos.patients);
 
   const currentPharm = pharmacists.find(p => p.id === activePharmacistId);
   const mySessions = sessions.filter(s => s.assignedPharmacistId === activePharmacistId);
@@ -32,6 +37,7 @@ export const AssignBillModal: React.FC = () => {
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [handoverNote, setHandoverNote] = useState('');
+  const [discreetPackagingRequested, setDiscreetPackagingRequested] = useState<boolean>(false);
 
   const heldBill = useSelector((state: RootState) => 
     modal.heldBillId ? state.pos.heldBills.find(h => h.id === modal.heldBillId || (h as any)._id === modal.heldBillId) : null
@@ -43,6 +49,8 @@ export const AssignBillModal: React.FC = () => {
       setSelectedSessionIds(preselect ? new Set([preselect]) : new Set());
       setSelectedTargetId(null);
       setHandoverNote('');
+      const targetSession = sessions.find(s => s.id === preselect);
+      setDiscreetPackagingRequested(Boolean(targetSession?.isDiscreetPackaging));
     }
   }, [modal.isOpen, modal.sessionId, activeSessionId]);
 
@@ -72,6 +80,36 @@ export const AssignBillModal: React.FC = () => {
   const totalItems = selectedSessions.reduce((sum, s) => sum + s.items.reduce((a, i) => a + i.quantity, 0), 0);
   const totalAmount = selectedSessions.reduce((sum, s) => sum + s.items.reduce((a, i) => a + i.lineTotal, 0), 0);
 
+  // Smart Staff Routing Analysis (Tasks #56 & #57)
+  const isChronicVIP = selectedSessions.some(session => {
+    const pName = session.patientDetails?.patientName?.toLowerCase() || '';
+    const phone = session.patientDetails?.phone;
+    const matchingRecord = patients.find(p => (phone && p.phone === phone) || (pName && p.name.toLowerCase() === pName));
+    const isVipRecord = matchingRecord && ((matchingRecord.chronicConditions && matchingRecord.chronicConditions.length > 0) || matchingRecord.totalBills >= 3 || matchingRecord.totalSpent >= 4000);
+    const hasVipName = pName.includes('vip') || pName.includes('chronic') || pName.includes('hypertension') || pName.includes('diabetic');
+    const hasChronicMed = session.items.some(i => {
+      const name = i.product?.name?.toLowerCase() || '';
+      return ['telma', 'glycomet', 'atorva', 'metformin', 'amlodipine', 'thyronorm', 'losartan', 'rosuvastatin', 'pantocid', 'glimepiride', 'concor', 'dytor', 'clopidogrel', 'januvia', 'ecosprin'].some(m => name.includes(m));
+    });
+    return isVipRecord || hasVipName || hasChronicMed;
+  }) || Boolean(heldBill && (
+    heldBill.customerName?.toLowerCase().includes('vip') ||
+    heldBill.billingSession?.items?.some(i => ['telma', 'glycomet', 'atorva', 'metformin', 'amlodipine'].some(m => i.product?.name?.toLowerCase().includes(m)))
+  ));
+
+  const isMaternityOrSensitive = selectedSessions.some(session => {
+    const isFemale = session.patientDetails?.gender === 'FEMALE';
+    const hasSensitiveItem = session.items.some(i => {
+      const name = i.product?.name?.toLowerCase() || '';
+      const category = (i.product as any)?.category?.toLowerCase() || '';
+      return ['preg', 'matern', 'contracep', 'i-pill', 'unwanted', 'condom', 'tampon', 'sanitary', 'folic', 'progesterone', 'susten', 'ovulation', 'feminine', 'intimate', 'lactat', 'breast', 'menstrual', 'period', 'clomid', 'duphaston'].some(k => name.includes(k) || category.includes(k));
+    });
+    return session.isDiscreetPackaging || hasSensitiveItem || (isFemale && session.items.some(i => i.product?.name?.toLowerCase().includes('iron') || i.product?.name?.toLowerCase().includes('calcium')));
+  }) || Boolean(heldBill && (
+    heldBill.billingSession?.isDiscreetPackaging ||
+    heldBill.billingSession?.items?.some(i => ['preg', 'matern', 'contracep', 'i-pill', 'unwanted'].some(k => i.product?.name?.toLowerCase().includes(k)))
+  ));
+
   const destinationPharmacists = pharmacists.filter(p => p.id !== activePharmacistId);
 
   const handleExecuteAssign = (targetId: string) => {
@@ -84,6 +122,9 @@ export const AssignBillModal: React.FC = () => {
     } else {
       if (selectedSessions.length === 0) return;
       selectedSessions.forEach(session => {
+        if (discreetPackagingRequested !== session.isDiscreetPackaging) {
+          dispatch(toggleDiscreetPackaging({ sessionId: session.id, isDiscreet: discreetPackagingRequested }));
+        }
         dispatch(assignBillToPharmacist({
           sessionId: session.id,
           targetPharmacistId: targetId,
@@ -250,75 +291,145 @@ export const AssignBillModal: React.FC = () => {
                 const isFree = activeCount === 0;
                 const isChief = pharm.id === 'pharm-emergency';
 
+                // Smart Staff Routing Logic (Tasks #56 & #57)
+                const isRecommendedForSenior = (pharm.id === 'pharm-1' || pharm.counterNumber === 1) && isChronicVIP;
+                const isRecommendedForFemale = (pharm.id === 'pharm-2' || pharm.counterNumber === 2) && isMaternityOrSensitive;
+
                 return (
                   <div
                     key={pharm.id}
                     onClick={() => setSelectedTargetId(pharm.id)}
-                    className={`border rounded-2xl p-3.5 flex items-center justify-between cursor-pointer transition-all ${
+                    className={`border rounded-2xl p-3.5 flex flex-col gap-2 cursor-pointer transition-all ${
                       isSelected
                         ? 'border-indigo-600 bg-indigo-50/70 shadow-xs ring-2 ring-indigo-500/20'
-                        : isFree
-                          ? 'border-emerald-200 bg-emerald-50/30 hover:border-emerald-400'
-                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                        : isRecommendedForSenior
+                          ? 'border-amber-300 bg-amber-50/40 hover:border-amber-400 ring-2 ring-amber-400/30'
+                          : isRecommendedForFemale
+                            ? 'border-rose-300 bg-rose-50/40 hover:border-rose-400 ring-2 ring-rose-400/30'
+                            : isFree
+                              ? 'border-emerald-200 bg-emerald-50/30 hover:border-emerald-400'
+                              : 'border-slate-200 hover:border-slate-300 bg-white'
                     }`}
                   >
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-xs ${
-                        isChief
-                          ? 'bg-rose-100 text-rose-700'
-                          : pharm.colorTheme === 'blue'
-                            ? 'bg-blue-100 text-blue-700'
-                            : pharm.colorTheme === 'purple'
-                              ? 'bg-purple-100 text-purple-700'
-                              : 'bg-emerald-100 text-emerald-700'
-                      }`}>
-                        {pharm.avatarInitials}
-                      </div>
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <h4 className="text-xs font-bold text-slate-900">{pharm.name}</h4>
-                          <span className={`text-[10px] px-1.5 py-0.2 rounded font-black uppercase ${
-                            isChief ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'
-                          }`}>
-                            {isChief ? 'SOS Desk' : `Counter ${pharm.counterNumber}`}
-                          </span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-xs ${
+                          isChief
+                            ? 'bg-rose-100 text-rose-700'
+                            : pharm.colorTheme === 'blue'
+                              ? 'bg-blue-100 text-blue-700'
+                              : pharm.colorTheme === 'purple'
+                                ? 'bg-purple-100 text-purple-700'
+                                : 'bg-emerald-100 text-emerald-700'
+                        }`}>
+                          {pharm.avatarInitials}
                         </div>
-                        <p className="text-[11px] text-slate-500">{pharm.role}</p>
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <h4 className="text-xs font-bold text-slate-900">{pharm.name}</h4>
+                            <span className={`text-[10px] px-1.5 py-0.2 rounded font-black uppercase ${
+                              isChief ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              {isChief ? 'SOS Desk' : `Counter ${pharm.counterNumber}`}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500">{pharm.role}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-3">
+                        <div className="text-right">
+                          {isFree ? (
+                            <span className="inline-flex items-center space-x-1 text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <span>FREE (0 queued)</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center space-x-1 text-[10px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
+                              <Clock className="w-3 h-3 text-slate-400" />
+                              <span>{activeCount} active bill{activeCount !== 1 ? 's' : ''}</span>
+                            </span>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={selectedSessions.length === 0 && !heldBill}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleExecuteAssign(pharm.id);
+                          }}
+                          className={`flex items-center space-x-1 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black px-3.5 py-2 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer ${
+                            isRecommendedForSenior
+                              ? 'bg-amber-600 hover:bg-amber-700'
+                              : isRecommendedForFemale
+                                ? 'bg-rose-600 hover:bg-rose-700'
+                                : 'bg-indigo-600 hover:bg-indigo-700'
+                          }`}
+                        >
+                          <span>Assign{selectedSessions.length > 1 && !heldBill ? ` (${selectedSessions.length})` : ''}</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-3">
-                      <div className="text-right">
-                        {isFree ? (
-                          <span className="inline-flex items-center space-x-1 text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            <span>FREE (0 queued)</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center space-x-1 text-[10px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
-                            <Clock className="w-3 h-3 text-slate-400" />
-                            <span>{activeCount} active bill{activeCount !== 1 ? 's' : ''}</span>
-                          </span>
-                        )}
+                    {/* Smart Routing AI Recommendation Badges */}
+                    {isRecommendedForSenior && (
+                      <div className="flex items-center space-x-1.5 text-[10.5px] font-bold text-amber-900 bg-amber-100/90 px-2.5 py-1 rounded-xl border border-amber-300 animate-fadeIn">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                        <span>⭐ Smart Staff Route: Chronic VIP Patient assigned to Senior Lead Pharmacist</span>
                       </div>
+                    )}
 
-                      <button
-                        type="button"
-                        disabled={selectedSessions.length === 0 && !heldBill}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleExecuteAssign(pharm.id);
-                        }}
-                        className="flex items-center space-x-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black px-3.5 py-2 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer"
-                      >
-                        <span>Assign{selectedSessions.length > 1 && !heldBill ? ` (${selectedSessions.length})` : ''}</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                    {isRecommendedForFemale && (
+                      <div className="flex items-center space-x-1.5 text-[10.5px] font-bold text-rose-900 bg-rose-100/90 px-2.5 py-1 rounded-xl border border-rose-300 animate-fadeIn">
+                        <HeartHandshake className="w-3.5 h-3.5 text-rose-600 flex-shrink-0" />
+                        <span>🌸 Smart Staff Route: Female Pharmacist Consultation Recommended (Maternity / Sensitive Care)</span>
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
+          </div>
+
+          {/* ── DISCREET PACKAGING CHECKBOX ── */}
+          <div className={`p-3 rounded-2xl border transition-all flex items-center justify-between ${
+            discreetPackagingRequested ? 'bg-indigo-50 border-indigo-300 ring-2 ring-indigo-500/20' : 'bg-slate-50 border-slate-200'
+          }`}>
+            <div className="flex items-center space-x-2.5">
+              <div className={`p-2 rounded-xl ${discreetPackagingRequested ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                <Package className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs font-bold text-slate-900">📦 Request Discreet Packaging</span>
+                  {isMaternityOrSensitive && (
+                    <span className="bg-rose-100 text-rose-700 text-[9.5px] font-black px-1.5 py-0.2 rounded-full uppercase">
+                      Recommended
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Deliver in opaque sealed brown security packaging for customer privacy
+                </p>
+              </div>
+            </div>
+            <label className="flex items-center space-x-1.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={discreetPackagingRequested}
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  setDiscreetPackagingRequested(val);
+                  selectedSessions.forEach(s => {
+                    dispatch(toggleDiscreetPackaging({ sessionId: s.id, isDiscreet: val }));
+                  });
+                }}
+                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+              />
+              <span className="text-xs font-black text-slate-700">{discreetPackagingRequested ? 'Sealed' : 'Enforce'}</span>
+            </label>
           </div>
 
           {/* Handover Note (Optional) */}
