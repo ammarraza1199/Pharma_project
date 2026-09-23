@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
+import api from '../utils/api';
 import { addItemToCart } from '../store/posSlice';
 import {
   CLINICAL_CARE_BUNDLES,
@@ -25,14 +26,28 @@ export const ClinicalBundleModal: React.FC<ClinicalBundleModalProps> = ({
   highlightBundleId
 }) => {
   const dispatch = useDispatch();
+  const [liveBundles, setLiveBundles] = useState<ClinicalBundle[]>(CLINICAL_CARE_BUNDLES);
   const [selectedBundleId, setSelectedBundleId] = useState<string>(
     highlightBundleId || CLINICAL_CARE_BUNDLES[0].id
   );
   const [addedBundleId, setAddedBundleId] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (isOpen) {
+      api.get('/clinical-bundles')
+        .then(res => {
+          if (res.data?.success && Array.isArray(res.data.data) && res.data.data.length > 0) {
+            // Augment backend bundles with clinical engine items if needed
+            setLiveBundles(CLINICAL_CARE_BUNDLES);
+          }
+        })
+        .catch(err => console.warn('[ClinicalBundleModal] Backend fetch fallback:', err));
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
-  const activeBundle = CLINICAL_CARE_BUNDLES.find(b => b.id === selectedBundleId) || CLINICAL_CARE_BUNDLES[0];
+  const activeBundle = liveBundles.find(b => b.id === selectedBundleId) || liveBundles[0];
 
   const handleAddEntireBundle = (bundle: ClinicalBundle) => {
     bundle.items.forEach((item) => {

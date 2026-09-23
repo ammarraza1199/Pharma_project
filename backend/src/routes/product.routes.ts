@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { Product } from '../models/Product';
-import { protect, AuthRequest } from '../middleware/auth';
+import { protect, requireRole, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
@@ -95,7 +95,7 @@ router.get('/:id', protect, async (req: AuthRequest, res: Response, next: NextFu
 });
 
 // POST /api/products
-router.post('/', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/', protect, requireRole('MANAGER', 'OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const product = await Product.create(req.body);
     res.status(201).json({ success: true, data: product });
@@ -103,7 +103,7 @@ router.post('/', protect, async (req: AuthRequest, res: Response, next: NextFunc
 });
 
 // PUT /api/products/:id
-router.put('/:id', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.put('/:id', protect, requireRole('MANAGER', 'OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const product = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
     if (!product) return res.status(404).json({ success: false, message: 'Product not found.' });
@@ -112,7 +112,7 @@ router.put('/:id', protect, async (req: AuthRequest, res: Response, next: NextFu
 });
 
 // DELETE /api/products/:id (soft delete)
-router.delete('/:id', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.delete('/:id', protect, requireRole('OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     await Product.findByIdAndUpdate(req.params.id, { isActive: false });
     res.json({ success: true, message: 'Product deactivated.' });
@@ -120,7 +120,7 @@ router.delete('/:id', protect, async (req: AuthRequest, res: Response, next: Nex
 });
 
 // POST /api/products/:id/batch
-router.post('/:id/batch', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/:id/batch', protect, requireRole('MANAGER', 'OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ success: false, message: 'Product not found.' });
@@ -131,7 +131,7 @@ router.post('/:id/batch', protect, async (req: AuthRequest, res: Response, next:
 });
 
 // PUT /api/products/:id/batch/:batchNumber
-router.put('/:id/batch/:batchNumber', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.put('/:id/batch/:batchNumber', protect, requireRole('MANAGER', 'OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ success: false, message: 'Product not found.' });
@@ -140,6 +140,33 @@ router.put('/:id/batch/:batchNumber', protect, async (req: AuthRequest, res: Res
     Object.assign(batch, req.body);
     await product.save();
     res.json({ success: true, data: product });
+  } catch (err) { next(err); }
+});
+
+// GET /api/products/:id/substitutes - Get clinical & generic substitutes
+router.get('/:id/substitutes', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ success: false, message: 'Product not found.' });
+
+    const salt = product.saltComposition?.trim().toLowerCase();
+    if (!salt) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const firstSaltPart = salt.split('+')[0]?.trim() || salt;
+
+    // Find other products with matching salt composition
+    const substitutes = await Product.find({
+      _id: { $ne: product._id },
+      isActive: true,
+      $or: [
+        { saltComposition: { $regex: new RegExp(`^${salt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
+        { saltComposition: { $regex: firstSaltPart.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } }
+      ]
+    }).limit(12);
+
+    res.json({ success: true, data: substitutes });
   } catch (err) { next(err); }
 });
 

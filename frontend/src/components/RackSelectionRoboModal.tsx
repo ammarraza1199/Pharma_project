@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import api from '../utils/api';
 import type { RootState } from '../store';
 import { setRackRoboModalOpen, addItemToCart } from '../store/posSlice';
 import type { Product, BatchInfo } from '../types/pos';

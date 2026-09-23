@@ -34,7 +34,7 @@ export const protect = async (req: AuthRequest, res: Response, next: NextFunctio
       return res.status(401).json({ success: false, message: 'User not found or deactivated.' });
     }
 
-    req.user = { id: decoded.id, email: decoded.email, role: decoded.role };
+    req.user = { id: decoded.id, email: decoded.email, role: user.role || decoded.role };
     next();
   } catch (err) {
     return res.status(401).json({ success: false, message: 'Token invalid or expired.' });

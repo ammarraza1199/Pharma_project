@@ -45,6 +45,8 @@ export const TabBar: React.FC = () => {
   const transferNotification = useSelector((state: RootState) => state.pos.transferNotification);
   const putAwayTasks = useSelector((state: RootState) => state.pos.putAwayTasks || []);
   const pendingPutAwayCount = putAwayTasks.filter(t => t.status === 'PENDING').length;
+  const currentUser = useSelector((state: RootState) => state.pos.currentUser);
+  const isManager = currentUser?.role === 'MANAGER' || currentUser?.role === 'OWNER';
 
   const [holdCustomerName, setHoldCustomerName] = useState<string>('');
   const [holdCustomerPhone, setHoldCustomerPhone] = useState<string>('');
@@ -179,16 +181,18 @@ export const TabBar: React.FC = () => {
           {hasQueueDisbalance && (
             <div className="flex items-center space-x-2 bg-amber-500/20 border border-amber-500/40 px-2.5 py-1 rounded-lg animate-pulse">
               <span className="text-[11px] text-amber-300 font-medium hidden md:inline">
-                ⚡ Counter {busiest.pharm.counterNumber} ({busiest.count} customers) is busy while Counter {freest.pharm.counterNumber} is free!
+                ⚡ Counter {busiest.pharm.counterNumber} ({busiest.count} customers) busy · Counter {freest.pharm.counterNumber} free
               </span>
-              <button
-                onClick={() => dispatch(autoBalanceQueues())}
-                className="flex items-center space-x-1 bg-amber-500 hover:bg-amber-400 text-slate-950 text-[11px] font-black px-2.5 py-0.5 rounded-md shadow-xs transition-all cursor-pointer active:scale-95"
-                title="Automatically transfer surplus pending customers to the free pharmacist"
-              >
-                <Zap className="w-3 h-3 fill-current" />
-                <span>Auto-Balance Queues</span>
-              </button>
+              {isManager && (
+                <button
+                  onClick={() => dispatch(autoBalanceQueues())}
+                  className="flex items-center space-x-1 bg-amber-500 hover:bg-amber-400 text-slate-950 text-[11px] font-black px-2.5 py-0.5 rounded-md shadow-xs transition-all cursor-pointer active:scale-95"
+                  title="Automatically transfer surplus pending customers to the free pharmacist"
+                >
+                  <Zap className="w-3 h-3 fill-current" />
+                  <span>Auto-Balance Queues</span>
+                </button>
+              )}
             </div>
           )}
 

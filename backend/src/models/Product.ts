@@ -6,6 +6,7 @@ export interface IBatchInfo {
   stockQuantity: number;
   location: string;
   mrp: number;
+  purchaseRate?: number;
 }
 
 export interface IProduct extends Document {

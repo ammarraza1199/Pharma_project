@@ -8,13 +8,14 @@ import { deductStock } from '../services/stockService';
 import { upsertPatientOnBilling } from '../services/patientService';
 import { protect, requireRole, AuthRequest } from '../middleware/auth';
 import bcrypt from 'bcryptjs';
+import { io } from '../index';
 
 const router = Router();
 
 // POST /api/invoices — Finalize Bill (most critical endpoint)
 router.post('/', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { billingSession, payment, subtotal, totalDiscount, totalCGST, totalSGST, grandTotal, managerPin } = req.body;
+    const { billingSession, payment, subtotal, totalDiscount, totalCGST, totalSGST, grandTotal, managerPin, invoiceType } = req.body;
     const items: any[] = billingSession?.items || [];
 
     if (items.length === 0) {
@@ -58,12 +59,18 @@ router.post('/', protect, async (req: AuthRequest, res: Response, next: NextFunc
 
     // ── STOCK DEDUCTION (atomic, per batch) ────────────────────────────────
     for (const item of items) {
-      await deductStock(
-        item.productId,
-        item.selectedBatch.batchNumber,
-        item.quantity,
-        null as any // Transactions removed for local standalone MongoDB
-      );
+      if (item.productId && mongoose.isValidObjectId(item.productId) && item.selectedBatch?.batchNumber) {
+        try {
+          await deductStock(
+            item.productId,
+            item.selectedBatch.batchNumber,
+            item.quantity,
+            null as any // Transactions removed for local standalone MongoDB
+          );
+        } catch (stockErr) {
+          console.warn('[Invoice] Stock deduction warning:', stockErr);
+        }
+      }
     }
 
     // ── GENERATE SEQUENTIAL INVOICE NUMBER ────────────────────────────────
@@ -82,13 +89,38 @@ router.post('/', protect, async (req: AuthRequest, res: Response, next: NextFunc
 
     // ── CREATE INVOICE ─────────────────────────────────────────────────────
     const [invoice] = await Invoice.create(
-      [{ invoiceNumber, invoiceDate: new Date(), storeInfo, billingSession, subtotal, totalDiscount, totalCGST, totalSGST, grandTotal, payment, createdBy: req.user!.id }]
+      [{
+        invoiceNumber,
+        invoiceDate: new Date(),
+        storeInfo,
+        billingSession,
+        subtotal,
+        totalDiscount,
+        totalCGST,
+        totalSGST,
+        grandTotal,
+        payment,
+        invoiceType: invoiceType === 'EMERGENCY' ? 'EMERGENCY' : 'REGULAR',
+        createdBy: req.user!.id
+      }]
     );
 
     // ── AUTO-UPDATE PATIENT (outside transaction — non-critical) ──────────
     try {
       await upsertPatientOnBilling(billingSession.patientDetails, grandTotal);
     } catch (e) { console.warn('[PatientService] Failed to upsert patient:', e); }
+
+    // ── REAL-TIME BROADCAST VIA SOCKET.IO ─────────────────────────────────
+    try {
+      io.emit('invoice:created', invoice);
+      io.emit('stock:updated', {
+        source: 'INVOICE',
+        invoiceNumber: invoice.invoiceNumber,
+        itemsDeducted: items.map(i => ({ productId: i.productId, batch: i.selectedBatch?.batchNumber, qty: i.quantity }))
+      });
+    } catch (socketErr) {
+      console.warn('[Socket.IO] Broadcast warning:', socketErr);
+    }
 
     res.status(201).json({ success: true, data: invoice });
   } catch (err: any) {
@@ -155,7 +187,7 @@ router.delete('/:invoiceNumber', protect, requireRole('MANAGER', 'OWNER'), async
 });
 
 // GET /api/invoices/export/csv
-router.get('/export/csv', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/export/csv', protect, requireRole('MANAGER', 'OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const invoices = await Invoice.find().sort({ invoiceDate: -1 }).limit(500);
     let csv = 'Invoice No,Date,Patient,Phone,Doctor,Items,Payment Method,Grand Total,CGST,SGST\n';

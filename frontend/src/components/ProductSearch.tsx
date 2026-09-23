@@ -19,6 +19,7 @@ import {
   FileText, Repeat, Building2, Volume2, PackageOpen, BadgeAlert,
   Compass, MapPin
 } from 'lucide-react';
+import api from '../utils/api';
 
 // ── Filter & Sort Types ──────────────────────────────────────────────────────
 type FilterTab = 'ALL' | 'MARGIN_MAXIMIZER' | 'PREVIOUSLY_ORDERED' | 'REGULAR' | 'SCHEDULE_H' | 'SCHEDULE_H1' | 'SCHEDULE_X' | 'LOW_STOCK' | 'NEAR_EXPIRY' | 'OUT_OF_STOCK';
@@ -161,17 +162,30 @@ export const ProductSearch: React.FC = () => {
   });
 
   // ── Barcode / Enter: exact match → add instantly ───────────────────────────
-  const handleBarcodeSubmit = (e: React.FormEvent) => {
+  const handleBarcodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!searchTerm.trim()) return;
+    const term = searchTerm.trim();
+    if (!term) return;
     const exact = products.find(
-      p => p.barcode === searchTerm.trim() ||
-        p.name.toLowerCase() === searchTerm.trim().toLowerCase()
+      p => p.barcode === term ||
+        p.name.toLowerCase() === term.toLowerCase()
     );
     const target = exact || (sorted.length === 1 ? sorted[0] : null);
     if (target) {
       flashAndAdd(target);
       setSearchTerm('');
+      return;
+    }
+
+    // Live backend barcode lookup if not found locally
+    try {
+      const res = await api.get(`/products/barcode/${encodeURIComponent(term)}`);
+      if (res.data?.success && res.data?.data) {
+        flashAndAdd(res.data.data);
+        setSearchTerm('');
+      }
+    } catch {
+      // Product not found with this barcode
     }
   };
 

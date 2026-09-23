@@ -1585,7 +1585,7 @@ export const posSlice = createSlice({
         pharmacyName: action.payload.pharmacyName || 'GENQUANTAA POS Store',
         licenseNo: action.payload.licenseNo || 'DL-2024/HYD/889201',
         email: email || 'user@genquantaa.com',
-        role: action.payload.role || 'STAFF',
+        role: action.payload.role || 'PHARMACIST',
         isLoggedIn: true
       };
       state.currentView = 'DASHBOARD';
@@ -1619,6 +1619,10 @@ export const posSlice = createSlice({
       if (idx !== -1) {
         state.products[idx] = action.payload;
       }
+    },
+
+    setAllProducts: (state, action: PayloadAction<Product[]>) => {
+      state.products = action.payload;
     },
 
     submitGRNEntry: (state, action: PayloadAction<GRNEntry>) => {
@@ -1954,6 +1958,10 @@ export const posSlice = createSlice({
       }
     },
 
+    setPurchaseOrders: (state, action: PayloadAction<PurchaseOrder[]>) => {
+      state.purchaseOrders = action.payload;
+    },
+
     createPurchaseOrder: (state, action: PayloadAction<PurchaseOrder>) => {
       state.purchaseOrders.unshift(action.payload);
     },
@@ -2069,6 +2077,13 @@ export const posSlice = createSlice({
       } else {
         const current = pharmacistSessions.find(s => s.id === state.activeSessionId);
         state.activeSessionId = current ? current.id : pharmacistSessions[0].id;
+      }
+    },
+
+    setPharmacists: (state, action: PayloadAction<PharmacistCounter[]>) => {
+      state.pharmacists = action.payload;
+      if (action.payload.length > 0 && !action.payload.some(p => p.id === state.activePharmacistId)) {
+        state.activePharmacistId = action.payload[0].id;
       }
     },
 
@@ -3125,6 +3140,9 @@ export const posSlice = createSlice({
     clearFinalizedInvoice: (state) => {
       state.latestFinalizedInvoice = null;
     },
+    setLatestFinalizedInvoice: (state, action: PayloadAction<FinalizedInvoice>) => {
+      state.latestFinalizedInvoice = action.payload;
+    },
     setInvoiceHistoryModalOpen: (state, action: PayloadAction<boolean>) => {
       state.invoiceHistoryModal.isOpen = action.payload;
     },
@@ -3144,6 +3162,9 @@ export const posSlice = createSlice({
     },
 
     // Delivery Order Management
+    setDeliveryOrders: (state, action: PayloadAction<DeliveryOrder[]>) => {
+      state.deliveryOrders = action.payload;
+    },
     addDeliveryOrder: (state, action: PayloadAction<Omit<DeliveryOrder, 'orderId' | 'orderNumber' | 'createdAt' | 'updatedAt'>>) => {
       const newOrder: DeliveryOrder = {
         ...action.payload,
@@ -3311,6 +3332,7 @@ export const {
   updateSupplier,
   updateStoreSettings,
   switchActivePharmacist,
+  setPharmacists,
   addNewTab,
   switchTab,
   closeTab,
@@ -3371,10 +3393,12 @@ export const {
   clearActiveSession,
   finalizeEmergencyInvoice,
   clearFinalizedInvoice,
+  setLatestFinalizedInvoice,
   setInvoiceHistoryModalOpen,
   reprintInvoice,
   deleteSavedInvoice,
   clearAllSavedInvoices,
+  setDeliveryOrders,
   addDeliveryOrder,
   updateDeliveryOrderStatus,
   deleteDeliveryOrder,
@@ -3384,6 +3408,7 @@ export const {
   applyBulk30DayDumpClearance,
   recordSupplierPayment,
   addSupplierBill,
+  setPurchaseOrders,
   createPurchaseOrder,
   updatePurchaseOrderStatus,
   deletePurchaseOrder,
@@ -3405,7 +3430,8 @@ export const {
   linkValueAddedServiceToSession,
   unlinkValueAddedServiceFromSession,
   setRackRoboModalOpen,
-  recordSubstituteEvent
+  recordSubstituteEvent,
+  setAllProducts
 } = posSlice.actions;
 
 export default posSlice.reducer;

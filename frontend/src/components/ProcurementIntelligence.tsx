@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
+import api from '../utils/api';
 import type { RootState } from '../store';
 import type { DistributorScheme } from '../types/pos';
 import {
@@ -41,6 +42,20 @@ export const ProcurementIntelligence: React.FC<Props> = ({
 
   const [selectedDealType, setSelectedDealType] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [procurementStats, setProcurementStats] = useState<{ totalSpend: number; totalShipments: number } | null>(null);
+
+  useEffect(() => {
+    api.get('/reports/procurement')
+      .then(res => {
+        if (res.data?.success && res.data.data) {
+          setProcurementStats({
+            totalSpend: res.data.data.totalProcurementSpend || 0,
+            totalShipments: res.data.data.totalShipmentsReceived || 0
+          });
+        }
+      })
+      .catch(err => console.warn('[ProcurementIntelligence] Backend fetch fallback:', err));
+  }, []);
 
   // Molecules Price Comparison Across Registered Distributors
   const comparisonMatrix: PriceComparisonRow[] = [
@@ -180,12 +195,18 @@ export const ProcurementIntelligence: React.FC<Props> = ({
 
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex items-center justify-between">
           <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Arbitrage Savings Potential</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              {procurementStats ? 'Live Procurement Spend (DB)' : 'Arbitrage Savings Potential'}
+            </span>
             <div className="text-2xl font-black text-blue-900 font-heading mt-0.5">
-              ₹14,800/mo
+              {procurementStats && procurementStats.totalSpend > 0
+                ? `₹${procurementStats.totalSpend.toLocaleString('en-IN')}`
+                : '₹14,800/mo'}
             </div>
             <p className="text-[10px] text-blue-600 font-semibold mt-0.5">
-              Estimated savings by routing orders to lowest-rate wholesalers
+              {procurementStats && procurementStats.totalShipments > 0
+                ? `${procurementStats.totalShipments} Inward GRN Receipts Synchronized`
+                : 'Estimated savings by routing orders to lowest-rate wholesalers'}
             </p>
           </div>
           <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">

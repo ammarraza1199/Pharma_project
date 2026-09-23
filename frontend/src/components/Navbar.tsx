@@ -43,8 +43,11 @@ export const Navbar: React.FC = () => {
   // Always show first letter of the EMAIL prefix (store account), not the pharmacist/role name
   const accountInitial = emailPrefixName.trim().charAt(0).toUpperCase() || 'N';
 
-  // Emergency desk mode: signed in with Emergency Desk option
-  const isEmergencyDesk = currentView === 'EMERGENCY_DELIVERY' && accountName.includes('Dr. S. Reddy');
+  const userRole = (currentUser?.role || 'PHARMACIST').toUpperCase();
+  const isOwner = userRole === 'OWNER';
+  const isManager = userRole === 'MANAGER' || isOwner;
+  // Emergency desk mode: signed in with Emergency Desk option or role
+  const isEmergencyDesk = userRole === 'EMERGENCY_DESK' || (currentView === 'EMERGENCY_DELIVERY' && accountName.includes('Dr. S. Reddy'));
 
   return (
     <header className="bg-white border-b border-slate-200 shadow-xs px-4 py-2 flex items-center justify-between sticky top-0 z-30">
@@ -64,149 +67,203 @@ export const Navbar: React.FC = () => {
 
       {/* Right Controls: Manager Lock & Pharmacist Profile & Exit */}
       <div className="flex items-center space-x-1.5">
-        {/* Dashboard Nav */}
-        <button
-          onClick={() => dispatch(navigateTo('DASHBOARD'))}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'DASHBOARD'
-            ? 'bg-violet-100 text-violet-800 font-bold'
-            : 'text-slate-500 hover:text-violet-700 hover:bg-violet-50'
-            }`}
-          title="Dashboard"
-        >
-          <LayoutDashboard className="w-4 h-4" />
-        </button>
+        {isEmergencyDesk ? (
+          <>
+            {/* Emergency Delivery Nav */}
+            <button
+              onClick={() => dispatch(navigateTo('EMERGENCY_DELIVERY'))}
+              className={`p-1.5 rounded-lg transition-all cursor-pointer shadow-xs shrink-0 flex items-center justify-center ${currentView === 'EMERGENCY_DELIVERY'
+                ? 'bg-red-600 text-white ring-2 ring-red-300 shadow-sm shadow-red-600/40'
+                : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
+                }`}
+              title="Emergency Fast Delivery"
+            >
+              <Siren className="w-4 h-4 text-red-600 animate-pulse" />
+            </button>
 
-        {/* POS Terminal Nav */}
-        <button
-          onClick={() => dispatch(navigateTo('POS_TERMINAL'))}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'POS_TERMINAL'
-            ? 'bg-emerald-100 text-emerald-800 font-bold'
-            : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
-            }`}
-          title="POS Billing Terminal"
-        >
-          <ShoppingCart className="w-4 h-4" />
-        </button>
+            {/* POS Terminal Nav */}
+            <button
+              onClick={() => dispatch(navigateTo('POS_TERMINAL'))}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'POS_TERMINAL'
+                ? 'bg-emerald-100 text-emerald-800 font-bold'
+                : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
+                }`}
+              title="POS Billing Terminal"
+            >
+              <ShoppingCart className="w-4 h-4" />
+            </button>
 
-        {/* Saved Invoices History Nav */}
-        <button
-          onClick={() => dispatch(navigateTo('INVOICES'))}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'INVOICES'
-            ? 'bg-emerald-100 text-emerald-800 font-bold'
-            : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
-            }`}
-          title="Invoices & Sales History"
-        >
-          <History className="w-4 h-4" />
-        </button>
+            {/* Saved Invoices History Nav */}
+            <button
+              onClick={() => dispatch(navigateTo('INVOICES'))}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'INVOICES'
+                ? 'bg-emerald-100 text-emerald-800 font-bold'
+                : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
+                }`}
+              title="Invoices & Sales History"
+            >
+              <History className="w-4 h-4" />
+            </button>
+          </>
+        ) : (
+          <>
+            {/* Dashboard Nav */}
+            <button
+              onClick={() => dispatch(navigateTo('DASHBOARD'))}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'DASHBOARD'
+                ? 'bg-violet-100 text-violet-800 font-bold'
+                : 'text-slate-500 hover:text-violet-700 hover:bg-violet-50'
+                }`}
+              title="Dashboard"
+            >
+              <LayoutDashboard className="w-4 h-4" />
+            </button>
 
-        {/* Inventory Catalog Nav */}
-        <button
-          onClick={() => dispatch(navigateTo('INVENTORY'))}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'INVENTORY'
-            ? 'bg-emerald-100 text-emerald-800 font-bold'
-            : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
-            }`}
-          title="Inventory Catalog"
-        >
-          <Package className="w-4 h-4" />
-        </button>
+            {/* POS Terminal Nav */}
+            <button
+              onClick={() => dispatch(navigateTo('POS_TERMINAL'))}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'POS_TERMINAL'
+                ? 'bg-emerald-100 text-emerald-800 font-bold'
+                : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
+                }`}
+              title="POS Billing Terminal"
+            >
+              <ShoppingCart className="w-4 h-4" />
+            </button>
 
-        {/* Inventory Shelf & Price Dashboard Nav */}
-        <button
-          onClick={() => dispatch(navigateTo('INVENTORY_DASHBOARD'))}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'INVENTORY_DASHBOARD'
-            ? 'bg-teal-100 text-teal-800 font-bold shadow-2xs'
-            : 'text-slate-500 hover:text-teal-700 hover:bg-teal-50'
-            }`}
-          title="Inventory Shelf, Expiry & Pricing Dashboard"
-        >
-          <BarChart3 className="w-4 h-4 text-teal-600" />
-        </button>
+            {/* Saved Invoices History Nav */}
+            <button
+              onClick={() => dispatch(navigateTo('INVOICES'))}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'INVOICES'
+                ? 'bg-emerald-100 text-emerald-800 font-bold'
+                : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
+                }`}
+              title="Invoices & Sales History"
+            >
+              <History className="w-4 h-4" />
+            </button>
 
-        {/* Stock Purchase GRN Nav */}
-        <button
-          onClick={() => dispatch(navigateTo('PURCHASE_GRN'))}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'PURCHASE_GRN'
-            ? 'bg-amber-100 text-amber-800 font-bold'
-            : 'text-slate-500 hover:text-amber-700 hover:bg-amber-50'
-            }`}
-          title="Stock Purchase (GRN)"
-        >
-          <Truck className="w-4 h-4" />
-        </button>
+            {/* Inventory Catalog Nav */}
+            <button
+              onClick={() => dispatch(navigateTo('INVENTORY'))}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'INVENTORY'
+                ? 'bg-emerald-100 text-emerald-800 font-bold'
+                : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
+                }`}
+              title="Inventory Catalog"
+            >
+              <Package className="w-4 h-4" />
+            </button>
 
-        {/* Reports Nav */}
-        <button
-          onClick={() => dispatch(navigateTo('REPORTS'))}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'REPORTS'
-            ? 'bg-blue-100 text-blue-800 font-bold'
-            : 'text-slate-500 hover:text-blue-700 hover:bg-blue-50'
-            }`}
-          title="Sales Reports & GST Analytics"
-        >
-          <BarChart3 className="w-4 h-4" />
-        </button>
+            {/* Inventory Shelf & Price Dashboard Nav (Manager/Owner Only) */}
+            {isManager && (
+              <button
+                onClick={() => dispatch(navigateTo('INVENTORY_DASHBOARD'))}
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'INVENTORY_DASHBOARD'
+                  ? 'bg-teal-100 text-teal-800 font-bold shadow-2xs'
+                  : 'text-slate-500 hover:text-teal-700 hover:bg-teal-50'
+                  }`}
+                title="Inventory Shelf, Expiry & Pricing Dashboard (Manager)"
+              >
+                <BarChart3 className="w-4 h-4 text-teal-600" />
+              </button>
+            )}
 
-        {/* Returns & Refunds Nav */}
-        <button
-          onClick={() => dispatch(navigateTo('RETURNS'))}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'RETURNS'
-            ? 'bg-rose-100 text-rose-800 font-bold'
-            : 'text-slate-500 hover:text-rose-700 hover:bg-rose-50'
-            }`}
-          title="Returns & Refund Credit Notes"
-        >
-          <RotateCcw className="w-4 h-4" />
-        </button>
+            {/* Stock Purchase GRN Nav (Manager/Owner Only) */}
+            {isManager && (
+              <button
+                onClick={() => dispatch(navigateTo('PURCHASE_GRN'))}
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'PURCHASE_GRN'
+                  ? 'bg-amber-100 text-amber-800 font-bold'
+                  : 'text-slate-500 hover:text-amber-700 hover:bg-amber-50'
+                  }`}
+                title="Stock Purchase GRN (Manager)"
+              >
+                <Truck className="w-4 h-4" />
+              </button>
+            )}
 
-        {/* Expiry Management Nav */}
-        <button
-          onClick={() => dispatch(navigateTo('EXPIRY_MANAGEMENT'))}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'EXPIRY_MANAGEMENT'
-            ? 'bg-amber-100 text-amber-800 font-bold'
-            : 'text-slate-500 hover:text-amber-700 hover:bg-amber-50'
-            }`}
-          title="Expiry & Stock Disposal Management"
-        >
-          <Clock className="w-4 h-4 text-amber-600" />
-        </button>
+            {/* Reports Nav (Manager/Owner Only) */}
+            {isManager && (
+              <button
+                onClick={() => dispatch(navigateTo('REPORTS'))}
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'REPORTS'
+                  ? 'bg-blue-100 text-blue-800 font-bold'
+                  : 'text-slate-500 hover:text-blue-700 hover:bg-blue-50'
+                  }`}
+                title="Sales Reports & GST Analytics (Manager)"
+              >
+                <BarChart3 className="w-4 h-4" />
+              </button>
+            )}
 
-        {/* Patients Directory Nav */}
-        <button
-          onClick={() => dispatch(navigateTo('PATIENTS'))}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'PATIENTS'
-            ? 'bg-orange-100 text-orange-800 font-bold'
-            : 'text-slate-500 hover:text-orange-700 hover:bg-orange-50'
-            }`}
-          title="Patients History Directory"
-        >
-          <Users className="w-4 h-4" />
-        </button>
+            {/* Returns & Refunds Nav */}
+            <button
+              onClick={() => dispatch(navigateTo('RETURNS'))}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'RETURNS'
+                ? 'bg-rose-100 text-rose-800 font-bold'
+                : 'text-slate-500 hover:text-rose-700 hover:bg-rose-50'
+                }`}
+              title="Returns & Refund Credit Notes"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
 
-        {/* Suppliers Directory Nav */}
-        <button
-          onClick={() => dispatch(navigateTo('SUPPLIERS'))}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'SUPPLIERS'
-            ? 'bg-emerald-100 text-emerald-800 font-bold'
-            : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
-            }`}
-          title="Suppliers & Vendors Directory"
-        >
-          <Building className="w-4 h-4" />
-        </button>
+            {/* Expiry Management Nav (Manager/Owner Only) */}
+            {isManager && (
+              <button
+                onClick={() => dispatch(navigateTo('EXPIRY_MANAGEMENT'))}
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'EXPIRY_MANAGEMENT'
+                  ? 'bg-amber-100 text-amber-800 font-bold'
+                  : 'text-slate-500 hover:text-amber-700 hover:bg-amber-50'
+                  }`}
+                title="Expiry & Stock Disposal Management (Manager)"
+              >
+                <Clock className="w-4 h-4 text-amber-600" />
+              </button>
+            )}
 
-        {/* Store Settings & Hardware Nav */}
-        <button
-          onClick={() => dispatch(navigateTo('SETTINGS'))}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'SETTINGS'
-            ? 'bg-slate-800 text-white font-bold shadow-xs'
-            : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          title="Store Settings & Hardware Config"
-        >
-          <Settings className="w-4 h-4" />
-        </button>
+            {/* Patients Directory Nav */}
+            <button
+              onClick={() => dispatch(navigateTo('PATIENTS'))}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'PATIENTS'
+                ? 'bg-orange-100 text-orange-800 font-bold'
+                : 'text-slate-500 hover:text-orange-700 hover:bg-orange-50'
+                }`}
+              title="Patients History Directory"
+            >
+              <Users className="w-4 h-4" />
+            </button>
+
+            {/* Suppliers Directory Nav (Manager/Owner Only) */}
+            {isManager && (
+              <button
+                onClick={() => dispatch(navigateTo('SUPPLIERS'))}
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'SUPPLIERS'
+                  ? 'bg-emerald-100 text-emerald-800 font-bold'
+                  : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
+                  }`}
+                title="Suppliers & Vendors Directory (Manager)"
+              >
+                <Building className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Store Settings & Hardware Nav (Manager/Owner Only) */}
+            {isManager && (
+              <button
+                onClick={() => dispatch(navigateTo('SETTINGS'))}
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'SETTINGS'
+                  ? 'bg-slate-800 text-white font-bold shadow-xs'
+                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                title="Store Settings & Hardware Config (Manager)"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+            )}
+          </>
+        )}
 
         {/* Emergency Delivery Nav - Icon Only */}
         <button
@@ -565,6 +622,14 @@ export const Navbar: React.FC = () => {
                     <h4 className="text-xs font-bold text-slate-900 truncate" title={accountName}>
                       {accountName}
                     </h4>
+                    <span className={`inline-block mt-0.5 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                      userRole === 'OWNER' ? 'bg-amber-100 text-amber-800 border border-amber-300' :
+                      userRole === 'MANAGER' ? 'bg-blue-100 text-blue-800 border border-blue-300' :
+                      userRole === 'EMERGENCY_DESK' ? 'bg-rose-100 text-rose-800 border border-rose-300' :
+                      'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    }`}>
+                      {userRole}
+                    </span>
                   </div>
                 </div>
 
@@ -575,16 +640,18 @@ export const Navbar: React.FC = () => {
                     </p>
                   </div>
 
-                  <button
-                    onClick={() => {
-                      setShowProfileDropdown(false);
-                      dispatch(navigateTo('SETTINGS'));
-                    }}
-                    className="w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-bold rounded-xl border border-slate-200 transition-colors flex items-center justify-center space-x-1.5 cursor-pointer active:scale-98"
-                  >
-                    <Settings className="w-3.5 h-3.5 text-slate-600" />
-                    <span>Store Settings &amp; Hardware</span>
-                  </button>
+                  {isManager && (
+                    <button
+                      onClick={() => {
+                        setShowProfileDropdown(false);
+                        dispatch(navigateTo('SETTINGS'));
+                      }}
+                      className="w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-bold rounded-xl border border-slate-200 transition-colors flex items-center justify-center space-x-1.5 cursor-pointer active:scale-98"
+                    >
+                      <Settings className="w-3.5 h-3.5 text-slate-600" />
+                      <span>Store Settings &amp; Hardware</span>
+                    </button>
+                  )}
 
                   <button
                     onClick={() => {

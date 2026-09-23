@@ -3,12 +3,13 @@ import mongoose from 'mongoose';
 import { GRNEntry } from '../models/GRNEntry';
 import { getNextSequence } from '../models/Counter';
 import { addStock } from '../services/stockService';
-import { protect, AuthRequest } from '../middleware/auth';
+import { protect, requireRole, AuthRequest } from '../middleware/auth';
+import { io } from '../index';
 
 const router = Router();
 
 // POST /api/grn
-router.post('/', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/', protect, requireRole('MANAGER', 'OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { supplierName, supplierId, supplierInvoiceNo, receivedDate, items, totalAmount } = req.body;
 
@@ -32,6 +33,10 @@ router.post('/', protect, async (req: AuthRequest, res: Response, next: NextFunc
     const [grn] = await GRNEntry.create(
       [{ grnNumber, supplierName, supplierId, supplierInvoiceNo, receivedDate: receivedDate ? new Date(receivedDate) : new Date(), items, totalAmount, status: 'COMPLETED', createdBy: req.user!.id }]
     );
+
+    try {
+      io.emit('stock:updated', { source: 'GRN', grnNumber: grn.grnNumber, itemsAdded: items.length });
+    } catch (e) {}
 
     res.status(201).json({ success: true, data: grn });
   } catch (err) {
@@ -62,7 +67,7 @@ router.get('/:id', protect, async (req: AuthRequest, res: Response, next: NextFu
 });
 
 // PUT /api/grn/:id/status
-router.put('/:id/status', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.put('/:id/status', protect, requireRole('MANAGER', 'OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const grn = await GRNEntry.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
     res.json({ success: true, data: grn });

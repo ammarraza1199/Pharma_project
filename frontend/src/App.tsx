@@ -1,6 +1,9 @@
-import React from 'react';
-import { useSelector } from 'react-redux';
+import React, { useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from './store';
+import { setAllProducts } from './store/posSlice';
+import api from './utils/api';
+import { getSocket } from './utils/socket';
 import { LandingPage } from './components/LandingPage';
 import { AuthPage } from './components/AuthPage';
 import { Navbar } from './components/Navbar';
@@ -41,7 +44,37 @@ import { ClearanceGiftModal } from './components/ClearanceGiftModal';
 import { RackSelectionRoboModal } from './components/RackSelectionRoboModal';
 
 export const App: React.FC = () => {
+  const dispatch = useDispatch();
   const currentView = useSelector((state: RootState) => state.pos.currentView);
+
+  // Synchronize products from Express API & Socket.IO events
+  useEffect(() => {
+    const fetchFreshProducts = async () => {
+      try {
+        const res = await api.get('/products?limit=100');
+        if (res.data?.success && Array.isArray(res.data.data) && res.data.data.length > 0) {
+          dispatch(setAllProducts(res.data.data));
+        }
+      } catch {
+        // Fallback to local offline catalog if server unavailable
+      }
+    };
+
+    fetchFreshProducts();
+
+    const socket = getSocket();
+    const handleRemoteUpdate = () => {
+      fetchFreshProducts();
+    };
+
+    socket.on('stock:updated', handleRemoteUpdate);
+    socket.on('invoice:created', handleRemoteUpdate);
+
+    return () => {
+      socket.off('stock:updated', handleRemoteUpdate);
+      socket.off('invoice:created', handleRemoteUpdate);
+    };
+  }, [dispatch]);
 
   if (currentView === 'LANDING') return <LandingPage />;
   if (currentView === 'AUTH')    return <AuthPage />;

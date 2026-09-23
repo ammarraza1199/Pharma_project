@@ -6,7 +6,8 @@ import type { GRNItem, GRNEntry } from '../types/pos';
 import api from '../utils/api';
 import {
   Loader2,
-  Package, Plus, CheckCircle2, Trash2, FileText, Building, Calendar, Truck
+  Package, Plus, CheckCircle2, Trash2, FileText, Building, Calendar, Truck,
+  Eye, X, Printer
 } from 'lucide-react';
 
 export const PurchaseGRNPage: React.FC = () => {
@@ -16,6 +17,8 @@ export const PurchaseGRNPage: React.FC = () => {
 
   const [grnHistoryFromApi, setGrnHistoryFromApi] = useState<any[]>([]);
   const [grnHistoryLoading, setGrnHistoryLoading] = useState<boolean>(true);
+  const [selectedGrnDetail, setSelectedGrnDetail] = useState<any | null>(null);
+  const [detailLoading, setDetailLoading] = useState<boolean>(false);
 
   // ── Fetch GRN history from API on mount ────────────────────────
   useEffect(() => {
@@ -33,6 +36,28 @@ export const PurchaseGRNPage: React.FC = () => {
     };
     fetchGrnHistory();
   }, []);
+
+  const handleViewGrnDetail = async (grn: any) => {
+    const grnId = grn._id || grn.grnId;
+    if (grnId && typeof grnId === 'string' && grnId.length === 24) {
+      setDetailLoading(true);
+      try {
+        const res = await api.get(`/grn/${grnId}`);
+        if (res.data.success && res.data.data) {
+          setSelectedGrnDetail(res.data.data);
+        } else {
+          setSelectedGrnDetail(grn);
+        }
+      } catch (err) {
+        console.error('[PurchaseGRNPage] Failed to fetch GRN detail:', err);
+        setSelectedGrnDetail(grn);
+      } finally {
+        setDetailLoading(false);
+      }
+    } else {
+      setSelectedGrnDetail(grn);
+    }
+  };
 
   const grnDisplayList = grnHistoryFromApi.length > 0 ? grnHistoryFromApi : grnEntries;
 
@@ -387,7 +412,7 @@ export const PurchaseGRNPage: React.FC = () => {
         ) : (
           <div className="space-y-2">
             {grnDisplayList.map((grn: any, idx: number) => (
-              <div key={grn.grnId || grn._id || idx} className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex justify-between items-center text-xs">
+              <div key={grn.grnId || grn._id || idx} className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex justify-between items-center text-xs flex-wrap gap-2">
                 <div>
                   <span className="font-mono font-bold text-slate-800">{grn.grnNumber}</span>
                   <span className="text-slate-400 mx-2">•</span>
@@ -395,17 +420,106 @@ export const PurchaseGRNPage: React.FC = () => {
                   <span className="text-slate-400 mx-2">•</span>
                   <span className="text-slate-500">Inv #: {grn.supplierInvoiceNo}</span>
                 </div>
-                <div className="text-right">
+                <div className="flex items-center space-x-3">
                   <span className="font-bold text-amber-800">₹{grn.totalAmount?.toFixed(2)}</span>
-                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full ml-2">
-                    {grn.items?.length || '?'} Items Received
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+                    {grn.items?.length || '?'} Items
                   </span>
+                  <button
+                    onClick={() => handleViewGrnDetail(grn)}
+                    className="flex items-center space-x-1 px-2.5 py-1 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-[11px] font-bold rounded-lg shadow-2xs cursor-pointer transition-colors"
+                  >
+                    <Eye className="w-3.5 h-3.5 text-slate-500" />
+                    <span>View</span>
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* ── GRN DETAIL VIEW MODAL ─────────────────────────────────────── */}
+      {selectedGrnDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="glass-modal rounded-2xl max-w-4xl w-full p-5 shadow-2xl border border-slate-200 relative max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-3 flex-shrink-0">
+              <div className="flex items-center space-x-2 text-amber-800">
+                <div className="p-2 bg-amber-100 rounded-xl">
+                  <FileText className="w-5 h-5 text-amber-700" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold font-heading text-slate-900 leading-tight">
+                    GRN Receipt Detail — {selectedGrnDetail.grnNumber}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Supplier: <strong className="text-slate-700">{selectedGrnDetail.supplierName}</strong> &nbsp;·&nbsp;
+                    Invoice #: <strong className="text-slate-700">{selectedGrnDetail.supplierInvoiceNo}</strong> &nbsp;·&nbsp;
+                    Date: {new Date(selectedGrnDetail.receivedDate || selectedGrnDetail.createdAt || Date.now()).toLocaleDateString('en-IN')}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedGrnDetail(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Line Items Table */}
+            <div className="overflow-y-auto flex-1 border border-slate-200 rounded-xl">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                    <th className="px-3 py-2.5">Item Name</th>
+                    <th className="px-2.5 py-2.5 text-center">Batch No</th>
+                    <th className="px-2.5 py-2.5 text-center">Expiry</th>
+                    <th className="px-2.5 py-2.5 text-center">Qty Received</th>
+                    <th className="px-2.5 py-2.5 text-right">Cost Rate</th>
+                    <th className="px-2.5 py-2.5 text-right">Selling Price</th>
+                    <th className="px-2.5 py-2.5 text-right">MRP</th>
+                    <th className="px-3 py-2.5 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {(selectedGrnDetail.items || []).map((item: any, i: number) => (
+                    <tr key={i} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-3 py-2 font-bold text-slate-900">{item.productName || item.name || 'Medicine'}</td>
+                      <td className="px-2.5 py-2 text-center font-mono text-slate-700">{item.batchNumber}</td>
+                      <td className="px-2.5 py-2 text-center text-slate-500">{typeof item.expiryDate === 'string' ? item.expiryDate.split('T')[0] : 'N/A'}</td>
+                      <td className="px-2.5 py-2 text-center font-black text-slate-900">{item.quantity}</td>
+                      <td className="px-2.5 py-2 text-right text-amber-800 font-semibold">₹{Number(item.purchaseRate || 0).toFixed(2)}</td>
+                      <td className="px-2.5 py-2 text-right text-emerald-800 font-semibold">₹{Number(item.sellingPrice || 0).toFixed(2)}</td>
+                      <td className="px-2.5 py-2 text-right text-slate-600">₹{Number(item.mrp || 0).toFixed(2)}</td>
+                      <td className="px-3 py-2 text-right font-black text-slate-900">₹{Number(item.totalAmount || (item.quantity * item.purchaseRate) || 0).toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="pt-3 border-t border-slate-200 flex items-center justify-between mt-3 flex-shrink-0">
+              <span className="text-xs font-semibold text-slate-500">
+                Status: <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  {selectedGrnDetail.status || 'COMPLETED'}
+                </span>
+              </span>
+              <div className="flex items-center space-x-3">
+                <span className="text-sm font-black text-slate-900 font-heading">
+                  Total GRN Amount: <span className="text-amber-800">₹{Number(selectedGrnDetail.totalAmount || 0).toFixed(2)}</span>
+                </span>
+                <button
+                  onClick={() => setSelectedGrnDetail(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

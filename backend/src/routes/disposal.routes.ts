@@ -4,12 +4,13 @@ import bcrypt from 'bcryptjs';
 import { DisposalRecord } from '../models/DisposalRecord';
 import { StoreSettings } from '../models/StoreSettings';
 import { disposeStock } from '../services/stockService';
-import { protect, AuthRequest } from '../middleware/auth';
+import { protect, requireRole, AuthRequest } from '../middleware/auth';
+import { io } from '../index';
 
 const router = Router();
 
 // POST /api/disposal
-router.post('/', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/', protect, requireRole('MANAGER', 'OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
@@ -32,6 +33,11 @@ router.post('/', protect, async (req: AuthRequest, res: Response, next: NextFunc
     );
 
     await session.commitTransaction();
+
+    try {
+      io.emit('stock:updated', { source: 'DISPOSAL', productId, batchNumber, quantity: quantityDisposed });
+    } catch (e) {}
+
     res.status(201).json({ success: true, data: record });
   } catch (err) {
     await session.abortTransaction();
@@ -42,7 +48,7 @@ router.post('/', protect, async (req: AuthRequest, res: Response, next: NextFunc
 });
 
 // GET /api/disposal
-router.get('/', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/', protect, requireRole('MANAGER', 'OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const records = await DisposalRecord.find().sort({ createdAt: -1 }).limit(100);
     res.json({ success: true, data: records });

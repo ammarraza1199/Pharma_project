@@ -112,4 +112,47 @@ router.delete('/held-bills/:id', protect, async (req: AuthRequest, res: Response
   } catch (err) { next(err); }
 });
 
+// PATCH /api/billing/held-bills/:id/assign — Multi-Counter Delegation
+router.patch('/held-bills/:id/assign', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { targetPharmacistId, targetCounter, note } = req.body;
+    if (mongoose.connection.readyState !== 1) {
+      const bill = inMemoryHeldBills.find(b => b.id === req.params.id || b._id === req.params.id);
+      if (!bill) return res.status(404).json({ success: false, message: 'Held bill not found.' });
+      bill.assignedPharmacistId = targetPharmacistId;
+      bill.assignedCounter = targetCounter;
+      bill.note = note || bill.note;
+      return res.json({ success: true, data: bill, message: 'Bill delegated to counter.' });
+    }
+
+    const bill = await HeldBill.findByIdAndUpdate(
+      req.params.id,
+      {
+        $set: {
+          assignedPharmacistId: targetPharmacistId,
+          assignedCounter: targetCounter,
+          note: note || '',
+        },
+      },
+      { new: true }
+    );
+
+    if (!bill) return res.status(404).json({ success: false, message: 'Held bill not found.' });
+    res.json({ success: true, data: bill, message: 'Bill successfully delegated to target counter.' });
+  } catch (err) { next(err); }
+});
+
+// GET /api/billing/counters — Multi-Counter Registry & Active Status
+router.get('/counters', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const counters = [
+      { id: 'counter-1', counterNumber: 1, name: 'Counter 1 (Main Fast-Track)', status: 'ACTIVE', queueLength: 0 },
+      { id: 'counter-2', counterNumber: 2, name: 'Counter 2 (Maternity & Chronic Care)', status: 'ACTIVE', queueLength: 0 },
+      { id: 'counter-3', counterNumber: 3, name: 'Counter 3 (General Rx)', status: 'ACTIVE', queueLength: 0 },
+      { id: 'counter-sos', counterNumber: 9, name: 'Emergency SOS Rapid Desk', status: 'ACTIVE', queueLength: 0 },
+    ];
+    res.json({ success: true, data: counters });
+  } catch (err) { next(err); }
+});
+
 export default router;

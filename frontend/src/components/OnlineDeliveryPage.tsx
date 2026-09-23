@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import {
+  setDeliveryOrders,
   addDeliveryOrder,
   updateDeliveryOrderStatus,
   deleteDeliveryOrder,
@@ -10,6 +11,7 @@ import {
   navigateTo
 } from '../store/posSlice';
 import type { DeliveryOrder, DeliveryStatus, DeliveryType, DeliveryMode } from '../types/pos';
+import api from '../utils/api';
 import {
   Bike, Clock, CheckCircle2, AlertTriangle, Package,
   XCircle, Plus, Phone, MapPin, Pill, ShieldCheck, ShieldAlert,
@@ -96,6 +98,46 @@ export const OnlineDeliveryPage: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<DeliveryOrder | null>(null);
   const [form, setForm] = useState<NewOrderForm>(EMPTY_FORM);
 
+  // Sync delivery orders from backend on mount
+  useEffect(() => {
+    api.get('/delivery-orders?limit=100')
+      .then(res => {
+        if (res.data?.data && Array.isArray(res.data.data) && res.data.data.length > 0) {
+          const mapped: DeliveryOrder[] = res.data.data.map((o: any) => ({
+            orderId: o.orderId || o._id?.toString() || `del-${Date.now()}`,
+            orderNumber: o.orderNumber,
+            customerName: o.customerName,
+            customerPhone: o.customerPhone,
+            deliveryMode: o.deliveryMode || 'HOME_DELIVERY',
+            deliveryAddress: o.deliveryAddress,
+            pickupCounter: o.pickupCounter,
+            items: o.items || [],
+            totalAmount: o.totalAmount || 0,
+            status: o.status || 'PENDING',
+            deliveryType: o.deliveryType || 'STANDARD',
+            timeSlot: o.timeSlot,
+            estimatedDeliveryTime: o.estimatedDeliveryTime,
+            actualDeliveryTime: o.actualDeliveryTime,
+            assignedRider: o.assignedRider,
+            riderPhone: o.riderPhone,
+            prescriptionRequired: !!o.prescriptionRequired,
+            prescriptionVerified: !!o.prescriptionVerified,
+            verificationDeadline: o.verificationDeadline,
+            pharmacistName: o.pharmacistName,
+            invoiceNumber: o.invoiceNumber,
+            isDiscreetPackaging: !!o.isDiscreetPackaging,
+            notes: o.notes,
+            createdAt: o.createdAt || new Date().toISOString(),
+            updatedAt: o.updatedAt || new Date().toISOString()
+          }));
+          dispatch(setDeliveryOrders(mapped));
+        }
+      })
+      .catch(err => {
+        console.warn('Could not fetch delivery orders from backend API, continuing with local store:', err);
+      });
+  }, [dispatch]);
+
   const totalOrders   = deliveryOrders.length;
   const homeCount     = deliveryOrders.filter(o => o.deliveryMode === 'HOME_DELIVERY' || !o.deliveryMode).length;
   const pickupCount   = deliveryOrders.filter(o => o.deliveryMode === 'STORE_PICKUP').length;
@@ -119,7 +161,12 @@ export const OnlineDeliveryPage: React.FC = () => {
     return matchTab && matchSearch;
   });
 
-  const handleStatusChange = (orderId: string, status: DeliveryStatus) => {
+  const handleStatusChange = async (orderId: string, status: DeliveryStatus) => {
+    try {
+      await api.put(`/delivery-orders/${orderId}/status`, { status });
+    } catch (err) {
+      console.warn('Failed to update delivery order status on backend:', err);
+    }
     dispatch(updateDeliveryOrderStatus({
       orderId, status,
       actualDeliveryTime: status === 'DELIVERED' ? new Date().toISOString() : undefined
@@ -127,23 +174,48 @@ export const OnlineDeliveryPage: React.FC = () => {
     setSelectedOrder(prev => prev ? { ...prev, status } : null);
   };
 
-  const handleVerifyPrescription = (orderId: string) => {
+  const handleVerifyPrescription = async (orderId: string) => {
+    try {
+      await api.put(`/delivery-orders/${orderId}/prescription`, {});
+    } catch (err) {
+      console.warn('Failed to update prescription verification on backend:', err);
+    }
     dispatch(toggleOrderPrescriptionVerification(orderId));
     setSelectedOrder(prev => prev ? { ...prev, prescriptionVerified: !prev.prescriptionVerified } : null);
   };
 
-  const handleGenerateInvoice = (order: DeliveryOrder) => {
+  const handleGenerateInvoice = async (order: DeliveryOrder) => {
     dispatch(convertDeliveryOrderToInvoice({ orderId: order.orderId, paymentMode: 'UPI' }));
+    try {
+      await api.put(`/delivery-orders/${order.orderId}/status`, {
+        status: 'DELIVERED',
+        invoiceNumber: order.invoiceNumber || `INV-DLV-${order.orderNumber}`
+      });
+    } catch (err) {
+      console.warn('Failed to mark delivery order as delivered on backend:', err);
+    }
     setSelectedOrder(null);
     dispatch(navigateTo('INVOICES'));
   };
 
-  const handleNewOrder = (e: React.FormEvent) => {
+  const handleDeleteOrder = async (orderId: string) => {
+    if (!window.confirm('Are you sure you want to delete this delivery order?')) return;
+    try {
+      await api.delete(`/delivery-orders/${orderId}`);
+    } catch (err) {
+      console.warn('Failed to delete delivery order on backend:', err);
+    }
+    dispatch(deleteDeliveryOrder(orderId));
+    setSelectedOrder(null);
+  };
+
+  const handleNewOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     const createdDate = new Date();
     const deadline = new Date(createdDate.getTime() + 24 * 3600000).toISOString(); // 24 Hours SLA
+    const estTime = new Date(Date.now() + (form.deliveryType === 'EXPRESS' ? 30 : 90) * 60000).toISOString();
 
-    dispatch(addDeliveryOrder({
+    const orderPayload = {
       customerName: form.customerName,
       customerPhone: form.customerPhone,
       deliveryMode: form.deliveryMode,
@@ -152,14 +224,35 @@ export const OnlineDeliveryPage: React.FC = () => {
       timeSlot: form.timeSlot,
       items: [{ productId: `prod-${Date.now()}`, productName: form.productName, quantity: form.quantity, unitPrice: form.unitPrice, lineTotal: form.quantity * form.unitPrice }],
       totalAmount: form.quantity * form.unitPrice,
-      status: 'PENDING',
+      status: 'PENDING' as DeliveryStatus,
       deliveryType: form.deliveryType,
-      estimatedDeliveryTime: new Date(Date.now() + (form.deliveryType === 'EXPRESS' ? 30 : 90) * 60000).toISOString(),
+      estimatedDeliveryTime: estTime,
       prescriptionRequired: form.prescriptionRequired,
       prescriptionVerified: false,
       verificationDeadline: deadline,
       notes: form.notes
-    }));
+    };
+
+    try {
+      const res = await api.post('/delivery-orders', orderPayload);
+      if (res.data?.data) {
+        const saved = res.data.data;
+        const newOrder: DeliveryOrder = {
+          ...orderPayload,
+          orderId: saved.orderId || saved._id?.toString() || `del-${Date.now()}`,
+          orderNumber: saved.orderNumber || `ODR-2026-${String(deliveryOrders.length + 1).padStart(3, '0')}`,
+          createdAt: saved.createdAt || new Date().toISOString(),
+          updatedAt: saved.updatedAt || new Date().toISOString()
+        };
+        dispatch(addDeliveryOrder(newOrder));
+      } else {
+        dispatch(addDeliveryOrder(orderPayload));
+      }
+    } catch (err) {
+      console.warn('Failed to persist delivery order to backend, saving in local state:', err);
+      dispatch(addDeliveryOrder(orderPayload));
+    }
+
     setForm(EMPTY_FORM);
     setShowNewOrderModal(false);
   };
@@ -522,7 +615,7 @@ export const OnlineDeliveryPage: React.FC = () => {
 
               {/* Delete */}
               <button
-                onClick={() => { dispatch(deleteDeliveryOrder(selectedOrder.orderId)); setSelectedOrder(null); }}
+                onClick={() => handleDeleteOrder(selectedOrder.orderId)}
                 className="w-full flex items-center justify-center space-x-1.5 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-xl py-2.5 transition-colors cursor-pointer font-bold">
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Delete Order</span>

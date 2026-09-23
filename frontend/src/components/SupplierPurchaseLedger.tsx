@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import { recordSupplierPayment, addSupplierBill } from '../store/posSlice';
 import type { SupplierBill } from '../types/pos';
+import api from '../utils/api';
 import {
   FileText, DollarSign, Clock, AlertTriangle, CheckCircle2,
   Calendar, Building, Plus, Search, Filter, MessageSquare,
-  CreditCard, ArrowUpRight, History, X, Check, ShieldAlert
+  CreditCard, ArrowUpRight, History, X, Check, ShieldAlert,
+  Truck, Loader2, ChevronDown, ChevronUp
 } from 'lucide-react';
 
 interface Props {
@@ -20,10 +22,70 @@ export const SupplierPurchaseLedger: React.FC<Props> = ({ onSwitchToPO }) => {
   const paymentLogs = useSelector((state: RootState) => state.pos.supplierPaymentLogs);
   const storeSettings = useSelector((state: RootState) => state.pos.settings);
 
+  // Live API Suppliers & Selected Vendor GRN History
+  const [apiSuppliers, setApiSuppliers] = useState<any[]>([]);
+  const [selectedSupplierDetail, setSelectedSupplierDetail] = useState<{ supplier: any; grnHistory: any[] } | null>(null);
+  const [grnHistoryLoading, setGrnHistoryLoading] = useState<boolean>(false);
+
+  // Fetch suppliers on mount
+  useEffect(() => {
+    const fetchSuppliers = async () => {
+      try {
+        const res = await api.get('/suppliers');
+        if (res.data.success && Array.isArray(res.data.data)) {
+          setApiSuppliers(res.data.data);
+        }
+      } catch (err) {
+        console.warn('[SupplierPurchaseLedger] Failed to fetch suppliers from backend:', err);
+      }
+    };
+    fetchSuppliers();
+  }, []);
+
+  // Combined Suppliers List
+  const allSuppliers = useMemo(() => {
+    const map = new Map<string, any>();
+    apiSuppliers.forEach(s => {
+      map.set(s._id || s.supplierId, { ...s, supplierId: s._id || s.supplierId });
+    });
+    suppliers.forEach(s => {
+      if (!map.has(s.supplierId)) map.set(s.supplierId, s);
+    });
+    return Array.from(map.values());
+  }, [apiSuppliers, suppliers]);
+
   // Filter state
   const [activeTab, setActiveTab] = useState<'ALL' | 'CREDIT' | 'OVERDUE' | 'CASH' | 'LOGS'>('CREDIT');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedSupplierFilter, setSelectedSupplierFilter] = useState<string>('ALL');
+
+  // When selectedSupplierFilter changes, fetch vendor GRN history
+  useEffect(() => {
+    if (selectedSupplierFilter && selectedSupplierFilter !== 'ALL') {
+      const fetchDetail = async () => {
+        setGrnHistoryLoading(true);
+        try {
+          const sup = allSuppliers.find(s => s.supplierId === selectedSupplierFilter || s._id === selectedSupplierFilter);
+          const targetId = sup?._id || selectedSupplierFilter;
+          if (targetId && targetId.length === 24) {
+            const res = await api.get(`/suppliers/${targetId}`);
+            if (res.data.success && res.data.data) {
+              setSelectedSupplierDetail(res.data.data);
+            }
+          } else {
+            setSelectedSupplierDetail(null);
+          }
+        } catch (err) {
+          console.warn('[SupplierPurchaseLedger] Failed to fetch supplier detail/grnHistory:', err);
+        } finally {
+          setGrnHistoryLoading(false);
+        }
+      };
+      fetchDetail();
+    } else {
+      setSelectedSupplierDetail(null);
+    }
+  }, [selectedSupplierFilter, allSuppliers]);
 
   // Settlement Modal State
   const [settlementBill, setSettlementBill] = useState<SupplierBill | null>(null);
@@ -102,9 +164,19 @@ export const SupplierPurchaseLedger: React.FC<Props> = ({ onSwitchToPO }) => {
   };
 
   // Submit Settlement Payment
-  const handleSubmitPayment = (e: React.FormEvent) => {
+  const handleSubmitPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!settlementBill || paymentAmount <= 0) return;
+
+    try {
+      const sup = allSuppliers.find(s => s.supplierId === settlementBill.supplierId || s._id === settlementBill.supplierId);
+      const targetId = sup?._id;
+      if (targetId && targetId.length === 24) {
+        await api.put(`/suppliers/${targetId}/balance`, { amount: Number(paymentAmount) });
+      }
+    } catch (err) {
+      console.warn('[SupplierPurchaseLedger] Failed to update supplier balance on server:', err);
+    }
 
     dispatch(recordSupplierPayment({
       supplierId: settlementBill.supplierId,
@@ -340,7 +412,7 @@ export const SupplierPurchaseLedger: React.FC<Props> = ({ onSwitchToPO }) => {
                 className="text-xs bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-1.5 font-semibold text-slate-700"
               >
                 <option value="ALL">All Vendors</option>
-                {suppliers.map(s => (
+                {allSuppliers.map(s => (
                   <option key={s.supplierId} value={s.supplierId}>{s.name}</option>
                 ))}
               </select>
@@ -356,6 +428,48 @@ export const SupplierPurchaseLedger: React.FC<Props> = ({ onSwitchToPO }) => {
           )}
         </div>
       </div>
+
+      {/* ── VENDOR GRN INWARD HISTORY (Live from GET /api/suppliers/:id) ── */}
+      {selectedSupplierDetail && selectedSupplierDetail.grnHistory && selectedSupplierDetail.grnHistory.length > 0 && (
+        <div className="bg-white rounded-2xl border border-amber-200 bg-amber-50/20 p-4 shadow-xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <div className="p-1.5 bg-amber-100 rounded-lg">
+                <Truck className="w-4 h-4 text-amber-700" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-900 font-heading">
+                  Vendor GRN Inward Shipments ({selectedSupplierDetail.grnHistory.length} Receipts)
+                </h4>
+                <p className="text-[10.5px] text-slate-500">
+                  {selectedSupplierDetail.supplier?.name} &nbsp;·&nbsp; Outstanding Balance: ₹{(selectedSupplierDetail.supplier?.pendingBalance || 0).toLocaleString('en-IN')}
+                </p>
+              </div>
+            </div>
+            <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded-full">
+              Live Backend Inward Log
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 pt-1">
+            {selectedSupplierDetail.grnHistory.map((grn: any, idx: number) => (
+              <div key={grn._id || idx} className="bg-white border border-slate-200 rounded-xl p-3 text-xs space-y-1 shadow-2xs">
+                <div className="flex justify-between font-mono font-bold text-slate-800">
+                  <span>{grn.grnNumber}</span>
+                  <span className="text-amber-800">₹{Number(grn.totalAmount || 0).toFixed(2)}</span>
+                </div>
+                <div className="text-[11px] text-slate-500 flex justify-between">
+                  <span>Inv: {grn.supplierInvoiceNo}</span>
+                  <span>{new Date(grn.receivedDate || grn.createdAt).toLocaleDateString('en-IN')}</span>
+                </div>
+                <div className="text-[10px] text-emerald-700 font-bold">
+                  {grn.items?.length || 0} Batches Received &amp; Stocked
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── TABLE 1: PURCHASE INVOICES LEDGER ──────────────────────── */}
       {activeTab !== 'LOGS' ? (

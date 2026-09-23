@@ -66,14 +66,46 @@ The frontend is built with React, Vite, TypeScript, and TailwindCSS.
 
 ---
 
-## 3. Important Default Credentials
+## 3. Important Default Credentials & Sign-In Access (RBAC)
 
-The backend automatically creates default store settings upon its first startup. Here are the default PINs needed for authorization inside the app (like overriding Schedule X sales or handling stock disposals):
+The application implements a 4-tier **Role-Based Access Control (RBAC)** architecture. All accounts below are pre-registered and active in the MongoDB database with the default password: **`password123`**.
+
+### 👥 1. Role-Based Sign-In Accounts
+
+| Role | Role Title | Email Address | Password | Permissions & Key Capabilities |
+|---|---|---|---|---|
+| **`OWNER`** | Store Owner / Chief | `owner@genquantaa.com` | `password123` | **Full Master Privileges**: Staff management, user activation/deactivation, role promotion/demotion, permanent & soft deletions (products, patients, suppliers, purchase orders), store settings, master Owner PIN (`1234`). |
+| **`MANAGER`** | Pharmacy Manager | `manager@genquantaa.com` | `password123` | **Operational Oversight**: Adding/editing products & batches, verifying Goods Receipt Note (GRN) inward shipments, approving stock disposal, modifying store profile & tax rates, deleting invoices, CSV exports, Manager PIN (`1234`). |
+| **`PHARMACIST`** | Staff Pharmacist | `jane@healthfirst.com` | `password123` | **Front-Counter Operations**: Standard POS billing, drug & barcode search, FEFO batch selection, parking/holding bills, repeat chronic refills, customer convince cards, multilingual PIL generation, returns intake. |
+| **`EMERGENCY_DESK`** | Emergency Specialist | `emergency@genquantaa.com` | `password123` | **Rapid Response Billing**: Dedicated emergency kit billing (Snake Bite, Cardiac Arrest, Acute Asthma, Severe Burns), fast-track emergency invoice generation, priority stock allocation, 108 ambulance dispatch linkage. |
+
+---
+
+### 🛡️ 2. Fallback / Offline Seed Account
+In-memory administrator configured as fallback when running without MongoDB connection:
+
+| Field | Credential |
+|---|---|
+| **Email** | `admin@genquantaa.com` |
+| **Password** | `1234` |
+| **Pharmacist Name** | Ramesh Kumar (Lead Pharmacist) |
+| **Pharmacy Name** | GENQUANTAA MedPlus Pharmacy |
+| **Role** | `PHARMACIST` |
+
+---
+
+### 🚨 3. Emergency Desk Direct Sign-In Mode
+On the **Sign In** screen, enter your credentials and select the **🚨 Dr. S. Reddy (Chief Emergency)** workstation card at the bottom of the counter list. This automatically routes directly into the **Emergency Delivery Desk** terminal with pre-approved emergency inventory dispensing.
+
+---
+
+### 🔐 4. Manager & Owner Security PINs
+Default cryptographic PINs required for high-privilege in-app authorization (Schedule H/X compliance gates, hazardous stock disposal, master security overrides):
 
 - **Manager PIN:** `1234`
 - **Owner PIN:** `1234`
 
-*(These can be updated later from the Settings page in the application).*
+*(These can be re-configured anytime by an Owner or Manager from **Settings → Security & Authorization**).*
 
 ---
 
@@ -81,20 +113,20 @@ The backend automatically creates default store settings upon its first startup.
 
 ```text
 Pharma_project/
-├── backend/                # Node.js + Express API
+├── backend/                # Node.js + Express + TypeScript API
 │   ├── src/
 │   │   ├── config/         # DB & Env configurations
-│   │   ├── middleware/     # Auth & Error handling
-│   │   ├── models/         # Mongoose Schemas (11 collections)
-│   │   ├── routes/         # API Endpoints
-│   │   └── services/       # Core business logic (Stock, GST, Interactions)
+│   │   ├── middleware/     # Auth, RBAC & Error handling
+│   │   ├── models/         # Mongoose Schemas (Products, Invoices, DeliveryOrders, POs, Consultations, etc.)
+│   │   ├── routes/         # API Endpoints (Auth, Products, Billing, GRN, Returns, Delivery, etc.)
+│   │   └── services/       # Core business logic (Stock, GST, Drug Interactions)
 │   └── package.json
-└── frontend/               # React + Vite UI
+└── frontend/               # React + Vite + TypeScript + TailwindCSS UI
     ├── src/
-    │   ├── components/     # React Components & Pages
-    │   ├── store/          # Redux State Management
-    │   ├── types/          # TypeScript definitions
-    │   └── utils/          # Helper functions (GST calc, Number to Words)
+    │   ├── components/     # React Components (POS, Invoices, Delivery, Patients, Purchase Orders, etc.)
+    │   ├── store/          # Redux State Management (posSlice, store config)
+    │   ├── types/          # TypeScript Domain Definitions
+    │   └── utils/          # Helper functions (API Axios client, WhatsApp Share, GST Engine)
     └── package.json
 ```
 

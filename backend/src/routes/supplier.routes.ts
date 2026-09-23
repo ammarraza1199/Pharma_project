@@ -1,7 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { Supplier } from '../models/Supplier';
 import { GRNEntry } from '../models/GRNEntry';
-import { protect, AuthRequest } from '../middleware/auth';
+import { protect, requireRole, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
@@ -24,7 +24,7 @@ router.get('/:id', protect, async (req: AuthRequest, res: Response, next: NextFu
 });
 
 // POST /api/suppliers
-router.post('/', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/', protect, requireRole('MANAGER', 'OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const supplier = await Supplier.create(req.body);
     res.status(201).json({ success: true, data: supplier });
@@ -32,7 +32,7 @@ router.post('/', protect, async (req: AuthRequest, res: Response, next: NextFunc
 });
 
 // PUT /api/suppliers/:id
-router.put('/:id', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.put('/:id', protect, requireRole('MANAGER', 'OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const supplier = await Supplier.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!supplier) return res.status(404).json({ success: false, message: 'Supplier not found.' });
@@ -41,7 +41,7 @@ router.put('/:id', protect, async (req: AuthRequest, res: Response, next: NextFu
 });
 
 // PUT /api/suppliers/:id/balance
-router.put('/:id/balance', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.put('/:id/balance', protect, requireRole('MANAGER', 'OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { amount } = req.body;
     const supplier = await Supplier.findById(req.params.id);
@@ -53,7 +53,7 @@ router.put('/:id/balance', protect, async (req: AuthRequest, res: Response, next
 });
 
 // DELETE /api/suppliers/:id (soft delete — preserves GRN purchase history)
-router.delete('/:id', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.delete('/:id', protect, requireRole('OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const supplier = await Supplier.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
     if (!supplier) return res.status(404).json({ success: false, message: 'Supplier not found.' });

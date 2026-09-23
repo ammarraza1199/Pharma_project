@@ -6,7 +6,7 @@ export interface IUser extends Document {
   licenseNo: string;
   email: string;
   passwordHash: string;
-  role: 'PHARMACIST' | 'MANAGER' | 'OWNER';
+  role: 'PHARMACIST' | 'MANAGER' | 'OWNER' | 'EMERGENCY_DESK';
   isActive: boolean;
   loginAttempts: number;
   lockUntil?: Date;
@@ -23,7 +23,7 @@ const UserSchema = new Schema<IUser>(
     licenseNo: { type: String, default: '' },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
-    role: { type: String, enum: ['PHARMACIST', 'MANAGER', 'OWNER'], default: 'PHARMACIST' },
+    role: { type: String, enum: ['PHARMACIST', 'MANAGER', 'OWNER', 'EMERGENCY_DESK'], default: 'PHARMACIST' },
     isActive: { type: Boolean, default: true },
     loginAttempts: { type: Number, default: 0 },
     lockUntil: { type: Date },

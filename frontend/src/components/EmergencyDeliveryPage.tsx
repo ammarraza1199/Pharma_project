@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../store';
 import { finalizeEmergencyInvoice } from '../store/posSlice';
 import type { FinalizedInvoice, PaymentDetails, PaymentMethodType, CartItem } from '../types/pos';
+import api from '../utils/api';
 import {
   AlertTriangle, Zap, Phone, Clock, CheckCircle2, ChevronRight,
   User, MapPin, PackageCheck, Printer, RotateCcw, HeartPulse,
@@ -344,122 +345,142 @@ export const EmergencyDeliveryPage: React.FC = () => {
     setShowPaymentModal(true);
   };
 
-  const handleConfirmPayment = () => {
+  const handleConfirmPayment = async () => {
     if (!selectedKit) return;
     setIsSubmittingPayment(true);
 
-    setTimeout(() => {
-      const dispatched = selectedKit.drugs.filter(d => checkedSet.has(`${selectedKit.id}_${d.name}`));
-      setDispatchedDrugs(dispatched);
-      setBillGenerated(true);
-      setTimerActive(false);
+    const dispatched = selectedKit.drugs.filter(d => checkedSet.has(`${selectedKit.id}_${d.name}`));
+    setDispatchedDrugs(dispatched);
+    setBillGenerated(true);
+    setTimerActive(false);
 
-      const items: CartItem[] = dispatched.map((d, idx) => ({
-        cartItemId: `item-sos-${idx}-${Date.now()}`,
-        productId: `prod-sos-${idx}`,
-        product: {
-          _id: `prod-sos-${idx}`,
-          name: d.name,
-          brand: 'EMERGENCY PROTOCOL',
-          saltComposition: d.genericName,
-          barcode: `890123456${idx}`,
-          hsnCode: d.hsnCode,
-          gstRate: d.gstRate,
-          unitMRP: Number((d.unitPrice * 1.15).toFixed(2)),
-          sellingPrice: d.unitPrice,
-          grossMarginPercent: 20,
-          scheduleCategory: 'REGULAR',
-          stockStatus: 'IN_STOCK',
-          totalStock: 50,
-          packSize: d.unit,
-          batches: [{
-            batchNumber: `EM-B${Math.floor(100 + Math.random() * 900)}`,
-            expiryDate: '2028-12-31',
-            stockQuantity: 50,
-            location: 'EMERGENCY_RACK_01',
-            mrp: Number((d.unitPrice * 1.15).toFixed(2))
-          }]
-        },
-        selectedBatch: {
+    const items: CartItem[] = dispatched.map((d, idx) => ({
+      cartItemId: `item-sos-${idx}-${Date.now()}`,
+      productId: `prod-sos-${idx}`,
+      product: {
+        _id: `prod-sos-${idx}`,
+        name: d.name,
+        brand: 'EMERGENCY PROTOCOL',
+        saltComposition: d.genericName,
+        barcode: `890123456${idx}`,
+        hsnCode: d.hsnCode,
+        gstRate: d.gstRate,
+        unitMRP: Number((d.unitPrice * 1.15).toFixed(2)),
+        sellingPrice: d.unitPrice,
+        grossMarginPercent: 20,
+        scheduleCategory: 'REGULAR',
+        stockStatus: 'IN_STOCK',
+        totalStock: 50,
+        packSize: d.unit,
+        batches: [{
           batchNumber: `EM-B${Math.floor(100 + Math.random() * 900)}`,
           expiryDate: '2028-12-31',
           stockQuantity: 50,
           location: 'EMERGENCY_RACK_01',
           mrp: Number((d.unitPrice * 1.15).toFixed(2))
-        },
-        quantity: d.qty,
-        unitMode: 'PACK',
-        unitPrice: d.unitPrice,
-        discountPercent: 0,
-        taxableAmount: d.unitPrice * d.qty,
-        cgstAmount: (d.unitPrice * d.qty * (d.gstRate / 2)) / 100,
-        sgstAmount: (d.unitPrice * d.qty * (d.gstRate / 2)) / 100,
-        totalGst: (d.unitPrice * d.qty * d.gstRate) / 100,
-        lineTotal: (d.unitPrice * d.qty) + ((d.unitPrice * d.qty * d.gstRate) / 100)
-      }));
+        }]
+      },
+      selectedBatch: {
+        batchNumber: `EM-B${Math.floor(100 + Math.random() * 900)}`,
+        expiryDate: '2028-12-31',
+        stockQuantity: 50,
+        location: 'EMERGENCY_RACK_01',
+        mrp: Number((d.unitPrice * 1.15).toFixed(2))
+      },
+      quantity: d.qty,
+      unitMode: 'PACK',
+      unitPrice: d.unitPrice,
+      discountPercent: 0,
+      taxableAmount: d.unitPrice * d.qty,
+      cgstAmount: (d.unitPrice * d.qty * (d.gstRate / 2)) / 100,
+      sgstAmount: (d.unitPrice * d.qty * (d.gstRate / 2)) / 100,
+      totalGst: (d.unitPrice * d.qty * d.gstRate) / 100,
+      lineTotal: (d.unitPrice * d.qty) + ((d.unitPrice * d.qty * d.gstRate) / 100)
+    }));
 
-      const payment: PaymentDetails = {
-        method: paymentMethod,
-        cashAmount: paymentMethod === 'CASH' ? grandTotal : 0,
-        upiAmount: paymentMethod === 'UPI' ? grandTotal : 0,
-        cardAmount: paymentMethod === 'CREDIT_CARD' || paymentMethod === 'DEBIT_CARD' ? grandTotal : 0,
-        creditCardAmount: paymentMethod === 'CREDIT_CARD' ? grandTotal : 0,
-        debitCardAmount: paymentMethod === 'DEBIT_CARD' ? grandTotal : 0,
-        autoPayAmount: paymentMethod === 'AUTO_PAY' ? grandTotal : 0,
-        totalPaid: grandTotal,
-        changeDue: paymentMethod === 'CASH' ? Math.max(0, cashTendered - grandTotal) : 0,
-        cardLast4: paymentMethod === 'CREDIT_CARD' ? '4242' : '5588',
-        cardNetwork: paymentMethod === 'CREDIT_CARD' ? 'VISA' : 'RUPAY',
-        paymentStatus: 'SUCCESS'
-      };
+    const payment: PaymentDetails = {
+      method: paymentMethod,
+      cashAmount: paymentMethod === 'CASH' ? grandTotal : 0,
+      upiAmount: paymentMethod === 'UPI' ? grandTotal : 0,
+      cardAmount: paymentMethod === 'CREDIT_CARD' || paymentMethod === 'DEBIT_CARD' ? grandTotal : 0,
+      creditCardAmount: paymentMethod === 'CREDIT_CARD' ? grandTotal : 0,
+      debitCardAmount: paymentMethod === 'DEBIT_CARD' ? grandTotal : 0,
+      autoPayAmount: paymentMethod === 'AUTO_PAY' ? grandTotal : 0,
+      totalPaid: grandTotal,
+      changeDue: paymentMethod === 'CASH' ? Math.max(0, cashTendered - grandTotal) : 0,
+      cardLast4: paymentMethod === 'CREDIT_CARD' ? '4242' : '5588',
+      cardNetwork: paymentMethod === 'CREDIT_CARD' ? 'VISA' : 'RUPAY',
+      paymentStatus: 'SUCCESS'
+    };
 
-      const invoice: FinalizedInvoice = {
-        invoiceNumber: `INV-SOS-${Math.floor(100000 + Math.random() * 900000)}`,
-        invoiceDate: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
-        billingSession: {
-          id: `session-sos-${Date.now()}`,
-          tabTitle: `🚨 SOS: ${patientName || 'Emergency Patient'}`,
-          assignedPharmacistId: 'pharm-emergency',
-          items,
-          doctorDetails: {
-            doctorName: `${currentSpecialist.name} (Emergency Protocol)`,
-            regNo: currentSpecialist.regNo
-          },
-          patientDetails: {
-            patientName: patientName || 'Emergency Patient',
-            phone: contact || '9999999999',
-            age: '35',
-            gender: 'MALE'
-          },
-          scheduleXVerified: false,
-          pharmacistSignatureAcknowledged: true,
-          createdAt: new Date().toISOString()
-        },
+    let generatedInvNumber = `INV-SOS-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    const billingSession = {
+      id: `session-sos-${Date.now()}`,
+      tabTitle: `🚨 SOS: ${patientName || 'Emergency Patient'}`,
+      assignedPharmacistId: 'pharm-emergency',
+      items,
+      doctorDetails: {
+        doctorName: `${currentSpecialist.name} (Emergency Protocol)`,
+        regNo: currentSpecialist.regNo
+      },
+      patientDetails: {
+        patientName: patientName || 'Emergency Patient',
+        phone: contact || '9999999999',
+        age: '35',
+        gender: 'MALE' as const
+      },
+      scheduleXVerified: false,
+      pharmacistSignatureAcknowledged: true,
+      createdAt: new Date().toISOString()
+    };
+
+    try {
+      const res = await api.post('/invoices', {
+        billingSession,
+        payment,
         subtotal: Number(subtotal.toFixed(2)),
         totalDiscount: 0,
         totalCGST: Number(totalCGST.toFixed(2)),
         totalSGST: Number(totalSGST.toFixed(2)),
         grandTotal: Number(grandTotal.toFixed(2)),
-        payment,
-        pharmacistName: currentSpecialist.name,
-        counterNumber: 4,
-        isEmergencyInvoice: true,
-        emergencyCondition: selectedKit.name,
-        storeInfo: {
-          name: 'GENQUANTAA MEDPLUS PHARMACY',
-          dlNo: 'DL-2024/HYD/889201',
-          gstin: '36AAACG1234F1Z8',
-          address: 'Plot 42, Innovation Corridor, Tech City, Hyderabad - 500081',
-          phone: '+91 98765 43210'
-        }
-      };
+        invoiceType: 'EMERGENCY'
+      });
+      if (res.data?.success && res.data?.data?.invoiceNumber) {
+        generatedInvNumber = res.data.data.invoiceNumber;
+      }
+    } catch (apiErr) {
+      console.warn('[EmergencyDeliveryPage] Backend invoice save fallback to local:', apiErr);
+    }
 
-      // Save to store and open the Tax Invoice & Print View Modal (Image 2)
-      dispatch(finalizeEmergencyInvoice(invoice));
-      setLatestEmergencyInvoice(invoice);
-      setIsSubmittingPayment(false);
-      setShowPaymentModal(false);
-    }, 700);
+    const invoice: FinalizedInvoice = {
+      invoiceNumber: generatedInvNumber,
+      invoiceDate: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+      billingSession,
+      subtotal: Number(subtotal.toFixed(2)),
+      totalDiscount: 0,
+      totalCGST: Number(totalCGST.toFixed(2)),
+      totalSGST: Number(totalSGST.toFixed(2)),
+      grandTotal: Number(grandTotal.toFixed(2)),
+      payment,
+      pharmacistName: currentSpecialist.name,
+      counterNumber: 4,
+      isEmergencyInvoice: true,
+      emergencyCondition: selectedKit.name,
+      storeInfo: {
+        name: 'GENQUANTAA MEDPLUS PHARMACY',
+        dlNo: 'DL-2024/HYD/889201',
+        gstin: '36AAACG1234F1Z8',
+        address: 'Plot 42, Innovation Corridor, Tech City, Hyderabad - 500081',
+        phone: '+91 98765 43210'
+      }
+    };
+
+    // Save to store and open the Tax Invoice & Print View Modal (Image 2)
+    dispatch(finalizeEmergencyInvoice(invoice));
+    setLatestEmergencyInvoice(invoice);
+    setIsSubmittingPayment(false);
+    setShowPaymentModal(false);
   };
 
   const handleReset = () => {

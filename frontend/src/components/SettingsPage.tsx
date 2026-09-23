@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import api from '../utils/api';
-import { updateStoreSettings, navigateTo, logoutUser } from '../store/posSlice';
+import { updateStoreSettings, navigateTo, logoutUser, setPharmacists } from '../store/posSlice';
 import {
   Settings, Store, Printer, Lock, ShieldCheck, Crown, Users,
   UserCheck, LogOut, CheckCircle2, Save, KeyRound, Monitor, Cpu, Laptop,
@@ -47,7 +47,96 @@ export const SettingsPage: React.FC = () => {
   const [savedBanner, setSavedBanner] = useState<boolean>(false);
   const [settingsLoading, setSettingsLoading] = useState<boolean>(true);
 
-  // ── Load settings from DB on mount ──────────────────────────────────────
+  // 4. Staff Management & RBAC States
+  interface StaffUser {
+    id?: string;
+    _id?: string;
+    pharmacistName: string;
+    pharmacyName?: string;
+    licenseNo?: string;
+    email: string;
+    role: 'PHARMACIST' | 'MANAGER' | 'OWNER' | 'EMERGENCY_DESK';
+    isActive: boolean;
+  }
+
+  const userRole = (currentUser?.role || 'PHARMACIST').toUpperCase();
+  const isOwner = userRole === 'OWNER';
+  const isManager = userRole === 'MANAGER' || isOwner;
+
+  const [staffList, setStaffList] = useState<StaffUser[]>([]);
+  const [staffLoading, setStaffLoading] = useState<boolean>(false);
+  const [staffError, setStaffError] = useState<string>('');
+  const [staffSuccess, setStaffSuccess] = useState<string>('');
+
+  const fetchStaff = async () => {
+    setStaffLoading(true);
+    try {
+      const res = await api.get('/auth/users');
+      if (res.data.success && Array.isArray(res.data.data)) {
+        setStaffList(res.data.data);
+        const activeStaff = res.data.data.filter((u: StaffUser) => u.isActive);
+        if (activeStaff.length > 0) {
+          const colors = ['emerald', 'blue', 'purple', 'amber', 'teal', 'rose'];
+          const mappedPharmacists = activeStaff.map((u: StaffUser, idx: number) => {
+            const initials = u.pharmacistName
+              .split(' ')
+              .map(n => n[0])
+              .join('')
+              .toUpperCase()
+              .slice(0, 2) || 'PH';
+            return {
+              id: u.id || u._id || `pharm-${idx + 1}`,
+              name: u.pharmacistName,
+              role: u.role === 'OWNER' ? 'Owner / Chief' : u.role === 'MANAGER' ? 'Pharmacy Manager' : u.role === 'EMERGENCY_DESK' ? 'Emergency Desk' : 'Staff Pharmacist',
+              counterNumber: idx + 1,
+              colorTheme: colors[idx % colors.length],
+              avatarInitials: initials,
+            };
+          });
+          dispatch(setPharmacists(mappedPharmacists));
+        }
+      }
+    } catch (err: any) {
+      console.warn('[SettingsPage] Could not load staff list:', err.response?.data?.message || err.message);
+    } finally {
+      setStaffLoading(false);
+    }
+  };
+
+  const handleUpdateRole = async (userId: string, newRole: string) => {
+    setStaffError('');
+    setStaffSuccess('');
+    try {
+      const res = await api.put(`/auth/users/${userId}/role`, { role: newRole });
+      if (res.data.success) {
+        setStaffSuccess(`Role successfully updated to ${newRole}`);
+        setStaffList(prev => prev.map(u => (u.id === userId || u._id === userId ? { ...u, role: newRole as any } : u)));
+        setTimeout(() => setStaffSuccess(''), 4000);
+      }
+    } catch (err: any) {
+      setStaffError(err.response?.data?.message || 'Failed to update user role.');
+      setTimeout(() => setStaffError(''), 5000);
+    }
+  };
+
+  const handleToggleStatus = async (userId: string, currentStatus: boolean) => {
+    setStaffError('');
+    setStaffSuccess('');
+    try {
+      const newStatus = !currentStatus;
+      const res = await api.put(`/auth/users/${userId}/status`, { isActive: newStatus });
+      if (res.data.success) {
+        setStaffSuccess(`User account ${newStatus ? 'activated' : 'deactivated'} successfully.`);
+        setStaffList(prev => prev.map(u => (u.id === userId || u._id === userId ? { ...u, isActive: newStatus } : u)));
+        setTimeout(() => setStaffSuccess(''), 4000);
+      }
+    } catch (err: any) {
+      setStaffError(err.response?.data?.message || 'Failed to update account status.');
+      setTimeout(() => setStaffError(''), 5000);
+    }
+  };
+
+  // ── Load settings & staff from DB on mount ──────────────────────────────────────
   useEffect(() => {
     const loadSettings = async () => {
       try {
@@ -78,6 +167,9 @@ export const SettingsPage: React.FC = () => {
       }
     };
     loadSettings();
+    if (isManager) {
+      fetchStaff();
+    }
   }, []);
 
   const activeEmail = currentUser?.email || 'navyasri@genquantaa.com';
@@ -604,6 +696,127 @@ export const SettingsPage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* ── SECTION 6: STAFF ROSTER & ROLE-BASED ACCESS CONTROL (RBAC) ── */}
+        {isManager && (
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-4">
+            <div className="flex items-center justify-between pb-2.5 border-b border-slate-200">
+              <div className="flex items-center space-x-2">
+                <Users className="w-5 h-5 text-indigo-600" />
+                <div>
+                  <h3 className="text-xs font-extrabold text-slate-900 font-heading uppercase tracking-wider">
+                    6. Staff Roster &amp; Role-Based Access Control (RBAC)
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    {isOwner ? 'Assign permissions and activate/deactivate pharmacy staff accounts' : 'Authorized pharmacy staff roster and assigned terminal roles'}
+                  </p>
+                </div>
+              </div>
+              <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg">
+                {staffList.length} Registered Staff
+              </span>
+            </div>
+
+            {staffSuccess && (
+              <div className="p-2.5 bg-emerald-50 border border-emerald-300 rounded-xl text-xs font-bold text-emerald-800 flex items-center space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{staffSuccess}</span>
+              </div>
+            )}
+
+            {staffError && (
+              <div className="p-2.5 bg-rose-50 border border-rose-300 rounded-xl text-xs font-bold text-rose-800 flex items-center space-x-2">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{staffError}</span>
+              </div>
+            )}
+
+            {staffLoading ? (
+              <div className="py-8 text-center text-xs font-bold text-slate-400">Loading staff roster...</div>
+            ) : staffList.length === 0 ? (
+              <div className="py-6 text-center text-xs text-slate-400">No staff members registered in database yet.</div>
+            ) : (
+              <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
+                    <tr>
+                      <th className="p-3">Staff Pharmacist</th>
+                      <th className="p-3">Email Address</th>
+                      <th className="p-3">Assigned Role</th>
+                      <th className="p-3">Account Status</th>
+                      {isOwner && <th className="p-3 text-right">Owner Control</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {staffList.map((user) => {
+                      const uId = user.id || user._id || '';
+                      const isSelf = currentUser?.email?.toLowerCase() === user.email?.toLowerCase();
+                      return (
+                        <tr key={uId} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="p-3">
+                            <div className="font-bold text-slate-900">{user.pharmacistName}</div>
+                            {user.licenseNo && <div className="text-[10px] text-slate-400">DL: {user.licenseNo}</div>}
+                          </td>
+                          <td className="p-3 font-mono text-slate-600">{user.email}</td>
+                          <td className="p-3">
+                            {isOwner && !isSelf ? (
+                              <select
+                                value={user.role}
+                                onChange={(e) => handleUpdateRole(uId, e.target.value)}
+                                className="p-1.5 border border-slate-300 rounded-lg text-xs font-bold bg-white text-slate-800 cursor-pointer shadow-2xs"
+                              >
+                                <option value="PHARMACIST">Staff Pharmacist</option>
+                                <option value="MANAGER">Pharmacy Manager</option>
+                                <option value="OWNER">Store Owner</option>
+                                <option value="EMERGENCY_DESK">Emergency Desk</option>
+                              </select>
+                            ) : (
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
+                                user.role === 'OWNER' ? 'bg-amber-100 text-amber-800 border border-amber-300' :
+                                user.role === 'MANAGER' ? 'bg-blue-100 text-blue-800 border border-blue-300' :
+                                user.role === 'EMERGENCY_DESK' ? 'bg-rose-100 text-rose-800 border border-rose-300' :
+                                'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              }`}>
+                                {user.role}
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            <span className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              user.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${user.isActive ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+                              <span>{user.isActive ? 'Active' : 'Suspended'}</span>
+                            </span>
+                          </td>
+                          {isOwner && (
+                            <td className="p-3 text-right">
+                              {isSelf ? (
+                                <span className="text-[10px] font-semibold text-slate-400 italic">Current Session</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleStatus(uId, user.isActive)}
+                                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-colors cursor-pointer border ${
+                                    user.isActive
+                                      ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200'
+                                      : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+                                  }`}
+                                >
+                                  {user.isActive ? 'Deactivate' : 'Activate'}
+                                </button>
+                              )}
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── SAVE & RESET ACTION BUTTONS ─────────────────────────────── */}
         <div className="flex items-center justify-between pt-3 flex-wrap gap-2">

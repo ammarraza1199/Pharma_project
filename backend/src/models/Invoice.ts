@@ -52,6 +52,7 @@ export interface IInvoice extends Document {
     };
     scheduleXVerified: boolean;
     pharmacistSignatureAcknowledged: boolean;
+    prescriptionUrl?: string;
   };
   subtotal: number;
   totalDiscount: number;
@@ -98,6 +99,7 @@ const InvoiceSchema = new Schema<IInvoice>(
       },
       scheduleXVerified: { type: Boolean, default: false },
       pharmacistSignatureAcknowledged: { type: Boolean, default: false },
+      prescriptionUrl: { type: String, default: '' },
     },
     subtotal: { type: Number, required: true },
     totalDiscount: { type: Number, default: 0 },
