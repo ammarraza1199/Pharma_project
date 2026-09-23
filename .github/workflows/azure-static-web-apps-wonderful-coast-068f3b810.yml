@@ -35,7 +35,7 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         env:
-          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_API_URL: https://backend-pos-b0hpb6aza2dwanh9.westus3-01.azurewebsites.net/api
         run: npm run build
 
       - name: Verify Vite output
