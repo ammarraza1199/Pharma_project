@@ -33,9 +33,30 @@ import clinicalBundleRoutes from './routes/clinicalBundle.routes';
 const app = express();
 const httpServer = createServer(app);
 
+const corsOptions = {
+  origin: (origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) => {
+    // Allow server-to-server requests and health checks with no Origin header.
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    const normalizedOrigin = origin.replace(/\/$/, '');
+    if (config.allowedOrigins.includes(normalizedOrigin)) {
+      return callback(null, true);
+    }
+
+    console.warn(`CORS blocked origin: ${origin}`);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  optionsSuccessStatus: 204,
+};
+
 // ── Socket.IO (Real-Time Stock Updates) ────────────────────────────────────────
 export const io = new SocketIOServer(httpServer, {
-  cors: { origin: config.clientUrl, methods: ['GET', 'POST'] },
+  cors: corsOptions,
 });
 io.on('connection', (socket) => {
   console.log(`🔌 Socket connected: ${socket.id}`);
@@ -44,7 +65,7 @@ io.on('connection', (socket) => {
 
 // ── Global Middlewares ──────────────────────────────────────────────────────────
 app.use(helmet());
-app.use(cors({ origin: config.clientUrl, credentials: true }));
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan(config.nodeEnv === 'development' ? 'dev' : 'combined'));
