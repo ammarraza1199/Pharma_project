@@ -1,6 +1,8 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 export const config = {
   port: process.env.PORT || 5000,
   mongoUri: process.env.MONGO_URI || 'mongodb://localhost:27017/genquantaa_pharmacy',
@@ -9,7 +11,11 @@ export const config = {
   jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || 'fallback_refresh_secret',
   jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   nodeEnv: process.env.NODE_ENV || 'development',
-  clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
+  clientUrl:
+    process.env.CLIENT_URL ||
+    (isProduction
+      ? 'https://wonderful-coast-068f3b810.6.azurestaticapps.net'
+      : 'http://localhost:5173'),
   smtp: {
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
     port: Number(process.env.SMTP_PORT) || 587,
