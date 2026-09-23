@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 env:
-  AZURE_WEBAPP_NAME: backend-pos-b0hpb6aza2dwanh9
+  AZURE_WEBAPP_NAME: backend-pos
   NODE_VERSION: "22"
 
 jobs:
