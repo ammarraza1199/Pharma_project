@@ -8,6 +8,7 @@ import { deductStock } from '../services/stockService';
 import { upsertPatientOnBilling } from '../services/patientService';
 import { protect, requireRole, AuthRequest } from '../middleware/auth';
 import bcrypt from 'bcryptjs';
+import { io } from '../index';
 
 const router = Router();
 
@@ -108,6 +109,18 @@ router.post('/', protect, async (req: AuthRequest, res: Response, next: NextFunc
     try {
       await upsertPatientOnBilling(billingSession.patientDetails, grandTotal);
     } catch (e) { console.warn('[PatientService] Failed to upsert patient:', e); }
+
+    // ── REAL-TIME BROADCAST VIA SOCKET.IO ─────────────────────────────────
+    try {
+      io.emit('invoice:created', invoice);
+      io.emit('stock:updated', {
+        source: 'INVOICE',
+        invoiceNumber: invoice.invoiceNumber,
+        itemsDeducted: items.map(i => ({ productId: i.productId, batch: i.selectedBatch?.batchNumber, qty: i.quantity }))
+      });
+    } catch (socketErr) {
+      console.warn('[Socket.IO] Broadcast warning:', socketErr);
+    }
 
     res.status(201).json({ success: true, data: invoice });
   } catch (err: any) {

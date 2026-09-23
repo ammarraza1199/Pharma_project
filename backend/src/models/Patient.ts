@@ -1,5 +1,14 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+export interface IChronicMedication {
+  productId: string;
+  productName: string;
+  dosage: string;
+  quantity: number;
+  conditionCategory: string;
+  defaultDaysSupply?: number;
+}
+
 export interface IPatient extends Document {
   name: string;
   phone: string;
@@ -9,6 +18,7 @@ export interface IPatient extends Document {
   totalSpent: number;
   lastVisit?: Date;
   chronicConditions: string[];
+  chronicMedications: IChronicMedication[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -23,6 +33,17 @@ const PatientSchema = new Schema<IPatient>(
     totalSpent: { type: Number, default: 0 },
     lastVisit: { type: Date },
     chronicConditions: [{ type: String }],
+    chronicMedications: [
+      {
+        productId: String,
+        productName: String,
+        dosage: String,
+        quantity: Number,
+        conditionCategory: String,
+        defaultDaysSupply: { type: Number, default: 30 },
+        _id: false,
+      },
+    ],
   },
   { timestamps: true }
 );

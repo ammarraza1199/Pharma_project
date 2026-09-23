@@ -7,6 +7,7 @@ import { User } from '../models/User';
 import { StoreSettings } from '../models/StoreSettings';
 import { config } from '../config/env';
 import { protect, requireRole, AuthRequest } from '../middleware/auth';
+import { sendPasswordResetEmail } from '../services/emailService';
 
 const router = Router();
 
@@ -168,8 +169,9 @@ router.post('/forgot-password', async (req: Request, res: Response, next: NextFu
     user.resetPasswordExpiry = new Date(Date.now() + 15 * 60 * 1000);
     await user.save();
 
-    // TODO: send email with reset link containing raw token
-    console.log(`[DEV] Password reset token for ${email}: ${token}`);
+    // Send actual email via nodemailer transporter (with fallback logging)
+    await sendPasswordResetEmail(user.email, token);
+
     res.json({ success: true, message: 'If this email is registered, a reset link has been sent.' });
   } catch (err) { next(err); }
 });

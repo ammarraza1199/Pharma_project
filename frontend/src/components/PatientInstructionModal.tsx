@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import api from '../utils/api';
 import type { RootState } from '../store';
 import { setPatientInstructionModalOpen, setPILLanguage } from '../store/posSlice';
 import type { PILLanguage, Product } from '../types/pos';
@@ -53,6 +54,20 @@ export const PatientInstructionModal: React.FC = () => {
     totalStock: 140,
     batches: []
   };
+
+  const [backendLeaflet, setBackendLeaflet] = useState<any>(null);
+
+  useEffect(() => {
+    if (activeProduct?._id && modal.isOpen) {
+      api.get(`/pil/${activeProduct._id}`)
+        .then(res => {
+          if (res.data?.success && res.data.data) {
+            setBackendLeaflet(res.data.data);
+          }
+        })
+        .catch(err => console.warn('[PIL] Backend fetch warning:', err));
+    }
+  }, [activeProduct?._id, modal.isOpen]);
 
   const leaflet = getOrCreateLeaflet(activeProduct);
   const currentLang = modal.selectedLanguage || 'en';

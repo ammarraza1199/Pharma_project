@@ -4,6 +4,7 @@ import { GRNEntry } from '../models/GRNEntry';
 import { getNextSequence } from '../models/Counter';
 import { addStock } from '../services/stockService';
 import { protect, requireRole, AuthRequest } from '../middleware/auth';
+import { io } from '../index';
 
 const router = Router();
 
@@ -32,6 +33,10 @@ router.post('/', protect, requireRole('MANAGER', 'OWNER'), async (req: AuthReque
     const [grn] = await GRNEntry.create(
       [{ grnNumber, supplierName, supplierId, supplierInvoiceNo, receivedDate: receivedDate ? new Date(receivedDate) : new Date(), items, totalAmount, status: 'COMPLETED', createdBy: req.user!.id }]
     );
+
+    try {
+      io.emit('stock:updated', { source: 'GRN', grnNumber: grn.grnNumber, itemsAdded: items.length });
+    } catch (e) {}
 
     res.status(201).json({ success: true, data: grn });
   } catch (err) {

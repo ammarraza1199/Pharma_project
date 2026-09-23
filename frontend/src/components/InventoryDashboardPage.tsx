@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import api from '../utils/api';
 import type { RootState } from '../store';
 import {
   navigateTo,
@@ -291,6 +292,7 @@ export const InventoryDashboardPage: React.FC = () => {
     };
 
     dispatch(createPurchaseOrder(newPO));
+    api.post('/purchase-orders', newPO).catch(err => console.warn('[InventoryDashboard] Failed to persist PO:', err));
     setDraftedBatchIds(prev => [...prev, `${row.product._id}-${row.batch.batchNumber}`]);
     setInventoryToast({
       message: `Created Purchase Order ${poNum} for ${row.product.name} (+${orderQty} units)!`,
@@ -352,6 +354,7 @@ export const InventoryDashboardPage: React.FC = () => {
     };
 
     dispatch(createPurchaseOrder(newPO));
+    api.post('/purchase-orders', newPO).catch(err => console.warn('[InventoryDashboard] Failed to persist bulk PO:', err));
     setDraftedBatchIds(prev => [...prev, ...candidates.map(r => `${r.product._id}-${r.batch.batchNumber}`)]);
     setInventoryToast({
       message: `Consolidated Reorder PO ${poNum} created with ${poItems.length} items (Total: ₹${totalCost.toLocaleString('en-IN')})!`,
@@ -407,6 +410,16 @@ export const InventoryDashboardPage: React.FC = () => {
       sellingPrice: formSellingPrice
     }));
 
+    api.post(`/products/${prod._id}/batch`, {
+      batchNumber: formBatchNo,
+      expiryDate: new Date(formExpiryDate),
+      stockQuantity: formQuantity,
+      location: formLocation,
+      mrp: formMrp,
+      purchaseRate: formPurchaseCost,
+      sellingPrice: formSellingPrice
+    }).catch(err => console.warn('[InventoryDashboard] Failed to persist batch to backend:', err));
+
     setShowAddBatchModal(false);
     setSuccessToast(`Added batch ${formBatchNo} (${formQuantity} units) to ${prod.name} at ${formLocation}!`);
     setTimeout(() => setSuccessToast(null), 5000);
@@ -425,6 +438,14 @@ export const InventoryDashboardPage: React.FC = () => {
       stockQuantity: editQuantity,
       expiryDate: editExpiryDate
     }));
+
+    api.put(`/products/${selectedBatchRow.product._id}/batch/${selectedBatchRow.batch.batchNumber}`, {
+      location: editLocation,
+      sellingPrice: editSellingPrice,
+      mrp: editMrp,
+      stockQuantity: editQuantity,
+      expiryDate: editExpiryDate
+    }).catch(err => console.warn('[InventoryDashboard] Failed to update batch on backend:', err));
 
     setShowQuickEditModal(false);
     setSuccessToast(`Updated shelf location & pricing for ${selectedBatchRow.product.name} (Batch: ${selectedBatchRow.batch.batchNumber})!`);

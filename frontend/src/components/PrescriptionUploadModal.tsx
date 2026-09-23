@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import api from '../utils/api';
 import type { RootState } from '../store';
 import {
   setPrescriptionUploadModalOpen,
@@ -196,12 +197,32 @@ export const PrescriptionUploadModal: React.FC = () => {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      dispatch(attachPrescriptionToSession({
-        sessionId: activeSessionId,
-        prescriptionUrl: url,
-        prescriptionName: file.name
-      }));
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64Data = reader.result as string;
+        dispatch(attachPrescriptionToSession({
+          sessionId: activeSessionId,
+          prescriptionUrl: base64Data,
+          prescriptionName: file.name
+        }));
+
+        try {
+          const res = await api.post('/prescriptions/upload', {
+            fileData: base64Data,
+            fileName: file.name
+          });
+          if (res.data?.success && res.data.data?.prescriptionUrl) {
+            dispatch(attachPrescriptionToSession({
+              sessionId: activeSessionId,
+              prescriptionUrl: res.data.data.prescriptionUrl,
+              prescriptionName: res.data.data.fileName
+            }));
+          }
+        } catch (err) {
+          console.warn('[PrescriptionUpload] Backend sync warning:', err);
+        }
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -210,12 +231,32 @@ export const PrescriptionUploadModal: React.FC = () => {
     setIsDragOver(false);
     const file = e.dataTransfer.files?.[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      dispatch(attachPrescriptionToSession({
-        sessionId: activeSessionId,
-        prescriptionUrl: url,
-        prescriptionName: file.name
-      }));
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64Data = reader.result as string;
+        dispatch(attachPrescriptionToSession({
+          sessionId: activeSessionId,
+          prescriptionUrl: base64Data,
+          prescriptionName: file.name
+        }));
+
+        try {
+          const res = await api.post('/prescriptions/upload', {
+            fileData: base64Data,
+            fileName: file.name
+          });
+          if (res.data?.success && res.data.data?.prescriptionUrl) {
+            dispatch(attachPrescriptionToSession({
+              sessionId: activeSessionId,
+              prescriptionUrl: res.data.data.prescriptionUrl,
+              prescriptionName: res.data.data.fileName
+            }));
+          }
+        } catch (err) {
+          console.warn('[PrescriptionUpload] Backend drop sync warning:', err);
+        }
+      };
+      reader.readAsDataURL(file);
     }
   };
 

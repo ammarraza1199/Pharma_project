@@ -143,4 +143,31 @@ router.put('/:id/batch/:batchNumber', protect, requireRole('MANAGER', 'OWNER'), 
   } catch (err) { next(err); }
 });
 
+// GET /api/products/:id/substitutes - Get clinical & generic substitutes
+router.get('/:id/substitutes', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ success: false, message: 'Product not found.' });
+
+    const salt = product.saltComposition?.trim().toLowerCase();
+    if (!salt) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const firstSaltPart = salt.split('+')[0]?.trim() || salt;
+
+    // Find other products with matching salt composition
+    const substitutes = await Product.find({
+      _id: { $ne: product._id },
+      isActive: true,
+      $or: [
+        { saltComposition: { $regex: new RegExp(`^${salt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
+        { saltComposition: { $regex: firstSaltPart.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } }
+      ]
+    }).limit(12);
+
+    res.json({ success: true, data: substitutes });
+  } catch (err) { next(err); }
+});
+
 export default router;

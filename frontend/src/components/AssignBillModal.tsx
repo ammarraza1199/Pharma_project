@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import api from '../utils/api';
 import type { RootState } from '../store';
 import {
   closeAssignBillModal,
@@ -113,12 +114,21 @@ export const AssignBillModal: React.FC = () => {
   const destinationPharmacists = pharmacists.filter(p => p.id !== activePharmacistId);
 
   const handleExecuteAssign = (targetId: string) => {
+    const targetPharm = pharmacists.find(p => p.id === targetId);
+
     if (heldBill) {
+      const billId = heldBill.id || (heldBill as any)._id;
       dispatch(assignBillToPharmacist({
-        heldBillId: heldBill.id || (heldBill as any)._id,
+        heldBillId: billId,
         targetPharmacistId: targetId,
         note: handoverNote.trim() || undefined
       }));
+
+      api.patch(`/billing/held-bills/${billId}/assign`, {
+        targetPharmacistId: targetId,
+        targetCounter: targetPharm?.counterNumber,
+        note: handoverNote.trim() || undefined
+      }).catch(err => console.warn('[AssignBillModal] Backend assign warning:', err));
     } else {
       if (selectedSessions.length === 0) return;
       selectedSessions.forEach(session => {

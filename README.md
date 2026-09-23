@@ -66,24 +66,23 @@ The frontend is built with React, Vite, TypeScript, and TailwindCSS.
 
 ---
 
-## 3. Important Default Credentials & Sign-In Access
+## 3. Important Default Credentials & Sign-In Access (RBAC)
 
-### 🔑 1. Database Registered Account (MongoDB Atlas)
-Use this primary account to sign in to the live POS terminal:
+The application implements a 4-tier **Role-Based Access Control (RBAC)** architecture. All accounts below are pre-registered and active in the MongoDB database with the default password: **`password123`**.
 
-| Field | Credential |
-|---|---|
-| **Email** | `jane@healthfirst.com` |
-| **Password** | `password123` |
-| **Pharmacist Name** | Pharma 1 |
-| **Store Name** | Hitech Pharna |
-| **Role** | `PHARMACIST` |
-| **Status** | Active (`true`) |
+### 👥 1. Role-Based Sign-In Accounts
+
+| Role | Role Title | Email Address | Password | Permissions & Key Capabilities |
+|---|---|---|---|---|
+| **`OWNER`** | Store Owner / Chief | `owner@genquantaa.com` | `password123` | **Full Master Privileges**: Staff management, user activation/deactivation, role promotion/demotion, permanent & soft deletions (products, patients, suppliers, purchase orders), store settings, master Owner PIN (`1234`). |
+| **`MANAGER`** | Pharmacy Manager | `manager@genquantaa.com` | `password123` | **Operational Oversight**: Adding/editing products & batches, verifying Goods Receipt Note (GRN) inward shipments, approving stock disposal, modifying store profile & tax rates, deleting invoices, CSV exports, Manager PIN (`1234`). |
+| **`PHARMACIST`** | Staff Pharmacist | `jane@healthfirst.com` | `password123` | **Front-Counter Operations**: Standard POS billing, drug & barcode search, FEFO batch selection, parking/holding bills, repeat chronic refills, customer convince cards, multilingual PIL generation, returns intake. |
+| **`EMERGENCY_DESK`** | Emergency Specialist | `emergency@genquantaa.com` | `password123` | **Rapid Response Billing**: Dedicated emergency kit billing (Snake Bite, Cardiac Arrest, Acute Asthma, Severe Burns), fast-track emergency invoice generation, priority stock allocation, 108 ambulance dispatch linkage. |
 
 ---
 
-### 🛡️ 2. Fallback / Seed Admin Account (Backend Auth)
-In-memory admin user configured as fallback in backend authentication:
+### 🛡️ 2. Fallback / Offline Seed Account
+In-memory administrator configured as fallback when running without MongoDB connection:
 
 | Field | Credential |
 |---|---|
@@ -91,23 +90,22 @@ In-memory admin user configured as fallback in backend authentication:
 | **Password** | `1234` |
 | **Pharmacist Name** | Ramesh Kumar (Lead Pharmacist) |
 | **Pharmacy Name** | GENQUANTAA MedPlus Pharmacy |
-| **License No** | DL-2024/HYD/889201 |
 | **Role** | `PHARMACIST` |
 
 ---
 
-### 🚨 3. Emergency Desk Sign-In Mode
+### 🚨 3. Emergency Desk Direct Sign-In Mode
 On the **Sign In** screen, enter your credentials and select the **🚨 Dr. S. Reddy (Chief Emergency)** workstation card at the bottom of the counter list. This automatically routes directly into the **Emergency Delivery Desk** terminal with pre-approved emergency inventory dispensing.
 
 ---
 
 ### 🔐 4. Manager & Owner Security PINs
-Default PINs required for high-privilege authorization in the app (Schedule X override, stock disposal, manager actions):
+Default cryptographic PINs required for high-privilege in-app authorization (Schedule H/X compliance gates, hazardous stock disposal, master security overrides):
 
 - **Manager PIN:** `1234`
 - **Owner PIN:** `1234`
 
-*(These can be re-configured anytime from **Settings → Security & Authorization**).*
+*(These can be re-configured anytime by an Owner or Manager from **Settings → Security & Authorization**).*
 
 ---
 

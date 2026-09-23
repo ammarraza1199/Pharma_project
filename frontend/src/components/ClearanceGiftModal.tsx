@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import api from '../utils/api';
 import type { RootState } from '../store';
 import {
   setClearanceGiftModalOpen,
@@ -98,6 +99,19 @@ export const ClearanceGiftModal: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'DISCOUNT' | 'GIFT'>('GIFT');
   const [customDiscount, setCustomDiscount] = useState<string>('');
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
+  const [liveGifts, setLiveGifts] = useState<PromoGiftOption[]>(PROMOTIONAL_GIFTS);
+
+  useEffect(() => {
+    if (modalState?.isOpen) {
+      api.get('/clinical-bundles/clearance/list')
+        .then(res => {
+          if (res.data?.success && res.data.data?.promotionalGifts && Array.isArray(res.data.data.promotionalGifts)) {
+            setLiveGifts(res.data.data.promotionalGifts);
+          }
+        })
+        .catch(err => console.warn('[ClearanceGiftModal] Backend sync warning:', err));
+    }
+  }, [modalState?.isOpen]);
 
   if (!modalState?.isOpen) return null;
 
@@ -265,12 +279,12 @@ export const ClearanceGiftModal: React.FC = () => {
                   Select a complimentary gift to add to the bill at <strong>₹0.00</strong> (100% Free).
                 </p>
                 <span className="text-xs text-rose-600 font-bold">
-                  {PROMOTIONAL_GIFTS.length} Promotional Gifts Available
+                  {liveGifts.length} Promotional Gifts Available
                 </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {PROMOTIONAL_GIFTS.map((gift) => {
+                {liveGifts.map((gift) => {
                   const isAdded = claimedGifts.some(cg => cg.product.name.includes(gift.name));
                   return (
                     <div

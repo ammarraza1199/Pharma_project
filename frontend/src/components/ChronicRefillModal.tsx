@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import api from '../utils/api';
 import type { RootState } from '../store';
 import {
   setChronicRefillModalOpen,
@@ -28,6 +29,7 @@ export const ChronicRefillModal: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [activeCategory, setActiveCategory] = useState<'ALL' | 'HYPERTENSION' | 'DIABETES' | 'CARDIAC' | 'THYROID'>('ALL');
   const [selectedMedIds, setSelectedMedIds] = useState<string[]>([]);
+  const [backendMeds, setBackendMeds] = useState<ChronicMedication[]>([]);
   const [refillDurationDays, setRefillDurationDays] = useState<number>(30);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -36,18 +38,31 @@ export const ChronicRefillModal: React.FC = () => {
     return patients.find(p => p.patientId === selectedPatientId) || patients[0];
   }, [patients, selectedPatientId]);
 
-  // Default select all medications when switching patient
-  React.useEffect(() => {
-    if (selectedPatient && selectedPatient.chronicMedications) {
-      setSelectedMedIds(selectedPatient.chronicMedications.map(m => m.productId));
-    } else {
-      setSelectedMedIds([]);
-    }
+  // Fetch live chronic medications from MongoDB backend
+  useEffect(() => {
+    if (!selectedPatient) return;
+    const patId = selectedPatient.phone || selectedPatient.patientId;
+    api.get(`/patients/${patId}/chronic-medicines`)
+      .then(res => {
+        if (res.data?.success && Array.isArray(res.data.data) && res.data.data.length > 0) {
+          setBackendMeds(res.data.data);
+          setSelectedMedIds(res.data.data.map((m: any) => m.productId));
+        } else if (selectedPatient.chronicMedications) {
+          setBackendMeds(selectedPatient.chronicMedications);
+          setSelectedMedIds(selectedPatient.chronicMedications.map(m => m.productId));
+        }
+      })
+      .catch(() => {
+        if (selectedPatient.chronicMedications) {
+          setBackendMeds(selectedPatient.chronicMedications);
+          setSelectedMedIds(selectedPatient.chronicMedications.map(m => m.productId));
+        }
+      });
   }, [selectedPatient]);
 
   // Group medications by condition category (Hooks must run unconditionally)
   const categorizedMeds = useMemo(() => {
-    const list = selectedPatient?.chronicMedications || [];
+    const list = backendMeds.length > 0 ? backendMeds : (selectedPatient?.chronicMedications || []);
     const groups: Record<string, ChronicMedication[]> = {
       HYPERTENSION: [],
       DIABETES: [],
@@ -65,7 +80,7 @@ export const ChronicRefillModal: React.FC = () => {
     });
 
     return groups;
-  }, [selectedPatient]);
+  }, [selectedPatient, backendMeds]);
 
   if (!modal.isOpen) return null;
 

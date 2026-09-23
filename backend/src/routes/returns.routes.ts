@@ -4,6 +4,7 @@ import { ReturnNote } from '../models/ReturnNote';
 import { getNextSequence } from '../models/Counter';
 import { restockItem } from '../services/stockService';
 import { protect, AuthRequest } from '../middleware/auth';
+import { io } from '../index';
 
 const router = Router();
 
@@ -24,6 +25,10 @@ router.post('/', protect, async (req: AuthRequest, res: Response, next: NextFunc
     const [note] = await ReturnNote.create(
       [{ creditNoteNo, originalInvoiceNo, patientName, returnDate: returnDate ? new Date(returnDate) : new Date(), items, totalRefundAmount, refundMethod, createdBy: req.user!.id }]
     );
+
+    try {
+      io.emit('stock:updated', { source: 'RETURN', creditNoteNo: note.creditNoteNo });
+    } catch (e) {}
 
     res.status(201).json({ success: true, data: note });
   } catch (err) {

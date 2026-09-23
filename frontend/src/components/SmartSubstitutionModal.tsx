@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import { closeSubstitutionModal, addItemToCart, removeFromCart, recordSubstituteEvent } from '../store/posSlice';
 import type { Product, BatchInfo } from '../types/pos';
 import { ConvinceCustomerCard } from './ConvinceCustomerCard';
+import api from '../utils/api';
 import {
   Zap, X, ShieldCheck, Plus, Tag, Sparkles,
   Clock, DollarSign, Package, Award, CheckCircle2,
@@ -83,9 +84,27 @@ export const SmartSubstitutionModal: React.FC = () => {
   const [activeTab, setActiveTab] = useState<SubstitutionCriteria>('LEAST_PRICE');
   const [isConvinceOpen, setIsConvinceOpen] = useState<boolean>(false);
   const [selectedConvinceAlt, setSelectedConvinceAlt] = useState<Product | null>(null);
+  const [backendAlternatives, setBackendAlternatives] = useState<Product[]>([]);
   const isReplaceMode = Boolean(modal.originalCartItemId);
 
   const now = useMemo(() => new Date(), []);
+
+  // Fetch live substitute products from backend when modal opens
+  useEffect(() => {
+    if (modal.isOpen && modal.originalProduct?._id) {
+      api.get(`/products/${modal.originalProduct._id}/substitutes`)
+        .then((res: any) => {
+          if (res.data?.success && Array.isArray(res.data.data)) {
+            setBackendAlternatives(res.data.data);
+          }
+        })
+        .catch(() => {
+          // If network error, fallback to local store alternatives
+        });
+    } else {
+      setBackendAlternatives([]);
+    }
+  }, [modal.isOpen, modal.originalProduct?._id]);
 
   // Helper to compute closest non-expired days left for a product
   const getNearestBatchDays = (product: Product): { daysLeft: number; batchNo: string } => {
@@ -112,9 +131,17 @@ export const SmartSubstitutionModal: React.FC = () => {
 
   // Sort alternatives dynamically according to the selected criteria
   const sortedAlternatives = useMemo(() => {
-    if (!modal.alternatives || modal.alternatives.length === 0) return [];
+    const rawList = [...(modal.alternatives || [])];
+    // Merge backend alternatives deduplicating by _id
+    backendAlternatives.forEach(ba => {
+      if (!rawList.some(r => r._id === ba._id)) {
+        rawList.push(ba);
+      }
+    });
 
-    const list = [...modal.alternatives];
+    if (rawList.length === 0) return [];
+
+    const list = [...rawList];
 
     switch (activeTab) {
       case 'NEAR_EXPIRED':

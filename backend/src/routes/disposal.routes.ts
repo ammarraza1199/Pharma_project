@@ -5,6 +5,7 @@ import { DisposalRecord } from '../models/DisposalRecord';
 import { StoreSettings } from '../models/StoreSettings';
 import { disposeStock } from '../services/stockService';
 import { protect, requireRole, AuthRequest } from '../middleware/auth';
+import { io } from '../index';
 
 const router = Router();
 
@@ -32,6 +33,11 @@ router.post('/', protect, requireRole('MANAGER', 'OWNER'), async (req: AuthReque
     );
 
     await session.commitTransaction();
+
+    try {
+      io.emit('stock:updated', { source: 'DISPOSAL', productId, batchNumber, quantity: quantityDisposed });
+    } catch (e) {}
+
     res.status(201).json({ success: true, data: record });
   } catch (err) {
     await session.abortTransaction();

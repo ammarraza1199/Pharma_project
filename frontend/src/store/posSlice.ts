@@ -1621,6 +1621,10 @@ export const posSlice = createSlice({
       }
     },
 
+    setAllProducts: (state, action: PayloadAction<Product[]>) => {
+      state.products = action.payload;
+    },
+
     submitGRNEntry: (state, action: PayloadAction<GRNEntry>) => {
       const entry = action.payload;
       state.grnEntries.unshift(entry);
@@ -3426,7 +3430,8 @@ export const {
   linkValueAddedServiceToSession,
   unlinkValueAddedServiceFromSession,
   setRackRoboModalOpen,
-  recordSubstituteEvent
+  recordSubstituteEvent,
+  setAllProducts
 } = posSlice.actions;
 
 export default posSlice.reducer;
