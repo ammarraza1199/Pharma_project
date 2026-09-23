@@ -44,10 +44,6 @@ jobs:
         working-directory: backend
         run: test -f dist/index.js
 
-      - name: Remove development dependencies
-        working-directory: backend
-        run: npm prune --omit=dev
-
       - name: Deploy to Azure App Service
         uses: azure/webapps-deploy@v3
         with:
