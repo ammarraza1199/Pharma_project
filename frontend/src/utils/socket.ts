@@ -2,9 +2,14 @@ import { io, Socket } from 'socket.io-client';
 
 let socket: Socket | null = null;
 
+const configuredApiUrl = import.meta.env.VITE_API_URL?.trim();
+const socketBaseUrl = configuredApiUrl
+  ? configuredApiUrl.replace(/\/api\/?$/, '')
+  : window.location.origin;
+
 export const getSocket = (): Socket => {
   if (!socket) {
-    socket = io(window.location.origin, {
+    socket = io(socketBaseUrl, {
       path: '/socket.io',
       autoConnect: true,
       reconnection: true,
