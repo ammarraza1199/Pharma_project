@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="te">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Genquantaa Pharmacy POS - Telugu Retail Brochure (₹499/Month)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Noto+Sans+Telugu:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #047857;
+      --primary-dark: #064e3b;
+      --primary-light: #ecfdf5;
+      --accent: #d97706;
+      --accent-light: #fef3c7;
+      --text-main: #1f2937;
+      --text-muted: #4b5563;
+      --border: #e5e7eb;
+      --danger: #dc2626;
+      --danger-light: #fee2e2;
+      --blue: #2563eb;
+      --blue-light: #eff6ff;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Noto Sans Telugu', 'Inter', sans-serif;
+      color: var(--text-main);
+      background: #f3f4f6;
+      line-height: 1.45;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Action bar on screen */
+    .screen-actions {
+      max-width: 210mm;
+      margin: 20px auto 10px;
+      padding: 12px 20px;
+      background: #111827;
+      color: #fff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .print-btn {
+      background: #10b981;
+      color: #fff;
+      border: none;
+      padding: 10px 22px;
+      font-size: 15px;
+      font-weight: 700;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: background 0.2s;
+    }
+    .print-btn:hover {
+      background: #059669;
+    }
+
+    /* A4 Sheet Container */
+    .page-container {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto 30px;
+      background: #ffffff;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      padding: 12mm 14mm;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* Header */
+    .header {
+      border-bottom: 2.5px solid var(--primary);
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .brand-title {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--primary-dark);
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand-pill {
+      background: var(--primary);
+      color: white;
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .tagline {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .price-badge {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #fff;
+      padding: 8px 14px;
+      border-radius: 10px;
+      text-align: center;
+      box-shadow: 0 4px 10px rgba(217, 119, 6, 0.25);
+    }
+    .price-badge .amount {
+      font-size: 24px;
+      font-weight: 800;
+      line-height: 1;
+      font-family: 'Inter', sans-serif;
+    }
+    .price-badge .period {
+      font-size: 11px;
+      font-weight: 600;
+      opacity: 0.95;
+    }
+
+    /* Hero Banner */
+    .hero-banner {
+      background: linear-gradient(135deg, #064e3b 0%, #047857 100%);
+      color: #ffffff;
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 14px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-headline {
+      font-size: 20px;
+      font-weight: 800;
+      line-height: 1.35;
+      margin-bottom: 6px;
+      color: #fef08a;
+    }
+    .hero-sub {
+      font-size: 13px;
+      line-height: 1.4;
+      opacity: 0.95;
+    }
+    .hero-points {
+      display: flex;
+      gap: 16px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+    .hero-point {
+      background: rgba(255, 255, 255, 0.15);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-weight: 600;
+      backdrop-filter: blur(4px);
+    }
+
+    /* Pain Points Section */
+    .pain-box {
+      background: var(--danger-light);
+      border-left: 4px solid var(--danger);
+      padding: 8px 12px;
+      border-radius: 6px;
+      margin-bottom: 14px;
+    }
+    .pain-box-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--danger);
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .pain-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      font-size: 11px;
+      color: #7f1d1d;
+      font-weight: 500;
+    }
+
+    /* Core Features Grid */
+    .section-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--primary-dark);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-title::after {
+      content: "";
+      flex: 1;
+      height: 1.5px;
+      background: #e5e7eb;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .feature-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 9px 11px;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      transition: all 0.2s;
+    }
+    .feature-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .feature-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .icon-green { background: #d1fae5; color: #047857; }
+    .icon-amber { background: #fef3c7; color: #b45309; }
+    .icon-blue { background: #dbeafe; color: #1d4ed8; }
+    .icon-purple { background: #f3e8ff; color: #7e22ce; }
+    .icon-rose { background: #ffe4e6; color: #be123c; }
+    .icon-teal { background: #ccfbf1; color: #0f766e; }
+
+    .feature-name {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #111827;
+    }
+    .feature-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.35;
+    }
+    .feature-highlight {
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--primary);
+      background: var(--primary-light);
+      padding: 2px 6px;
+      border-radius: 4px;
+      align-self: flex-start;
+      margin-top: 2px;
+    }
+
+    /* Comparison / Benefit highlight */
+    .benefit-banner {
+      background: var(--blue-light);
+      border: 1px dashed var(--blue);
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .benefit-text {
+      font-size: 12px;
+      color: #1e3a8a;
+      line-height: 1.4;
+    }
+    .benefit-text strong {
+      color: #1d4ed8;
+      font-size: 13px;
+    }
+    .benefit-badge {
+      background: #2563eb;
+      color: white;
+      font-weight: 700;
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+
+    /* Pricing & Setup Box */
+    .pricing-box {
+      background: #fafafa;
+      border: 1.5px solid #10b981;
+      border-radius: 10px;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+      display: grid;
+      grid-template-columns: 1.6fr 1fr;
+      gap: 12px;
+      align-items: center;
+    }
+    .pricing-left h4 {
+      font-size: 13.5px;
+      font-weight: 800;
+      color: var(--primary-dark);
+      margin-bottom: 4px;
+    }
+    .pricing-features {
+      list-style: none;
+      font-size: 11px;
+      color: #374151;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .pricing-features li::before {
+      content: "✓ ";
+      color: var(--primary);
+      font-weight: bold;
+    }
+    .pricing-right {
+      background: #ffffff;
+      border: 1px solid #d1fae5;
+      border-radius: 8px;
+      padding: 8px 12px;
+      text-align: center;
+    }
+    .daily-cost {
+      font-size: 11px;
+      color: #6b7280;
+    }
+    .daily-highlight {
+      font-size: 16px;
+      font-weight: 800;
+      color: #d97706;
+      margin: 2px 0;
+    }
+    .tea-text {
+      font-size: 10px;
+      color: #059669;
+      font-weight: 600;
+    }
+
+    /* Footer & Contact Strip */
+    .contact-strip {
+      background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+      color: #ffffff;
+      border-radius: 10px;
+      padding: 10px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: auto;
+    }
+    .contact-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: #fef08a;
+      margin-bottom: 2px;
+    }
+    .contact-sub {
+      font-size: 11px;
+      opacity: 0.9;
+    }
+    .contact-fields {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+    .contact-box {
+      border: 1px dashed #4b5563;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      background: rgba(255,255,255,0.05);
+    }
+    .contact-box strong {
+      color: #34d399;
+    }
+
+    /* Print Styles */
+    @media print {
+      body {
+        background: #ffffff;
+      }
+      .screen-actions {
+        display: none !important;
+      }
+      .page-container {
+        width: 100%;
+        min-height: auto;
+        margin: 0;
+        padding: 8mm 10mm;
+        box-shadow: none;
+        page-break-after: avoid;
+      }
+      @page {
+        size: A4 portrait;
+        margin: 6mm;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Screen Only Bar -->
+  <div class="screen-actions">
+    <div>
+      <span style="font-weight: 700; font-size: 15px;">📄 ఫార్మసీ రిటైల్ బ్రోచర్ (తెలుగు) - ప్రింట్ రెడీ కాపీ</span>
+      <p style="font-size: 12px; color: #9ca3af; margin-top: 2px;">ఈ పేజీని నేరుగా A4 సైజు కలర్ లేదా బ్లాక్ & వైట్ పేపర్‌పై ప్రింట్ తీసుకోవచ్చు (Ctrl + P).</p>
+    </div>
+    <button class="print-btn" onclick="window.print()">
+      🖨️ బ్రోచర్ ప్రింట్ చేయండి (Print A4)
+    </button>
+  </div>
+
+  <!-- A4 Single-Page High Impact Brochure Sheet -->
+  <div class="page-container">
+    
+    <!-- Header -->
+    <header class="header">
+      <div>
+        <div class="brand-title">
+          <span>GENQUANTAA</span>
+          <span style="font-weight: 600; font-size: 18px; color: var(--text-main);">ఫార్మసీ బిల్లింగ్ సాఫ్ట్‌వేర్</span>
+          <span class="brand-pill">గ్రామీణ ఎడిషన్</span>
+        </div>
+        <div class="tagline">గ్రామీణ మెడికల్ షాపులు & రిటైల్ ఫార్మసిస్టుల కోసం ప్రత్యేకంగా రూపొందించబడింది</div>
+      </div>
+      <div class="price-badge">
+        <div class="amount">₹499/-</div>
+        <div class="period">నెలకు మాత్రమే</div>
+      </div>
+    </header>
+
+    <!-- Hero Banner -->
+    <section class="hero-banner">
+      <h1 class="hero-headline">మీ మెడికల్ షాప్‌లో మందుల నష్టాన్ని ఆపండి – లాభాన్ని రెట్టింపు చేసుకోండి!</h1>
+      <p class="hero-sub">
+        ఇకపై రాత పుస్తకాలతో శ్రమ పడకండి! కంప్యూటర్ పరిజ్ఞానం లేకపోయినా ఎవరైనా సులభంగా వాడగలిగే అత్యంత సరళమైన తెలుగు ఫార్మసీ సాఫ్ట్‌వేర్.
+      </p>
+      <div class="hero-points">
+        <div class="hero-point">⚡ 30 సెకన్లలో బిల్లింగ్</div>
+        <div class="hero-point">🛡️ ఎక్స్‌పైరీ అలర్ట్స్ (Zero Loss)</div>
+        <div class="hero-point">📱 వాట్సాప్ బిల్ & ఖాతా బుక్</div>
+        <div class="hero-point">💊 లూజ్ టాబ్లెట్ కటింగ్</div>
+      </div>
+    </section>
+
+    <!-- Pain Points (Why this software) -->
+    <section class="pain-box">
+      <div class="pain-box-title">
+        <span>⚠️ మీ షాపులో ఈ సమస్యలు ఎదుర్కొంటున్నారా?</span>
+      </div>
+      <div class="pain-grid">
+        <div>• ఎక్స్‌పైరీ అయిపోయి పారేసే మందులతో వేల రూపాయల నష్టం?</div>
+        <div>• 2 లేదా 3 గోలీలు (Loose Tablets) ఇచ్చినప్పుడు రేట్ లెక్కల్లో తప్పులా?</div>
+        <div>• ఊరి ఖాతా అప్పులు కాగితాల్లో రాసి మర్చిపోయి డబ్బులు ఆగిపోతున్నాయా?</div>
+      </div>
+    </section>
+
+    <!-- Core Features Grid -->
+    <h2 class="section-title">గ్రామీణ మెడికల్ షాపులకు అవసరమైన 6 అద్భుతమైన ఫీచర్లు</h2>
+    
+    <div class="features-grid">
+      
+      <!-- Feature 1 -->
+      <div class="feature-card">
+        <div class="feature-header">
+          <div class="feature-icon icon-rose">🛡️</div>
+          <div class="feature-name">ఎక్స్‌పైరీ అలర్ట్స్ & రిటర్న్స్ (Expiry Guard)</div>
+        </div>
+        <div class="feature-desc">
+          మందులు ఎక్స్‌పైర్ అవ్వడానికి 30, 60, 90 రోజుల ముందే వార్నింగ్ ఇస్తుంది. డిస్ట్రిబ్యూటర్‌కు సమయానికి రిటర్న్ పంపి 100% డబ్బు వెనక్కి పొందండి.
+        </div>
+        <div class="feature-highlight">నష్టం సున్నా (Zero Expiry Loss)</div>
+      </div>
+
+      <!-- Feature 2 -->
+      <div class="feature-card">
+        <div class="feature-header">
+          <div class="feature-icon icon-green">💊</div>
+          <div class="feature-name">లూజ్ టాబ్లెట్ కటింగ్ బిల్లింగ్ (Loose Billing)</div>
+        </div>
+        <div class="feature-desc">
+          గ్రామాల్లో ఫుల్ స్ట్రిప్ కాకుండా 2 లేదా 4 మాత్రలు అడిగినా చిటికెలో ఆటోమేటిక్ రేటు క్యాలిక్యులేషన్. స్టాక్ కూడా ఖచ్చితంగా కట్ అవుతుంది.
+        </div>
+        <div class="feature-highlight">క్యాలిక్యులేటర్ లేకుండా పక్కా లెక్క</div>
+      </div>
+
+      <!-- Feature 3 -->
+      <div class="feature-card">
+        <div class="feature-header">
+          <div class="feature-icon icon-amber">💡</div>
+          <div class="feature-name">స్మార్ట్ సబ్‌స్టిట్యూట్ & ఎక్కువ మార్జిన్ (Smart Margin)</div>
+        </div>
+        <div class="feature-desc">
+          డాక్టర్ రాసిన మందు స్టాక్ లేకపోయినా, అదే సాల్ట్ ఉండే బెస్ట్ క్వాలిటీ మందును క్షణాల్లో సూచిస్తుంది. కస్టమర్‌కు డబ్బు ఆదా – మీకు 20-40% అధిక లాభం!
+        </div>
+        <div class="feature-highlight">కస్టమర్ సేవింగ్స్ + అధిక లాభం</div>
+      </div>
+
+      <!-- Feature 4 -->
+      <div class="feature-card">
+        <div class="feature-header">
+          <div class="feature-icon icon-blue">📖</div>
+          <div class="feature-name">డిజిటల్ ఖాతా బుక్ & వాట్సాప్ (Khata & WhatsApp)</div>
+        </div>
+        <div class="feature-desc">
+          ఊరి రైతులు, గ్రామస్తుల అప్పుల లెక్కలు ఫోన్ నంబర్‌తో పక్కాగా భద్రపరచండి. ఒక క్లిక్‌తో వాట్సాప్‌కి బిల్లు మరియు బ్యాలెన్స్ రిమైండర్ పంపవచ్చు.
+        </div>
+        <div class="feature-highlight">బాకీల రికవరీ 100% వేగవంతం</div>
+      </div>
+
+      <!-- Feature 5 -->
+      <div class="feature-card">
+        <div class="feature-header">
+          <div class="feature-icon icon-purple">📍</div>
+          <div class="feature-name">రాక్ & అరల లొకేటర్ (Shelf Robo Locator)</div>
+        </div>
+        <div class="feature-desc">
+          ఏ మందు ఏ రాక్ లేదా ఏ అరలో ఉందో బిల్లింగ్ స్క్రీన్‌పైనే కనిపిస్తుంది. షాపులో కొత్త అబ్బాయి ఉన్నా ఒక్క క్షణం కూడా వెతకకుండా మందు తీయొచ్చు.
+        </div>
+        <div class="feature-highlight">రద్దీ సమయంలో కస్టమర్‌కు వేగంగా డెలివరీ</div>
+      </div>
+
+      <!-- Feature 6 -->
+      <div class="feature-card">
+        <div class="feature-header">
+          <div class="feature-icon icon-teal">🧾</div>
+          <div class="feature-name">అన్ని ప్రింటర్ల సపోర్ట్ (Dual Printing)</div>
+        </div>
+        <div class="feature-desc">
+          చిన్న థర్మల్ ప్రింటర్ (3-అంగుళాల రోల్ స్లిప్) లేదా పెద్ద A4 ప్రింటర్ ఏదైనా సరే రన్ అవుతుంది. UPI QR కోడ్ ద్వారా ఫోన్‌పే, గూగుల్‌పే సులభంగా పేమెంట్స్.
+        </div>
+        <div class="feature-highlight">కస్టమర్‌కు ప్రొఫెషనల్ రసీదు</div>
+      </div>
+
+    </div>
+
+    <!-- Middle Callout -->
+    <div class="benefit-banner">
+      <div class="benefit-text">
+        <strong>ఇతర సాఫ్ట్‌వేర్‌లతో వేల రూపాయలు వృథా చేసుకోకండి!</strong><br>
+        ఇతర మార్కెట్ సాఫ్ట్‌వేర్లకు ₹10,000 - ₹20,000 ముందస్తుగా కట్టాలి. కానీ జెన్‌క్వాంటాలో ఎలాంటి ముందస్తు డిపాజిట్ లేదు!
+      </div>
+      <div class="benefit-badge">ఉచిత సెటప్ & ట్రైనింగ్</div>
+    </div>
+
+    <!-- Pricing Section -->
+    <div class="pricing-box">
+      <div class="pricing-left">
+        <h4>రైతులకు, గ్రామీణ ప్రజలకు సేవ చేసే మీ షాపు కోసం ప్రత్యేక ప్లాన్</h4>
+        <ul class="pricing-features">
+          <li><strong>నెలకు కేవలం ₹499/- మాత్రమే</strong> (వార్షిక లేదా దీర్ఘకాలిక కాంట్రాక్టుల ఒత్తిడి లేదు)</li>
+          <li>మీ కంప్యూటర్ / లాప్‌టాప్‌లో ఉచిత ఇన్‌స్టాలేషన్ & తెలుగులో ట్రైనింగ్</li>
+          <li>ఇంటర్నెట్ స్లోగా ఉన్నా లేదా ఆగిపోయినా ఆఫ్-లైన్‌లో బిల్లింగ్ చేసుకునే సౌలభ్యం</li>
+          <li>7 రోజుల పూర్తి ఉచిత డెమో (నచ్చితేనే కొనసాగించండి)</li>
+        </ul>
+      </div>
+      <div class="pricing-right">
+        <div class="daily-cost">రోజువారీ ఖర్చు</div>
+        <div class="daily-highlight">రోజుకు ₹16/- మాత్రమే!</div>
+        <div class="tea-text">☕ ఒక టీ ఖర్చు కన్నా తక్కువ!</div>
+      </div>
+    </div>
+
+    <!-- Contact & Pitch Strip -->
+    <footer class="contact-strip">
+      <div>
+        <div class="contact-title">📲 ఈరోజే మీ షాపులో ఉచిత లైవ్ డెమో చూడండి!</div>
+        <div class="contact-sub">మా ప్రతినిధి మీ మెడికల్ షాపు వద్దకే వచ్చి సాఫ్ట్‌వేర్ చూపిస్తారు.</div>
+      </div>
+      <div class="contact-fields">
+        <div class="contact-box">
+          <div>సంప్రదించండి (Contact Person):</div>
+          <strong>[మీ పేరు రాయండి]</strong>
+        </div>
+        <div class="contact-box">
+          <div>ఫోన్ / వాట్సాప్ నంబర్:</div>
+          <strong style="font-size: 13px;">[మీ మొబైల్ నంబర్ రాయండి]</strong>
+        </div>
+      </div>
+    </footer>
+
+  </div>
+
+</body>
+</html>

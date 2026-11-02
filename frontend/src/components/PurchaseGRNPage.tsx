@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import { submitGRNEntry, navigateTo } from '../store/posSlice';
@@ -7,8 +7,10 @@ import api from '../utils/api';
 import {
   Loader2,
   Package, Plus, CheckCircle2, Trash2, FileText, Building, Calendar, Truck,
-  Eye, X, Printer
+  Eye, X, Printer, FileSpreadsheet, UploadCloud, Download, ScanBarcode
 } from 'lucide-react';
+import { ExcelInvoiceImportModal } from './ExcelInvoiceImportModal';
+import { downloadSampleExcelTemplate } from '../utils/excelInvoiceParser';
 
 export const PurchaseGRNPage: React.FC = () => {
   const dispatch = useDispatch();
@@ -78,8 +80,22 @@ export const PurchaseGRNPage: React.FC = () => {
   // Active Draft Items
   const [grnItems, setGrnItems] = useState<GRNItem[]>([]);
   const [isSaved, setIsSaved] = useState<boolean>(false);
+  const [isExcelModalOpen, setIsExcelModalOpen] = useState<boolean>(false);
+
+  const handleImportVerifiedItems = (
+    items: GRNItem[],
+    metadata: { supplierName: string; supplierInvoiceNo: string; receivedDate: string }
+  ) => {
+    setSupplierName(metadata.supplierName);
+    setSupplierInvoiceNo(metadata.supplierInvoiceNo);
+    setReceivedDate(metadata.receivedDate);
+    setGrnItems(prev => [...prev, ...items]);
+  };
 
   const selectedProduct = products.find(p => p._id === selectedProductId);
+
+  const [barcodeScanInput, setBarcodeScanInput] = useState<string>('');
+  const batchInputRef = useRef<HTMLInputElement>(null);
 
   const handleSelectProduct = (id: string) => {
     setSelectedProductId(id);
@@ -88,6 +104,29 @@ export const PurchaseGRNPage: React.FC = () => {
       setMrp(prod.unitMRP);
       setSellingPrice(prod.sellingPrice);
       setPurchaseRate(Number((prod.sellingPrice * 0.75).toFixed(2)));
+    }
+  };
+
+  const handleBarcodeOrSearch = (inputVal: string) => {
+    const query = inputVal.trim().toLowerCase();
+    if (!query) return;
+
+    // Search by exact barcode first, then partial barcode, then medicine name or salt
+    const matched = products.find(p => p.barcode && p.barcode.toLowerCase() === query) ||
+                    products.find(p => p.name.toLowerCase() === query) ||
+                    products.find(p => p.barcode && p.barcode.toLowerCase().includes(query)) ||
+                    products.find(p => p.name.toLowerCase().includes(query) || p.saltComposition.toLowerCase().includes(query));
+
+    if (matched) {
+      handleSelectProduct(matched._id);
+      setBarcodeScanInput('');
+      // Focus batch input so pharmacist can immediately enter printed details
+      setTimeout(() => {
+        batchInputRef.current?.focus();
+        batchInputRef.current?.select();
+      }, 50);
+    } else {
+      alert(`No product found matching: "${inputVal}". Please select from dropdown or add product in catalog.`);
     }
   };
 
@@ -173,11 +212,56 @@ export const PurchaseGRNPage: React.FC = () => {
 
         <div className="flex items-center space-x-2">
           <button
+            onClick={() => setIsExcelModalOpen(true)}
+            className="flex items-center space-x-1.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs transition-all cursor-pointer active:scale-95"
+            title="Upload supplier invoice spreadsheet or CSV"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-amber-200" />
+            <span>Upload Invoice (Excel / CSV)</span>
+          </button>
+
+          <button
+            onClick={downloadSampleExcelTemplate}
+            className="flex items-center space-x-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl transition-all cursor-pointer"
+            title="Download standard Excel format for distributors"
+          >
+            <Download className="w-3.5 h-3.5 text-slate-500" />
+            <span>Template</span>
+          </button>
+
+          <button
             onClick={() => dispatch(navigateTo('INVENTORY'))}
             className="flex items-center space-x-1 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold px-3.5 py-2 rounded-xl transition-all cursor-pointer"
           >
             <Package className="w-4 h-4 text-emerald-600" />
             <span>View Inventory Catalog</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── FAST EXCEL IMPORT BANNER ──────────────────────────────────── */}
+      <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-300/80 rounded-2xl p-3.5 flex items-center justify-between flex-wrap gap-2 shadow-2xs">
+        <div className="flex items-center space-x-3">
+          <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-700 flex items-center justify-center shrink-0">
+            <UploadCloud className="w-5 h-5 text-amber-600" />
+          </div>
+          <div>
+            <h4 className="text-xs font-bold text-slate-900">
+              Skip Manual Typing — Auto-Load Stock from Distributor Invoices
+            </h4>
+            <p className="text-[11px] text-slate-600">
+              Upload Excel (.xlsx/.xls) or CSV files. Automatically maps medicines, audits batch numbers &amp; expiries, and lets you verify with human review before updating stock.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setIsExcelModalOpen(true)}
+            className="flex items-center space-x-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3.5 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer active:scale-95"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>Open Invoice Importer</span>
           </button>
         </div>
       </div>
@@ -234,9 +318,31 @@ export const PurchaseGRNPage: React.FC = () => {
 
       {/* ── ADD LINE ITEM SECTION ──────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-3">
-        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider font-heading">
-          Add Stock Medicine Item
-        </h3>
+        <div className="flex items-center justify-between flex-wrap gap-2 pb-1 border-b border-slate-100">
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider font-heading flex items-center space-x-1.5">
+            <Package className="w-3.5 h-3.5 text-amber-600" />
+            <span>Add Stock Medicine Item</span>
+          </h3>
+
+          {/* Quick Barcode Scanner / Instant Lookup Field */}
+          <div className="relative w-full sm:w-72">
+            <ScanBarcode className="w-4 h-4 text-amber-600 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={barcodeScanInput}
+              onChange={(e) => setBarcodeScanInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleBarcodeOrSearch(barcodeScanInput);
+                }
+              }}
+              placeholder="Scan Barcode or Search Drug... [Enter]"
+              className="w-full pl-9 pr-3 py-1.5 text-xs bg-amber-50/60 hover:bg-amber-50 border border-amber-300 rounded-xl font-medium focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
+              title="Point handheld barcode scanner or type barcode/name and press Enter"
+            />
+          </div>
+        </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-7 gap-2.5 text-xs font-semibold">
           {/* Select Medicine */}
@@ -259,10 +365,12 @@ export const PurchaseGRNPage: React.FC = () => {
           <div>
             <label className="block text-slate-700 mb-1">Batch No. *</label>
             <input
+              ref={batchInputRef}
               type="text"
               value={batchNo}
               onChange={(e) => setBatchNo(e.target.value)}
-              className="w-full p-2 border border-slate-300 rounded-xl font-mono"
+              className="w-full p-2 border border-slate-300 rounded-xl font-mono focus:ring-2 focus:ring-amber-500"
+              placeholder="e.g. BT-2026-001"
             />
           </div>
 
@@ -520,6 +628,13 @@ export const PurchaseGRNPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* ── EXCEL / CSV INVOICE IMPORT & VERIFICATION MODAL ───────────── */}
+      <ExcelInvoiceImportModal
+        isOpen={isExcelModalOpen}
+        onClose={() => setIsExcelModalOpen(false)}
+        onImportVerifiedItems={handleImportVerifiedItems}
+      />
 
     </div>
   );
