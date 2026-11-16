@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
-import { navigateTo } from '../store/posSlice';
+import { navigateTo, openMedicineInspectionModal } from '../store/posSlice';
 import api from '../utils/api';
 import type { Product, ScheduleCategory, StockStatus, BatchInfo } from '../types/pos';
 import {
   Package, Search, Plus, Filter, AlertTriangle, PackageX,
-  TrendingUp, Edit3, X, Truck, Layers
+  TrendingUp, Edit3, X, Truck, Layers, Info
 } from 'lucide-react';
 
 export const InventoryPage: React.FC = () => {
@@ -398,15 +398,24 @@ export const InventoryPage: React.FC = () => {
                         </div>
                       </td>
 
-                      {/* Edit Button */}
+                      {/* Actions: Inspect & Edit */}
                       <td className="px-3 py-3 text-center">
-                        <button
-                          onClick={() => handleOpenEdit(product)}
-                          className="p-1.5 text-slate-600 hover:text-emerald-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                          title="Edit Product Details"
-                        >
-                          <Edit3 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-center space-x-1">
+                          <button
+                            onClick={() => dispatch(openMedicineInspectionModal({ product }))}
+                            className="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                            title="Inspect 4-Tab Drug Details (Pricing, Batches, Generics, Warnings)"
+                          >
+                            <Info className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleOpenEdit(product)}
+                            className="p-1.5 text-slate-600 hover:text-emerald-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                            title="Edit Product Details"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

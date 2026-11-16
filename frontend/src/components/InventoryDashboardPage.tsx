@@ -8,9 +8,12 @@ import {
   updateBatchDetails,
   quickUpdateProductPriceAndShelf,
   applyDumpClearanceDiscount,
-  createPurchaseOrder
+  createPurchaseOrder,
+  createMultiplePurchaseOrders
 } from '../store/posSlice';
 import type { Product, BatchInfo, ScheduleCategory, PurchaseOrder, PurchaseOrderItem } from '../types/pos';
+import { matchBestSupplierForProduct } from '../utils/replenishmentEngine';
+import { SmartReplenishmentPanel } from './SmartReplenishmentPanel';
 import {
   Package, Search, Plus, Filter, AlertTriangle, ArrowUpDown,
   TrendingUp, Edit3, X, Truck, Layers, Percent, Clock, MapPin,
@@ -39,6 +42,7 @@ export const InventoryDashboardPage: React.FC = () => {
   const products = useSelector((state: RootState) => state.pos.products);
   const suppliers = useSelector((state: RootState) => state.pos.suppliers);
 
+  const [dashboardTab, setDashboardTab] = useState<'BATCH_MONITOR' | 'SMART_REORDER'>('BATCH_MONITOR');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedRackFilter, setSelectedRackFilter] = useState<string>('ALL');
   const [expiryFilter, setExpiryFilter] = useState<ExpiryFilterType>('ALL');
@@ -249,14 +253,9 @@ export const InventoryDashboardPage: React.FC = () => {
     return result;
   }, [allBatchRows, searchTerm, selectedRackFilter, expiryFilter, stockTierFilter, scheduleFilter, sortOption]);
 
-  // Handlers for Task #39: 1-Click PO Drafting & Bulk Reorder
+  // Handlers for Task #39 & Day 9: 1-Click Smart Supplier PO Drafting & Grouped Bulk Reorder
   const handleDraftBatchPO = (row: BatchRowItem) => {
-    const supplier = suppliers[0] || {
-      supplierId: 'sup-002',
-      name: 'Sun Pharma Wholesale Depot',
-      gstin: '36AAACS5512B1Z5',
-      phone: '+91 98490 12346'
-    };
+    const supplier = matchBestSupplierForProduct(row.product, suppliers);
     const now = new Date();
     const poNum = `PO-2026-${Math.floor(1000 + Math.random() * 9000)}`;
     const estDelivery = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -269,7 +268,7 @@ export const InventoryDashboardPage: React.FC = () => {
       packType: 'STRIP',
       quantity: orderQty,
       estimatedRate: Math.round(estCost / orderQty),
-      gstRate: 12,
+      gstRate: row.product.gstRate || 12,
       totalAmount: estCost
     };
 
@@ -286,7 +285,7 @@ export const InventoryDashboardPage: React.FC = () => {
       status: 'DRAFT',
       items: [item],
       totalAmount: estCost,
-      schemeNotes: `Drafted from Inventory 4-Tier Stock Dashboard (${row.stockTier})`,
+      schemeNotes: `Matched Supplier Reorder (${row.stockTier})`,
       notes: `Current batch: ${row.batch.batchNumber}, DOS: ${row.daysOfStock}d, Velocity: ${row.dailyVelocity} units/day.`,
       createdAt: now.toISOString()
     };
@@ -295,70 +294,77 @@ export const InventoryDashboardPage: React.FC = () => {
     api.post('/purchase-orders', newPO).catch(err => console.warn('[InventoryDashboard] Failed to persist PO:', err));
     setDraftedBatchIds(prev => [...prev, `${row.product._id}-${row.batch.batchNumber}`]);
     setInventoryToast({
-      message: `Created Purchase Order ${poNum} for ${row.product.name} (+${orderQty} units)!`,
+      message: `Created Purchase Order ${poNum} for ${supplier.name} (${row.product.name} +${orderQty} units)!`,
       poNumber: poNum
     });
     setTimeout(() => setInventoryToast(null), 5000);
   };
 
   const handleBulkDraftTriggerPOs = () => {
-    const candidates = allBatchRows.filter(r => (r.stockTier === 'TRIGGER_ORDER' || r.stockTier === 'CRITICAL_LOW') && !draftedBatchIds.includes(`${r.product._id}-${r.batch.batchNumber}`));
+    const candidates = allBatchRows.filter(
+      r => (r.stockTier === 'TRIGGER_ORDER' || r.stockTier === 'CRITICAL_LOW') &&
+      !draftedBatchIds.includes(`${r.product._id}-${r.batch.batchNumber}`)
+    );
 
     if (candidates.length === 0) {
       alert('All items in Trigger Order and Critical Low have already been drafted into purchase orders!');
       return;
     }
 
-    const supplier = suppliers[0] || {
-      supplierId: 'sup-002',
-      name: 'Sun Pharma Wholesale Depot',
-      gstin: '36AAACS5512B1Z5',
-      phone: '+91 98490 12346'
-    };
     const now = new Date();
-    const poNum = `PO-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-    const estDelivery = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const bySupplier: Record<string, { supplier: ReturnType<typeof matchBestSupplierForProduct>; items: PurchaseOrderItem[] }> = {};
 
-    const poItems: PurchaseOrderItem[] = candidates.map(r => {
+    candidates.forEach(r => {
+      const sup = matchBestSupplierForProduct(r.product, suppliers);
       const orderQty = Math.max(20, (r.dailyVelocity * 10) + 10);
       const estCost = Math.round(orderQty * (r.product.unitMRP * 0.72));
-      return {
+      if (!bySupplier[sup.supplierId]) {
+        bySupplier[sup.supplierId] = { supplier: sup, items: [] };
+      }
+      bySupplier[sup.supplierId].items.push({
         productId: r.product._id,
         productName: r.product.name,
         packType: 'STRIP',
         quantity: orderQty,
         estimatedRate: Math.round(estCost / orderQty),
-        gstRate: 12,
+        gstRate: r.product.gstRate || 12,
         totalAmount: estCost
-      };
+      });
     });
 
-    const totalCost = poItems.reduce((sum, it) => sum + it.totalAmount, 0);
+    const createdPOs: PurchaseOrder[] = Object.values(bySupplier).map((grp, idx) => {
+      const poNum = `PO-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+      const estDelivery = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const totalCost = grp.items.reduce((sum, it) => sum + it.totalAmount, 0);
 
-    const newPO: PurchaseOrder = {
-      poId: `po-${Date.now()}`,
-      poNumber: poNum,
-      supplierId: supplier.supplierId,
-      supplierName: supplier.name,
-      supplierGstin: supplier.gstin,
-      supplierPhone: supplier.phone,
-      orderDate: now.toISOString().split('T')[0],
-      expectedDeliveryDate: estDelivery,
-      paymentTerms: 'CREDIT_30_DAYS',
-      status: 'DRAFT',
-      items: poItems,
-      totalAmount: totalCost,
-      schemeNotes: `Bulk replenishment for ${poItems.length} Trigger & Critical Low Inventory Batches`,
-      notes: `Consolidated 4-tier stock replenishment drafted on ${now.toLocaleDateString()}.`,
-      createdAt: now.toISOString()
-    };
+      const newPO: PurchaseOrder = {
+        poId: `po-${Date.now()}-${idx}`,
+        poNumber: poNum,
+        supplierId: grp.supplier.supplierId,
+        supplierName: grp.supplier.name,
+        supplierGstin: grp.supplier.gstin,
+        supplierPhone: grp.supplier.phone,
+        orderDate: now.toISOString().split('T')[0],
+        expectedDeliveryDate: estDelivery,
+        paymentTerms: grp.supplier.creditPeriodDays === 30 ? 'CREDIT_30_DAYS' : 'CREDIT_15_DAYS',
+        status: 'DRAFT',
+        items: grp.items,
+        totalAmount: totalCost,
+        schemeNotes: `Auto-grouped Reorder PO for ${grp.items.length} low-stock batches`,
+        notes: `Consolidated multi-vendor replenishment drafted on ${now.toLocaleDateString()}.`,
+        createdAt: now.toISOString()
+      };
 
-    dispatch(createPurchaseOrder(newPO));
-    api.post('/purchase-orders', newPO).catch(err => console.warn('[InventoryDashboard] Failed to persist bulk PO:', err));
+      api.post('/purchase-orders', newPO).catch(err => console.warn('[InventoryDashboard] Failed to persist bulk PO:', err));
+      return newPO;
+    });
+
+    dispatch(createMultiplePurchaseOrders(createdPOs));
     setDraftedBatchIds(prev => [...prev, ...candidates.map(r => `${r.product._id}-${r.batch.batchNumber}`)]);
+    const grandTotal = createdPOs.reduce((s, p) => s + p.totalAmount, 0);
     setInventoryToast({
-      message: `Consolidated Reorder PO ${poNum} created with ${poItems.length} items (Total: ₹${totalCost.toLocaleString('en-IN')})!`,
-      poNumber: poNum
+      message: `Created ${createdPOs.length} Supplier PO(s) (${createdPOs.map(p => p.poNumber).join(', ')}) covering ${candidates.length} batches (₹${grandTotal.toLocaleString('en-IN')})!`,
+      poNumber: createdPOs[0]?.poNumber
     });
     setTimeout(() => setInventoryToast(null), 5000);
   };
@@ -573,6 +579,46 @@ export const InventoryDashboardPage: React.FC = () => {
         </div>
       )}
 
+      {/* ── INVENTORY DASHBOARD SUB-TABS ───────────────────────────── */}
+      <div className="flex items-center space-x-2 border-b border-slate-200 pb-2 overflow-x-auto">
+        <button
+          onClick={() => setDashboardTab('BATCH_MONITOR')}
+          className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+            dashboardTab === 'BATCH_MONITOR'
+              ? 'bg-emerald-600 text-white shadow-xs'
+              : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+          }`}
+        >
+          <Package className="w-4 h-4" />
+          <span>Shelf &amp; 4-Tier Stock Monitor ({totalBatchesCount} Batches)</span>
+        </button>
+
+        <button
+          onClick={() => setDashboardTab('SMART_REORDER')}
+          className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+            dashboardTab === 'SMART_REORDER'
+              ? 'bg-amber-600 text-white shadow-xs'
+              : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+          }`}
+        >
+          <Zap className={`w-4 h-4 ${dashboardTab === 'SMART_REORDER' ? 'text-white' : 'text-amber-500'}`} />
+          <span>Smart Run-Rate &amp; Auto-PO Triggers</span>
+          {(criticalLowCount + triggerStockCount) > 0 && (
+            <span className="px-1.5 py-0.2 bg-rose-100 text-rose-800 text-[10px] font-black rounded-full">
+              {criticalLowCount + triggerStockCount} Triggers
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ── SMART REORDER & AUTO-PO TRIGGERS TAB ─────────────────────── */}
+      {dashboardTab === 'SMART_REORDER' && (
+        <SmartReplenishmentPanel />
+      )}
+
+      {/* ── BATCH & SHELF MONITOR TAB ────────────────────────────────── */}
+      {dashboardTab === 'BATCH_MONITOR' && (
+        <>
       {/* ── TOP KPI SUMMARY CARDS (LIGHT PHARMACY THEME) ───────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Total Active Batches & Stock Units */}
@@ -1173,6 +1219,8 @@ export const InventoryDashboardPage: React.FC = () => {
           </table>
         </div>
       </div>
+        </>
+      )}
 
       {/* ── MODAL 1: ADD NEW BATCH & SHELF STOCK ───────────────────────── */}
       {showAddBatchModal && (

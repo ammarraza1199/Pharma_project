@@ -128,6 +128,80 @@ router.post('/', protect, async (req: AuthRequest, res: Response, next: NextFunc
   }
 });
 
+// POST /api/invoices/offline-sync — Bulk Auto-Sync of Offline Invoices
+router.post('/offline-sync', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { invoices = [] } = req.body;
+    if (!Array.isArray(invoices) || invoices.length === 0) {
+      return res.status(400).json({ success: false, message: 'No offline invoices provided for synchronization.' });
+    }
+
+    const syncedInvoices: any[] = [];
+    const settings = await StoreSettings.findOne();
+    const storeInfo = {
+      name: settings?.storeName || 'GENQUANTAA MedPlus Pharmacy',
+      dlNo: settings?.dlNo || '',
+      gstin: settings?.gstin || '',
+      address: settings?.address || '',
+      phone: settings?.phone || '',
+    };
+
+    for (const offInv of invoices) {
+      const existing = await Invoice.findOne({ invoiceNumber: offInv.invoiceNumber });
+      if (existing) {
+        syncedInvoices.push(existing);
+        continue;
+      }
+
+      const items: any[] = offInv.billingSession?.items || [];
+      for (const item of items) {
+        if (item.productId && mongoose.isValidObjectId(item.productId) && item.selectedBatch?.batchNumber) {
+          try {
+            await deductStock(item.productId, item.selectedBatch.batchNumber, item.quantity, null as any);
+          } catch (e) {
+            console.warn('[OfflineSync] Stock deduction warning:', e);
+          }
+        }
+      }
+
+      const newInv = new Invoice({
+        invoiceNumber: offInv.invoiceNumber,
+        invoiceDate: offInv.invoiceDate ? new Date(offInv.invoiceDate) : new Date(),
+        storeInfo: offInv.storeInfo || storeInfo,
+        billingSession: offInv.billingSession,
+        subtotal: offInv.subtotal || 0,
+        totalDiscount: offInv.totalDiscount || 0,
+        totalCGST: offInv.totalCGST || 0,
+        totalSGST: offInv.totalSGST || 0,
+        grandTotal: offInv.grandTotal || 0,
+        payment: offInv.payment,
+        invoiceType: offInv.invoiceType || 'REGULAR',
+        createdBy: req.user!.id,
+      });
+
+      await newInv.save();
+      syncedInvoices.push(newInv);
+
+      try {
+        if (offInv.billingSession?.patientDetails) {
+          await upsertPatientOnBilling(offInv.billingSession.patientDetails, offInv.grandTotal || 0);
+        }
+      } catch (e) { /* ignore */ }
+
+      try {
+        io.emit('invoice:created', newInv);
+      } catch (e) { /* ignore */ }
+    }
+
+    res.json({
+      success: true,
+      message: `Successfully synchronized ${syncedInvoices.length} offline invoices.`,
+      syncedCount: syncedInvoices.length,
+      data: syncedInvoices,
+    });
+  } catch (err) { next(err); }
+});
+
 // GET /api/invoices
 router.get('/', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {

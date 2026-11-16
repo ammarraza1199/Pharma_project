@@ -42,6 +42,11 @@ import { VoiceConsultationModal } from './components/VoiceConsultationModal';
 import { PatientInstructionModal } from './components/PatientInstructionModal';
 import { ClearanceGiftModal } from './components/ClearanceGiftModal';
 import { RackSelectionRoboModal } from './components/RackSelectionRoboModal';
+import { MedicineInspectionModal } from './components/MedicineInspectionModal';
+import { OfflineBackupModal } from './components/OfflineBackupModal';
+import { MobileBottomNav } from './components/MobileBottomNav';
+import { KeyboardShortcutsBar } from './components/KeyboardShortcutsBar';
+import { ToolsSidebar } from './components/ToolsSidebar';
 
 export const App: React.FC = () => {
   const dispatch = useDispatch();
@@ -81,111 +86,125 @@ export const App: React.FC = () => {
 
   // Shared shell for all authenticated views
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col font-sans text-slate-900 select-none overflow-hidden">
+    <div className="h-screen bg-slate-100 flex flex-col font-sans text-slate-900 select-none overflow-hidden">
       {/* Shared Top Header */}
       <Navbar />
 
-      {/* ── DASHBOARD VIEW ── */}
-      {currentView === 'DASHBOARD' && (
-        <Dashboard />
-      )}
+      {/* Main Body Shell: Left Tools Sidebar + Active Workspace */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Side Navigation Bar for Clinical & Emergency Tools */}
+        <ToolsSidebar />
 
-      {/* ── INVENTORY MANAGEMENT VIEW ── */}
-      {currentView === 'INVENTORY' && (
-        <InventoryPage />
-      )}
+        {/* Active Content Workspace */}
+        <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden pb-14 md:pb-0">
+          {/* ── DASHBOARD VIEW ── */}
+          {currentView === 'DASHBOARD' && (
+            <Dashboard />
+          )}
 
-      {/* ── DEDICATED INVENTORY & SHELF-LIFE DASHBOARD VIEW ── */}
-      {currentView === 'INVENTORY_DASHBOARD' && (
-        <InventoryDashboardPage />
-      )}
+          {/* ── INVENTORY MANAGEMENT VIEW ── */}
+          {currentView === 'INVENTORY' && (
+            <InventoryPage />
+          )}
 
-      {/* ── STOCK PURCHASE (GRN) VIEW ── */}
-      {currentView === 'PURCHASE_GRN' && (
-        <PurchaseGRNPage />
-      )}
+          {/* ── DEDICATED INVENTORY & SHELF-LIFE DASHBOARD VIEW ── */}
+          {currentView === 'INVENTORY_DASHBOARD' && (
+            <InventoryDashboardPage />
+          )}
 
-      {/* ── SALES REPORTS & ANALYTICS VIEW ── */}
-      {currentView === 'REPORTS' && (
-        <ReportsPage />
-      )}
+          {/* ── STOCK PURCHASE (GRN) VIEW ── */}
+          {currentView === 'PURCHASE_GRN' && (
+            <PurchaseGRNPage />
+          )}
 
-      {/* ── RETURNS & REFUNDS VIEW ── */}
-      {currentView === 'RETURNS' && (
-        <ReturnsPage />
-      )}
+          {/* ── SALES REPORTS & ANALYTICS VIEW ── */}
+          {currentView === 'REPORTS' && (
+            <ReportsPage />
+          )}
 
-      {/* ── EXPIRY & DISPOSAL MANAGEMENT VIEW ── */}
-      {currentView === 'EXPIRY_MANAGEMENT' && (
-        <ExpiryManagementPage />
-      )}
+          {/* ── RETURNS & REFUNDS VIEW ── */}
+          {currentView === 'RETURNS' && (
+            <ReturnsPage />
+          )}
 
-      {/* ── PATIENT HISTORY RECORDS VIEW ── */}
-      {currentView === 'PATIENTS' && (
-        <PatientsPage />
-      )}
+          {/* ── EXPIRY & DISPOSAL MANAGEMENT VIEW ── */}
+          {currentView === 'EXPIRY_MANAGEMENT' && (
+            <ExpiryManagementPage />
+          )}
 
-      {/* ── SUPPLIER & VENDOR DIRECTORY VIEW ── */}
-      {currentView === 'SUPPLIERS' && (
-        <SuppliersPage />
-      )}
+          {/* ── PATIENT HISTORY RECORDS VIEW ── */}
+          {currentView === 'PATIENTS' && (
+            <PatientsPage />
+          )}
 
-      {/* ── STORE SETTINGS & HARDWARE CONFIG VIEW ── */}
-      {currentView === 'SETTINGS' && (
-        <SettingsPage />
-      )}
+          {/* ── SUPPLIER & VENDOR DIRECTORY VIEW ── */}
+          {currentView === 'SUPPLIERS' && (
+            <SuppliersPage />
+          )}
 
-      {/* ── EMERGENCY FAST DELIVERY VIEW ── */}
-      {currentView === 'EMERGENCY_DELIVERY' && (
-        <EmergencyDeliveryPage />
-      )}
+          {/* ── STORE SETTINGS & HARDWARE CONFIG VIEW ── */}
+          {currentView === 'SETTINGS' && (
+            <SettingsPage />
+          )}
 
-      {/* ── INVOICES & SALES JOURNAL VIEW ── */}
-      {currentView === 'INVOICES' && (
-        <InvoicesPage />
-      )}
+          {/* ── EMERGENCY FAST DELIVERY VIEW ── */}
+          {currentView === 'EMERGENCY_DELIVERY' && (
+            <EmergencyDeliveryPage />
+          )}
 
-      {/* ── ONLINE DELIVERY DASHBOARD VIEW ── */}
-      {currentView === 'ONLINE_DELIVERY' && (
-        <OnlineDeliveryPage />
-      )}
+          {/* ── INVOICES & SALES JOURNAL VIEW ── */}
+          {currentView === 'INVOICES' && (
+            <InvoicesPage />
+          )}
 
-      {/* ── POS TERMINAL VIEW ── */}
-      {currentView === 'POS_TERMINAL' && (
-        <>
-          {/* Multi-Tab Billing & Parking Bar */}
-          <TabBar />
+          {/* ── ONLINE DELIVERY DASHBOARD VIEW ── */}
+          {currentView === 'ONLINE_DELIVERY' && (
+            <OnlineDeliveryPage />
+          )}
 
-          {/* Main 3-Column Billing Workspace */}
-          <main className="flex-1 p-3 grid grid-cols-12 gap-3 overflow-hidden h-[calc(100vh-105px)]">
-            {/* Left (5 cols): Product Search */}
-            <section className="col-span-12 lg:col-span-5 h-full overflow-hidden">
-              <ProductSearch />
-            </section>
+          {/* ── POS TERMINAL VIEW ── */}
+          {currentView === 'POS_TERMINAL' && (
+            <>
+              {/* Multi-Tab Billing & Parking Bar */}
+              <TabBar />
 
-            {/* Center (4 cols): Cart Table */}
-            <section className="col-span-12 lg:col-span-4 h-full overflow-hidden">
-              <CartTable />
-            </section>
+              {/* Main 3-Column Billing Workspace */}
+              <main className="flex-1 min-h-0 p-3 grid grid-cols-12 gap-3 overflow-hidden">
+                {/* Left (5 cols): Product Search */}
+                <section className="col-span-12 lg:col-span-5 h-full min-h-0 overflow-hidden flex flex-col">
+                  <ProductSearch />
+                </section>
 
-            {/* Right (3 cols): Billing Summary & Checkout */}
-            <section className="col-span-12 lg:col-span-3 h-full overflow-hidden">
-              <CartSummary />
-            </section>
-          </main>
+                {/* Center (4 cols): Cart Table */}
+                <section className="col-span-12 lg:col-span-4 h-full min-h-0 overflow-hidden flex flex-col">
+                  <CartTable />
+                </section>
 
-          {/* Modals & Overlays */}
-          <SmartSubstitutionModal />
-          <ComplianceModal />
-          <DrugInteractionModal />
-          <PaymentModal />
-          <HeldBillsModal />
-          <CustomerDisplayModal />
-          <AssignBillModal />
-          <PrescriptionUploadModal />
-          <ChronicRefillModal />
-        </>
-      )}
+                {/* Right (3 cols): Billing Summary & Checkout */}
+                <section className="col-span-12 lg:col-span-3 h-full min-h-0 overflow-hidden flex flex-col">
+                  <CartSummary />
+                </section>
+              </main>
+
+              {/* Cashier Keyboard Shortcuts Strip & Cheatsheet (Desktop) */}
+              <KeyboardShortcutsBar />
+
+              {/* Modals & Overlays */}
+              <SmartSubstitutionModal />
+              <ComplianceModal />
+              <DrugInteractionModal />
+              <PaymentModal />
+              <HeldBillsModal />
+              <CustomerDisplayModal />
+              <AssignBillModal />
+              <ChronicRefillModal />
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Touch-Friendly Mobile & Tablet Bottom Navigation Bar (md:hidden) */}
+      <MobileBottomNav />
 
       {/* Global Overlays accessible from all tabs */}
       <ReceiptPrintView />
@@ -197,6 +216,9 @@ export const App: React.FC = () => {
       <PatientInstructionModal />
       <ClearanceGiftModal />
       <RackSelectionRoboModal />
+      <MedicineInspectionModal />
+      <PrescriptionUploadModal />
+      <OfflineBackupModal />
     </div>
   );
 };

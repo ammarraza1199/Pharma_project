@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import {
@@ -14,13 +14,18 @@ import {
   dismissReorderPushAlert,
   clearAllReorderPushAlerts,
   convertReorderAlertToPO,
-  setRackRoboModalOpen
+  setRackRoboModalOpen,
+  setOfflineBackupModalOpen
 } from '../store/posSlice';
+import type { AppView } from '../types/pos';
+import api from '../utils/api';
+import { isBrowserOnline, getOfflineInvoices } from '../utils/offlineStorage';
 import {
   Clock, Store, LogOut, LayoutDashboard, ShoppingCart, Package, Truck, BarChart3,
   RotateCcw, Users, Building, Settings, History, FileText, Siren, ChevronDown,
   Check, Bike, AlertTriangle, Sparkles, Building2, Bot, Mic, Volume2,
-  Bell, BellRing, X, AlertCircle, Compass, Zap
+  Bell, BellRing, X, AlertCircle, Compass, Zap, Wrench, Shield,
+  Wifi, WifiOff, CloudUpload, HardDrive
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -30,327 +35,237 @@ export const Navbar: React.FC = () => {
   const pharmacists = useSelector((state: RootState) => state.pos.pharmacists);
   const activePharmacistId = useSelector((state: RootState) => state.pos.activePharmacistId);
   const reorderPushAlerts = useSelector((state: RootState) => state.pos.reorderPushAlerts || []);
+  const products = useSelector((state: RootState) => state.pos.products || []);
+  const deliveryOrders = useSelector((state: RootState) => state.pos.deliveryOrders || []);
+
   const [showProfileDropdown, setShowProfileDropdown] = useState<boolean>(false);
   const [showCounterDropdown, setShowCounterDropdown] = useState<boolean>(false);
   const [showReorderAlertsDropdown, setShowReorderAlertsDropdown] = useState<boolean>(false);
 
+  // Live badge counts from API/Redux
+  const [liveLowStockCount, setLiveLowStockCount] = useState<number>(0);
+  const [livePendingDeliveryCount, setLivePendingDeliveryCount] = useState<number>(0);
+
+  // Day 12: Offline Resilience & Sync Tracking
+  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [pendingOfflineCount, setPendingOfflineCount] = useState<number>(0);
+
+  useEffect(() => {
+    const updateStatus = () => {
+      setIsOnline(isBrowserOnline());
+      const queue = getOfflineInvoices();
+      setPendingOfflineCount(queue.filter(i => i.syncStatus === 'PENDING_SYNC').length);
+    };
+
+    updateStatus();
+    window.addEventListener('online', updateStatus);
+    window.addEventListener('offline', updateStatus);
+    const interval = setInterval(updateStatus, 8000);
+
+    return () => {
+      window.removeEventListener('online', updateStatus);
+      window.removeEventListener('offline', updateStatus);
+      clearInterval(interval);
+    };
+  }, []);
+
   const activePharmacist = pharmacists.find(p => p.id === activePharmacistId) || pharmacists[0];
 
-  // Store account initial — always from the STORE LOGIN email, never from the pharmacist name
+  // Store account name & initials
   const accountEmail = currentUser?.email || 'navyasri@genquantaa.com';
   const emailPrefixName = accountEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   const accountName = currentUser?.pharmacistName || emailPrefixName || 'User';
-  // Always show first letter of the EMAIL prefix (store account), not the pharmacist/role name
   const accountInitial = emailPrefixName.trim().charAt(0).toUpperCase() || 'N';
 
+  // Role permissions
   const userRole = (currentUser?.role || 'PHARMACIST').toUpperCase();
   const isOwner = userRole === 'OWNER';
   const isManager = userRole === 'MANAGER' || isOwner;
-  // Emergency desk mode: signed in with Emergency Desk option or role
+  const isCashier = userRole === 'CASHIER';
   const isEmergencyDesk = userRole === 'EMERGENCY_DESK' || (currentView === 'EMERGENCY_DELIVERY' && accountName.includes('Dr. S. Reddy'));
 
+  // Calculate Low Stock from Redux Products
+  const reduxLowStockCount = products.filter(p =>
+    p.stockStatus === 'LOW_STOCK' ||
+    p.stockStatus === 'OUT_OF_STOCK' ||
+    (typeof p.totalStock === 'number' && p.totalStock <= 20)
+  ).length;
+
+  // Calculate Pending Delivery Orders from Redux
+  const reduxPendingDeliveryCount = deliveryOrders.filter(o =>
+    o.status === 'PENDING' || o.status === 'CONFIRMED'
+  ).length;
+
+  // Sync live counts with backend
+  useEffect(() => {
+    // 1. Fetch real-time low stock count from backend
+    api.get('/products/stock/low')
+      .then(res => {
+        if (res.data?.success && typeof res.data.count === 'number') {
+          setLiveLowStockCount(res.data.count);
+        } else {
+          setLiveLowStockCount(reduxLowStockCount);
+        }
+      })
+      .catch(() => setLiveLowStockCount(reduxLowStockCount));
+
+    // 2. Fetch pending online orders count from backend
+    api.get('/delivery')
+      .then(res => {
+        if (res.data?.success && Array.isArray(res.data.data)) {
+          const count = res.data.data.filter((o: any) =>
+            o.status === 'PENDING' || o.status === 'CONFIRMED'
+          ).length;
+          setLivePendingDeliveryCount(count);
+        } else {
+          setLivePendingDeliveryCount(reduxPendingDeliveryCount);
+        }
+      })
+      .catch(() => setLivePendingDeliveryCount(reduxPendingDeliveryCount));
+  }, [products.length, deliveryOrders.length]);
+
+  const displayLowStock = Math.max(liveLowStockCount, reduxLowStockCount);
+  const displayPendingDelivery = Math.max(livePendingDeliveryCount, reduxPendingDeliveryCount);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Role-Based Navigation Tabs Definition
+  // ─────────────────────────────────────────────────────────────────────────
+  interface NavTabItem {
+    id: AppView;
+    label: string;
+    icon: React.FC<{ className?: string }>;
+    badgeCount?: number;
+    badgeColor?: string;
+    badgePulse?: boolean;
+    roleGuard?: 'ALL' | 'PHARMACIST_AND_ABOVE' | 'MANAGER_ONLY';
+  }
+
+  // Center Navigation Tabs: Core Pharmacy Counter & Dashboard
+  const navTabs: NavTabItem[] = [
+    {
+      id: 'DASHBOARD',
+      label: 'Dashboard',
+      icon: LayoutDashboard
+    },
+    {
+      id: 'POS_TERMINAL',
+      label: 'Billing',
+      icon: ShoppingCart
+    }
+  ];
+
+  // Visible to all users
+  const visibleTabs = navTabs;
+
   return (
-    <header className="bg-white border-b border-slate-200 shadow-xs px-4 py-2 flex items-center justify-between sticky top-0 z-30">
-      {/* Brand & Store Information */}
-      <div className="flex items-center space-x-3">
-        <div className="bg-emerald-600 text-white p-2 rounded-lg shadow-sm flex items-center justify-center">
-          <Store className="w-5 h-5" />
-        </div>
-        <div>
-          <div className="flex items-center space-x-2">
-            <h1 className="text-base font-bold text-slate-900 tracking-tight font-heading">
-              GENQUANTAA POS
-            </h1>
+    <header className="bg-white border-b border-slate-200 shadow-2xs px-3.5 py-1.5 flex items-center justify-between sticky top-0 z-30 select-none">
+      {/* ───────────────────────────────────────────────────────────────── */}
+      {/* 1. Left: Brand & Store Logo                                       */}
+      {/* ───────────────────────────────────────────────────────────────── */}
+      <div className="flex items-center space-x-2.5 shrink-0">
+        <button
+          onClick={() => dispatch(navigateTo('POS_TERMINAL'))}
+          className="flex items-center space-x-2.5 text-left group cursor-pointer"
+        >
+          <div className="bg-gradient-to-br from-emerald-600 to-teal-700 text-white p-2 rounded-xl shadow-xs group-hover:scale-105 transition-transform flex items-center justify-center">
+            <Store className="w-4 h-4" />
           </div>
-        </div>
+          <div>
+            <div className="flex items-center space-x-1.5">
+              <h1 className="text-sm font-black text-slate-900 tracking-tight font-heading leading-tight group-hover:text-emerald-700 transition-colors">
+                GENQUANTAA
+              </h1>
+              <span className="text-[10px] font-bold px-1.5 py-0.2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md">
+                POS
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-400 font-medium leading-none">
+              Pharmacy System
+            </p>
+          </div>
+        </button>
       </div>
 
-      {/* Right Controls: Manager Lock & Pharmacist Profile & Exit */}
-      <div className="flex items-center space-x-1.5">
-        {isEmergencyDesk ? (
-          <>
-            {/* Emergency Delivery Nav */}
-            <button
-              onClick={() => dispatch(navigateTo('EMERGENCY_DELIVERY'))}
-              className={`p-1.5 rounded-lg transition-all cursor-pointer shadow-xs shrink-0 flex items-center justify-center ${currentView === 'EMERGENCY_DELIVERY'
-                ? 'bg-red-600 text-white ring-2 ring-red-300 shadow-sm shadow-red-600/40'
-                : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
-                }`}
-              title="Emergency Fast Delivery"
-            >
-              <Siren className="w-4 h-4 text-red-600 animate-pulse" />
-            </button>
-
-            {/* POS Terminal Nav */}
-            <button
-              onClick={() => dispatch(navigateTo('POS_TERMINAL'))}
-              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'POS_TERMINAL'
-                ? 'bg-emerald-100 text-emerald-800 font-bold'
-                : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
-                }`}
-              title="POS Billing Terminal"
-            >
-              <ShoppingCart className="w-4 h-4" />
-            </button>
-
-            {/* Saved Invoices History Nav */}
-            <button
-              onClick={() => dispatch(navigateTo('INVOICES'))}
-              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'INVOICES'
-                ? 'bg-emerald-100 text-emerald-800 font-bold'
-                : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
-                }`}
-              title="Invoices & Sales History"
-            >
-              <History className="w-4 h-4" />
-            </button>
-          </>
-        ) : (
-          <>
-            {/* Dashboard Nav */}
-            <button
-              onClick={() => dispatch(navigateTo('DASHBOARD'))}
-              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'DASHBOARD'
-                ? 'bg-violet-100 text-violet-800 font-bold'
-                : 'text-slate-500 hover:text-violet-700 hover:bg-violet-50'
-                }`}
-              title="Dashboard"
-            >
-              <LayoutDashboard className="w-4 h-4" />
-            </button>
-
-            {/* POS Terminal Nav */}
-            <button
-              onClick={() => dispatch(navigateTo('POS_TERMINAL'))}
-              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'POS_TERMINAL'
-                ? 'bg-emerald-100 text-emerald-800 font-bold'
-                : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
-                }`}
-              title="POS Billing Terminal"
-            >
-              <ShoppingCart className="w-4 h-4" />
-            </button>
-
-            {/* Saved Invoices History Nav */}
-            <button
-              onClick={() => dispatch(navigateTo('INVOICES'))}
-              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'INVOICES'
-                ? 'bg-emerald-100 text-emerald-800 font-bold'
-                : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
-                }`}
-              title="Invoices & Sales History"
-            >
-              <History className="w-4 h-4" />
-            </button>
-
-            {/* Inventory Catalog Nav */}
-            <button
-              onClick={() => dispatch(navigateTo('INVENTORY'))}
-              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'INVENTORY'
-                ? 'bg-emerald-100 text-emerald-800 font-bold'
-                : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
-                }`}
-              title="Inventory Catalog"
-            >
-              <Package className="w-4 h-4" />
-            </button>
-
-            {/* Inventory Shelf & Price Dashboard Nav (Manager/Owner Only) */}
-            {isManager && (
-              <button
-                onClick={() => dispatch(navigateTo('INVENTORY_DASHBOARD'))}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'INVENTORY_DASHBOARD'
-                  ? 'bg-teal-100 text-teal-800 font-bold shadow-2xs'
-                  : 'text-slate-500 hover:text-teal-700 hover:bg-teal-50'
-                  }`}
-                title="Inventory Shelf, Expiry & Pricing Dashboard (Manager)"
-              >
-                <BarChart3 className="w-4 h-4 text-teal-600" />
-              </button>
-            )}
-
-            {/* Stock Purchase GRN Nav (Manager/Owner Only) */}
-            {isManager && (
-              <button
-                onClick={() => dispatch(navigateTo('PURCHASE_GRN'))}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'PURCHASE_GRN'
-                  ? 'bg-amber-100 text-amber-800 font-bold'
-                  : 'text-slate-500 hover:text-amber-700 hover:bg-amber-50'
-                  }`}
-                title="Stock Purchase GRN (Manager)"
-              >
-                <Truck className="w-4 h-4" />
-              </button>
-            )}
-
-            {/* Reports Nav (Manager/Owner Only) */}
-            {isManager && (
-              <button
-                onClick={() => dispatch(navigateTo('REPORTS'))}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'REPORTS'
-                  ? 'bg-blue-100 text-blue-800 font-bold'
-                  : 'text-slate-500 hover:text-blue-700 hover:bg-blue-50'
-                  }`}
-                title="Sales Reports & GST Analytics (Manager)"
-              >
-                <BarChart3 className="w-4 h-4" />
-              </button>
-            )}
-
-            {/* Returns & Refunds Nav */}
-            <button
-              onClick={() => dispatch(navigateTo('RETURNS'))}
-              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'RETURNS'
-                ? 'bg-rose-100 text-rose-800 font-bold'
-                : 'text-slate-500 hover:text-rose-700 hover:bg-rose-50'
-                }`}
-              title="Returns & Refund Credit Notes"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
-
-            {/* Expiry Management Nav (Manager/Owner Only) */}
-            {isManager && (
-              <button
-                onClick={() => dispatch(navigateTo('EXPIRY_MANAGEMENT'))}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'EXPIRY_MANAGEMENT'
-                  ? 'bg-amber-100 text-amber-800 font-bold'
-                  : 'text-slate-500 hover:text-amber-700 hover:bg-amber-50'
-                  }`}
-                title="Expiry & Stock Disposal Management (Manager)"
-              >
-                <Clock className="w-4 h-4 text-amber-600" />
-              </button>
-            )}
-
-            {/* Patients Directory Nav */}
-            <button
-              onClick={() => dispatch(navigateTo('PATIENTS'))}
-              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'PATIENTS'
-                ? 'bg-orange-100 text-orange-800 font-bold'
-                : 'text-slate-500 hover:text-orange-700 hover:bg-orange-50'
-                }`}
-              title="Patients History Directory"
-            >
-              <Users className="w-4 h-4" />
-            </button>
-
-            {/* Suppliers Directory Nav (Manager/Owner Only) */}
-            {isManager && (
-              <button
-                onClick={() => dispatch(navigateTo('SUPPLIERS'))}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'SUPPLIERS'
-                  ? 'bg-emerald-100 text-emerald-800 font-bold'
-                  : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'
-                  }`}
-                title="Suppliers & Vendors Directory (Manager)"
-              >
-                <Building className="w-4 h-4" />
-              </button>
-            )}
-
-            {/* Store Settings & Hardware Nav (Manager/Owner Only) */}
-            {isManager && (
-              <button
-                onClick={() => dispatch(navigateTo('SETTINGS'))}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${currentView === 'SETTINGS'
-                  ? 'bg-slate-800 text-white font-bold shadow-xs'
-                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
-                  }`}
-                title="Store Settings & Hardware Config (Manager)"
-              >
-                <Settings className="w-4 h-4" />
-              </button>
-            )}
-          </>
-        )}
-
-        {/* Emergency Delivery Nav - Icon Only */}
-        <button
-          onClick={() => dispatch(navigateTo('EMERGENCY_DELIVERY'))}
-          className={`p-1.5 rounded-lg transition-all cursor-pointer shadow-xs shrink-0 flex items-center justify-center ${currentView === 'EMERGENCY_DELIVERY'
-            ? 'bg-red-600 text-white ring-2 ring-red-300 shadow-sm shadow-red-600/40'
-            : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
+      {/* ───────────────────────────────────────────────────────────────── */}
+      {/* 2. Center: Modern Segmented Navigation Tabs                       */}
+      {/* ───────────────────────────────────────────────────────────────── */}
+      {isEmergencyDesk ? (
+        // Emergency Desk Mode Specialized Tabs
+        <div className="flex items-center space-x-1.5 bg-rose-50/80 border border-rose-200 p-1 rounded-xl">
+          <button
+            onClick={() => dispatch(navigateTo('EMERGENCY_DELIVERY'))}
+            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              currentView === 'EMERGENCY_DELIVERY'
+                ? 'bg-rose-600 text-white shadow-xs'
+                : 'text-rose-700 hover:bg-rose-100'
             }`}
-          title="Emergency Fast Delivery"
-        >
-          <Siren className="w-4 h-4 text-red-600 animate-pulse" />
-        </button>
+          >
+            <Siren className="w-3.5 h-3.5 animate-pulse" />
+            <span>Emergency Fast Delivery</span>
+          </button>
 
-        {/* Online Delivery Dashboard Nav - Icon Only */}
-        <button
-          onClick={() => dispatch(navigateTo('ONLINE_DELIVERY'))}
-          className={`p-1.5 rounded-lg transition-all cursor-pointer shadow-xs shrink-0 flex items-center justify-center ${currentView === 'ONLINE_DELIVERY'
-            ? 'bg-emerald-600 text-white ring-2 ring-emerald-300 shadow-sm'
-            : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+          <button
+            onClick={() => dispatch(navigateTo('POS_TERMINAL'))}
+            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              currentView === 'POS_TERMINAL'
+                ? 'bg-emerald-600 text-white font-bold shadow-xs'
+                : 'text-slate-600 hover:bg-white/80'
             }`}
-          title="Online Home Delivery Dashboard"
-        >
-          <Bike className="w-4 h-4" />
-        </button>
+          >
+            <ShoppingCart className="w-3.5 h-3.5" />
+            <span>POS Counter</span>
+          </button>
 
-        {/* Health & Wellness Plan Brochure Nav - Icon Only */}
-        <button
-          onClick={() => dispatch(setWellnessBrochureModalOpen({ isOpen: true }))}
-          className="p-1.5 rounded-lg bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white shadow-xs transition-all cursor-pointer border border-emerald-400/30 shrink-0 flex items-center justify-center"
-          title="Health & Wellness Plan Brochure"
-        >
-          <Sparkles className="w-4 h-4 text-emerald-100" />
-        </button>
+          <button
+            onClick={() => dispatch(navigateTo('INVOICES'))}
+            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              currentView === 'INVOICES'
+                ? 'bg-emerald-600 text-white font-bold shadow-xs'
+                : 'text-slate-600 hover:bg-white/80'
+            }`}
+          >
+            <History className="w-3.5 h-3.5" />
+            <span>Invoices</span>
+          </button>
+        </div>
+      ) : (
+        // Standard Modern Navigation Tabs Strip (Dashboard & Billing)
+        <nav className="flex items-center space-x-1.5 bg-slate-100/80 border border-slate-200/80 p-1 rounded-xl shadow-2xs">
+          {visibleTabs.map(tab => {
+            const isActive = currentView === tab.id;
+            const Icon = tab.icon;
 
-        {/* Multi-Store & Borrowed Stock Hub - Icon Only */}
-        <button
-          onClick={() => dispatch(setMultiStoreModalOpen({ isOpen: true }))}
-          className="p-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white shadow-xs transition-all cursor-pointer border border-sky-400/30 shrink-0 flex items-center justify-center"
-          title="Multi-Store & Inter-Branch Stock Lookup"
-        >
-          <Building2 className="w-4 h-4 text-sky-100" />
-        </button>
+            return (
+              <button
+                key={tab.id}
+                onClick={() => dispatch(navigateTo(tab.id))}
+                className={`relative flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-emerald-600 text-white shadow-xs ring-1 ring-emerald-500'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
+                }`}
+                title={`Go to ${tab.label}`}
+              >
+                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-slate-500'}`} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      )}
 
-        {/* Inter-Store AI Chatbot Widget - Icon Only */}
-        <button
-          onClick={() => dispatch(setInterStoreChatbotModalOpen(true))}
-          className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-emerald-400 shadow-xs transition-all cursor-pointer border border-slate-700 shrink-0 flex items-center justify-center"
-          title="PharmaConnect AI Chatbot"
-        >
-          <Bot className="w-4 h-4 text-emerald-400" />
-        </button>
-
-        {/* Customer Voice Record & Notes Nav - Icon Only */}
-        <button
-          onClick={() => dispatch(setVoiceConsultationModalOpen({ isOpen: true }))}
-          className="p-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition-all cursor-pointer border border-rose-400/30 shrink-0 flex items-center justify-center"
-          title="Customer Voice Record & Discussion Notes"
-        >
-          <Mic className="w-4 h-4 text-rose-100 animate-pulse" />
-        </button>
-
-        {/* Patient Instruction Leaflet (PIL) & Voice Clips - Icon Only */}
-        <button
-          onClick={() => dispatch(setPatientInstructionModalOpen({ isOpen: true }))}
-          className="p-1.5 rounded-lg bg-teal-700 hover:bg-teal-800 text-white shadow-xs transition-all cursor-pointer border border-teal-500/30 shrink-0 flex items-center justify-center"
-          title="Patient Instruction Leaflets (PIL) & Multi-Language Voice Clips"
-        >
-          <Volume2 className="w-4 h-4 text-teal-100" />
-        </button>
-
-        {/* Rack Selection Robo (Task #44) - Icon Only */}
-        <button
-          onClick={() => dispatch(setRackRoboModalOpen({ isOpen: true }))}
-          className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-cyan-300 shadow-xs transition-all cursor-pointer border border-cyan-400/40 shrink-0 flex items-center justify-center"
-          title="Rack Selection Robo (Interactive 2D Pharmacy Shelf Map)"
-        >
-          <Compass className="w-4 h-4 text-cyan-400 animate-spin-slow" />
-        </button>
-
-        {/* Safety Reorder Push Alert Bell (Task #41) */}
+      {/* ───────────────────────────────────────────────────────────────── */}
+      {/* 3. Right: Alerts, Counter Shift & Account Profile                  */}
+      {/* ───────────────────────────────────────────────────────────────── */}
+      <div className="flex items-center space-x-2 shrink-0">
+        {/* Safety Reorder Push Alert Bell */}
         <div className="relative">
           <button
             onClick={() => setShowReorderAlertsDropdown(!showReorderAlertsDropdown)}
-            className={`p-1.5 rounded-lg transition-all cursor-pointer shadow-xs shrink-0 relative flex items-center justify-center ${
+            className={`p-1.5 rounded-xl transition-all cursor-pointer shadow-xs shrink-0 relative flex items-center justify-center border ${
               reorderPushAlerts.length > 0
-                ? 'bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-300'
-                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                ? 'bg-rose-50 text-rose-600 hover:bg-rose-100 border-rose-300'
+                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100 border-slate-200'
             }`}
             title="Real-Time Safety Threshold Reorder Alerts"
           >
@@ -446,11 +361,6 @@ export const Navbar: React.FC = () => {
                                   Threshold: {alert.safetyThreshold || alert.minThreshold}
                                 </span>
                               </div>
-                              {alert.runoutDays !== undefined && (
-                                <p className="text-[9.5px] font-bold text-amber-800 mt-0.5">
-                                  ⏳ Runout: ~{alert.runoutDays} {alert.runoutDays === 1 ? 'day' : 'days'} left
-                                </p>
-                              )}
                             </div>
                             <button
                               onClick={() => dispatch(dismissReorderPushAlert(alert.id))}
@@ -467,17 +377,6 @@ export const Navbar: React.FC = () => {
                             </span>
                             
                             <div className="flex items-center space-x-1.5">
-                              {/* Quick Supplier WhatsApp Intimation */}
-                              <a
-                                href={`https://wa.me/919849012345?text=${encodeURIComponent(`Urgent Reorder Intimation: ${alert.productName} has dropped to ${alert.currentStock} units (Batch: ${alert.batchNumber}). Please prepare supply dispatch.`)}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="px-1.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg text-[10px] font-bold border border-emerald-300 transition-colors inline-flex items-center"
-                                title="Send Reorder Alert via WhatsApp to Supplier"
-                              >
-                                💬 WhatsApp
-                              </a>
-
                               {/* 1-Click PO Action Button */}
                               {isQueued ? (
                                 <button
@@ -497,7 +396,7 @@ export const Navbar: React.FC = () => {
                                     dispatch(convertReorderAlertToPO({ alertId: alert.id, reorderQty: alert.suggestedReorderQty || 50 }));
                                   }}
                                   className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] rounded-lg shadow-2xs flex items-center space-x-1 cursor-pointer active:scale-95"
-                                  title="1-Click: Add 50 units to Draft Purchase Order"
+                                  title="Add to Draft Purchase Order"
                                 >
                                   <Zap className="w-3 h-3 text-amber-200" />
                                   <span>+ Add to PO</span>
@@ -510,42 +409,28 @@ export const Navbar: React.FC = () => {
                     })}
                   </div>
                 )}
-
-                <div className="mt-2.5 pt-2 border-t border-slate-100 text-center">
-                  <button
-                    onClick={() => {
-                      setShowReorderAlertsDropdown(false);
-                      dispatch(navigateTo('INVENTORY_DASHBOARD'));
-                    }}
-                    className="text-[11px] font-bold text-emerald-700 hover:underline cursor-pointer"
-                  >
-                    Open Stock Health Dashboard →
-                  </button>
-                </div>
               </div>
             </>
           )}
         </div>
 
-        {/* 🏪 Active Shift Counter Badge — or Emergency Desk Badge */}
+        {/* Active Shift Counter Badge */}
         <div className="relative">
           {isEmergencyDesk ? (
-            // Emergency Desk identity badge — no dropdown, fixed to Dr. S. Reddy
-            <div className="flex items-center space-x-1.5 px-2.5 py-1 bg-rose-50 text-rose-800 border border-rose-300 rounded-lg text-xs font-bold shadow-2xs">
+            <div className="flex items-center space-x-1.5 px-2.5 py-1.5 bg-rose-50 text-rose-800 border border-rose-300 rounded-xl text-xs font-bold shadow-2xs">
               <Siren className="w-3.5 h-3.5 text-rose-600 animate-pulse" />
-              <span className="font-black">Emergency Desk:</span>
+              <span className="font-black">Emergency:</span>
               <span className="font-semibold text-rose-900">Dr. S. Reddy</span>
             </div>
           ) : (
-            // Normal billing counter badge with switcher dropdown
             <>
               <button
                 onClick={() => setShowCounterDropdown(!showCounterDropdown)}
-                className="flex items-center space-x-1.5 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                className="flex items-center space-x-1.5 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
                 title="Active Shift Counter - Click to switch"
               >
                 <Users className="w-3.5 h-3.5 text-emerald-600" />
-                <span className="font-black">Counter {activePharmacist.counterNumber}:</span>
+                <span className="font-black hidden sm:inline">Counter {activePharmacist.counterNumber}:</span>
                 <span className="font-semibold text-emerald-900">{activePharmacist.name.split(' ')[0]}</span>
                 <ChevronDown className="w-3 h-3 text-emerald-600" />
               </button>
@@ -594,28 +479,56 @@ export const Navbar: React.FC = () => {
           )}
         </div>
 
-        {/* User Profile Initial Avatar with Dropdown */}
+        {/* Day 12: Offline Resilience & Data Backup Pill */}
+        <button
+          onClick={() => dispatch(setOfflineBackupModalOpen(true))}
+          className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs ${
+            !isOnline
+              ? 'bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 animate-pulse'
+              : pendingOfflineCount > 0
+              ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300'
+              : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300'
+          }`}
+          title={!isOnline ? `Offline Resilience Mode Active (${pendingOfflineCount} queued)` : pendingOfflineCount > 0 ? `${pendingOfflineCount} offline bills ready to sync` : 'Connected to Cloud MongoDB. 1-Click Backup ready.'}
+        >
+          {!isOnline ? (
+            <>
+              <WifiOff className="w-3.5 h-3.5 text-rose-600" />
+              <span className="hidden sm:inline font-mono">Offline ({pendingOfflineCount})</span>
+            </>
+          ) : pendingOfflineCount > 0 ? (
+            <>
+              <CloudUpload className="w-3.5 h-3.5 text-amber-600 animate-bounce" />
+              <span className="hidden sm:inline font-mono">Sync ({pendingOfflineCount})</span>
+            </>
+          ) : (
+            <>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="hidden sm:inline font-mono text-[11px]">Online</span>
+            </>
+          )}
+        </button>
+
+        {/* User Account Avatar with Profile Dropdown */}
         <div className="relative">
           <button
             onClick={() => setShowProfileDropdown(!showProfileDropdown)}
-            className="w-7 h-7 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center justify-center shadow-xs uppercase select-none cursor-pointer transition-all active:scale-95 ring-2 ring-emerald-100"
-            title={`Signed in as ${accountName}`}
+            className="w-8 h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center justify-center shadow-xs uppercase select-none cursor-pointer transition-all active:scale-95 ring-2 ring-emerald-100"
+            title={`Signed in as ${accountName} (${userRole})`}
           >
             {accountInitial}
           </button>
 
           {showProfileDropdown && (
             <>
-              {/* Backdrop listener to close popup on outside click */}
               <div
                 className="fixed inset-0 z-40"
                 onClick={() => setShowProfileDropdown(false)}
-              ></div>
+              />
 
-              {/* Profile Email Card Dropdown */}
-              <div className="absolute right-0 mt-2.5 w-60 bg-white rounded-2xl shadow-xl border border-slate-200 p-4 z-50 animate-fadeIn">
+              <div className="absolute right-0 mt-2.5 w-64 bg-white rounded-2xl shadow-xl border border-slate-200 p-4 z-50 animate-fadeIn">
                 <div className="flex items-center space-x-3 pb-3 border-b border-slate-100">
-                  <div className="w-9 h-9 rounded-full bg-emerald-600 text-white text-xs font-black flex items-center justify-center shadow-sm uppercase flex-shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white text-sm font-black flex items-center justify-center shadow-xs uppercase flex-shrink-0">
                     {accountInitial}
                   </div>
                   <div className="overflow-hidden">
@@ -668,9 +581,7 @@ export const Navbar: React.FC = () => {
             </>
           )}
         </div>
-
       </div>
     </header>
   );
 };
-

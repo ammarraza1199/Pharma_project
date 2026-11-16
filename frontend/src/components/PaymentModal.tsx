@@ -10,6 +10,7 @@ import {
 } from '../store/posSlice';
 import type { PaymentDetails, PaymentMethodType, DeliveryMode, DeliveryType } from '../types/pos';
 import api from '../utils/api';
+import { saveOfflineInvoice, isBrowserOnline } from '../utils/offlineStorage';
 import {
   QrCode,
   CreditCard,
@@ -229,9 +230,19 @@ export const PaymentModal: React.FC = () => {
         managerPin: currentSession?.scheduleXManagerPin // Pass temporary PIN if present
       };
 
-      // Make API Call
-      const res = await api.post('/invoices', payload);
-      const invoiceData = res.data.data; // The returned FinalizedInvoice
+      // Make API Call with Day 12 Offline Resilience Fallback
+      let invoiceData;
+      if (!isBrowserOnline()) {
+        invoiceData = saveOfflineInvoice(payload);
+      } else {
+        try {
+          const res = await api.post('/invoices', payload);
+          invoiceData = res.data.data;
+        } catch (apiErr: any) {
+          console.warn('[PaymentModal] Server or network offline during checkout, saving locally offline to queue:', apiErr);
+          invoiceData = saveOfflineInvoice(payload);
+        }
+      }
 
       // If Home Delivery or Store Pickup is selected, create delivery order for dashboard tracking
       if (fulfillmentMode === 'HOME_DELIVERY' || fulfillmentMode === 'STORE_PICKUP') {

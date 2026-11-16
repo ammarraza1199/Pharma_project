@@ -1,23 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { createPurchaseOrder, updatePurchaseOrderStatus, deletePurchaseOrder, setPurchaseOrders, navigateTo } from '../store/posSlice';
+import { createPurchaseOrder, updatePurchaseOrderStatus, deletePurchaseOrder, setPurchaseOrders, startGrnFromPurchaseOrder, navigateTo } from '../store/posSlice';
 import type { PurchaseOrder, PurchaseOrderItem, DistributorScheme } from '../types/pos';
 import api from '../utils/api';
 import {
   FileText, Plus, Printer, MessageSquare, Truck, CheckCircle2,
   Clock, X, Trash2, Calendar, Building, CreditCard, ExternalLink,
-  ChevronRight, ArrowRight, ShieldCheck, Check, Search
+  ChevronRight, ArrowRight, ShieldCheck, Check, Search, Zap
 } from 'lucide-react';
 
 interface Props {
   initialDraftScheme?: DistributorScheme | null;
   onClearInitialScheme?: () => void;
+  onOpenSmartReorder?: () => void;
 }
 
 export const AdvancePurchaseOrders: React.FC<Props> = ({
   initialDraftScheme,
-  onClearInitialScheme
+  onClearInitialScheme,
+  onOpenSmartReorder
 }) => {
   const dispatch = useDispatch();
   const purchaseOrders = useSelector((state: RootState) => state.pos.purchaseOrders);
@@ -242,8 +244,8 @@ export const AdvancePurchaseOrders: React.FC<Props> = ({
       poId: po.poId,
       status: 'CONVERTED_TO_GRN'
     }));
+    dispatch(startGrnFromPurchaseOrder(po));
 
-    alert(`✓ Purchase Order "${po.poNumber}" converted to GRN! Redirecting to Stock Purchase Intake...`);
     dispatch(navigateTo('PURCHASE_GRN'));
   };
 
@@ -338,6 +340,16 @@ export const AdvancePurchaseOrders: React.FC<Props> = ({
               className="w-full pl-8 pr-2.5 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:bg-white"
             />
           </div>
+
+          {onOpenSmartReorder && (
+            <button
+              onClick={onOpenSmartReorder}
+              className="flex items-center space-x-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold px-3.5 py-1.5 rounded-xl transition-all cursor-pointer"
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-600" />
+              <span>Smart Auto-Reorder</span>
+            </button>
+          )}
 
           <button
             onClick={() => {

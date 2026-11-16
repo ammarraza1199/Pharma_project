@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { submitGRNEntry, navigateTo } from '../store/posSlice';
+import { submitGRNEntry, clearPendingGrnFromPo, navigateTo } from '../store/posSlice';
 import type { GRNItem, GRNEntry } from '../types/pos';
 import api from '../utils/api';
 import {
@@ -16,6 +16,8 @@ export const PurchaseGRNPage: React.FC = () => {
   const dispatch = useDispatch();
   const products = useSelector((state: RootState) => state.pos.products);
   const grnEntries = useSelector((state: RootState) => state.pos.grnEntries);
+  const pendingGrnFromPo = useSelector((state: RootState) => state.pos.pendingGrnFromPo);
+  const [loadedFromPoNumber, setLoadedFromPoNumber] = useState<string | null>(null);
 
   const [grnHistoryFromApi, setGrnHistoryFromApi] = useState<any[]>([]);
   const [grnHistoryLoading, setGrnHistoryLoading] = useState<boolean>(true);
@@ -81,6 +83,37 @@ export const PurchaseGRNPage: React.FC = () => {
   const [grnItems, setGrnItems] = useState<GRNItem[]>([]);
   const [isSaved, setIsSaved] = useState<boolean>(false);
   const [isExcelModalOpen, setIsExcelModalOpen] = useState<boolean>(false);
+
+  // Pre-fill GRN items when converted from a Purchase Order
+  useEffect(() => {
+    if (!pendingGrnFromPo) return;
+    setSupplierName(pendingGrnFromPo.supplierName);
+    setSupplierInvoiceNo(`GRN-${pendingGrnFromPo.poNumber}`);
+    setLoadedFromPoNumber(pendingGrnFromPo.poNumber);
+
+    const mappedItems: GRNItem[] = (pendingGrnFromPo.items || []).map((poIt, idx) => {
+      const prod = products.find(p => p._id === poIt.productId || p.name.toLowerCase() === poIt.productName.toLowerCase());
+      const rate = poIt.estimatedRate || (prod ? Number((prod.sellingPrice * 0.72).toFixed(2)) : 50);
+      const gst = poIt.gstRate ?? prod?.gstRate ?? 12;
+      const itemMrp = prod?.unitMRP || Number((rate * 1.38).toFixed(2));
+      const itemSelling = prod?.sellingPrice || Number((itemMrp * 0.92).toFixed(2));
+      return {
+        productId: prod?._id || poIt.productId,
+        productName: prod?.name || poIt.productName,
+        batchNumber: `BT-${pendingGrnFromPo.poNumber.slice(-4)}-${idx + 1}`,
+        expiryDate: '2027-12-31',
+        quantity: poIt.quantity,
+        purchaseRate: rate,
+        mrp: itemMrp,
+        sellingPrice: itemSelling,
+        gstRate: gst,
+        totalAmount: Number((poIt.quantity * rate * (1 + gst / 100)).toFixed(2)),
+      };
+    });
+
+    setGrnItems(mappedItems);
+    dispatch(clearPendingGrnFromPo());
+  }, [pendingGrnFromPo, products, dispatch]);
 
   const handleImportVerifiedItems = (
     items: GRNItem[],
@@ -238,6 +271,21 @@ export const PurchaseGRNPage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* ── PRE-FILLED FROM PO BANNER ───────────────────────────────── */}
+      {loadedFromPoNumber && (
+        <div className="bg-emerald-50 border border-emerald-300 rounded-2xl p-3 flex items-center justify-between text-xs shadow-2xs">
+          <div className="flex items-center space-x-2 text-emerald-900 font-bold">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span>
+              Pre-filled line items from Purchase Order <span className="font-mono">{loadedFromPoNumber}</span>. Verify batch numbers &amp; expiries below, then submit GRN to update stock.
+            </span>
+          </div>
+          <button onClick={() => setLoadedFromPoNumber(null)} className="text-emerald-700 hover:text-emerald-900 cursor-pointer p-1">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* ── FAST EXCEL IMPORT BANNER ──────────────────────────────────── */}
       <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-300/80 rounded-2xl p-3.5 flex items-center justify-between flex-wrap gap-2 shadow-2xs">

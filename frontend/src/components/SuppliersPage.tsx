@@ -7,12 +7,13 @@ import api from '../utils/api';
 import {
   Building, Search, Plus, Truck,
   DollarSign, X, ShieldCheck, Edit2, Trash2,
-  Clock, Sparkles, FileText, AlertTriangle, CheckCircle2
+  Clock, Sparkles, FileText, AlertTriangle, CheckCircle2, Zap
 } from 'lucide-react';
 
 import { SupplierPurchaseLedger } from './SupplierPurchaseLedger';
 import { ProcurementIntelligence } from './ProcurementIntelligence';
 import { AdvancePurchaseOrders } from './AdvancePurchaseOrders';
+import { SmartReplenishmentPanel } from './SmartReplenishmentPanel';
 
 export const SuppliersPage: React.FC = () => {
   const dispatch = useDispatch();
@@ -20,9 +21,13 @@ export const SuppliersPage: React.FC = () => {
   const supplierBills = useSelector((state: RootState) => state.pos.supplierBills);
   const distributorSchemes = useSelector((state: RootState) => state.pos.distributorSchemes);
   const purchaseOrders = useSelector((state: RootState) => state.pos.purchaseOrders);
+  const products = useSelector((state: RootState) => state.pos.products);
+  const lowStockTriggerCount = products.filter(
+    p => p.stockStatus === 'LOW_STOCK' || p.stockStatus === 'OUT_OF_STOCK' || p.totalStock <= 25
+  ).length;
 
   // Top-level Navigation Tabs
-  const [activeMainTab, setActiveMainTab] = useState<'DIRECTORY' | 'PURCHASE_LEDGER' | 'PROCUREMENT_INTELLIGENCE' | 'ADVANCE_PO'>('DIRECTORY');
+  const [activeMainTab, setActiveMainTab] = useState<'DIRECTORY' | 'PURCHASE_LEDGER' | 'PROCUREMENT_INTELLIGENCE' | 'ADVANCE_PO' | 'SMART_REORDER'>('DIRECTORY');
 
   // Scheme selected from Procurement Intelligence to prefill Advance PO
   const [selectedSchemeForPO, setSelectedSchemeForPO] = useState<DistributorScheme | null>(null);
@@ -247,6 +252,24 @@ export const SuppliersPage: React.FC = () => {
             {purchaseOrders.length}
           </span>
         </button>
+
+        {/* Tab 5: Smart Stock Reordering & Auto-PO Triggers */}
+        <button
+          onClick={() => setActiveMainTab('SMART_REORDER')}
+          className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+            activeMainTab === 'SMART_REORDER'
+              ? 'bg-amber-600 text-white shadow-xs'
+              : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+          }`}
+        >
+          <Zap className={`w-4 h-4 ${activeMainTab === 'SMART_REORDER' ? 'text-white' : 'text-amber-500'}`} />
+          <span>Smart Auto-Reorder</span>
+          {lowStockTriggerCount > 0 && (
+            <span className="px-1.5 py-0.2 bg-rose-100 text-rose-800 text-[10px] font-black rounded-full">
+              {lowStockTriggerCount} Due
+            </span>
+          )}
+        </button>
       </div>
 
       {/* ── TAB 1 CONTENT: VENDOR DIRECTORY ────────────────────────── */}
@@ -409,7 +432,13 @@ export const SuppliersPage: React.FC = () => {
         <AdvancePurchaseOrders
           initialDraftScheme={selectedSchemeForPO}
           onClearInitialScheme={() => setSelectedSchemeForPO(null)}
+          onOpenSmartReorder={() => setActiveMainTab('SMART_REORDER')}
         />
+      )}
+
+      {/* ── TAB 5 CONTENT: SMART STOCK REORDERING & SUPPLIER POs ────── */}
+      {activeMainTab === 'SMART_REORDER' && (
+        <SmartReplenishmentPanel onGoToPOs={() => setActiveMainTab('ADVANCE_PO')} />
       )}
 
       {/* ── REGISTER NEW SUPPLIER MODAL ───────────────────────────────── */}

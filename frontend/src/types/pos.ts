@@ -3,9 +3,11 @@ export type AuthMode = 'SIGN_IN' | 'SIGN_UP';
 
 export interface UserAccount {
   pharmacistName: string;
+  name?: string;
   pharmacyName: string;
   licenseNo: string;
   email: string;
+  gstin?: string;
   role?: string;
   isLoggedIn: boolean;
 }
@@ -289,8 +291,19 @@ export interface ChronicMedication {
   daysRemaining?: number;
 }
 
+export interface PatientVitals {
+  bp?: string;
+  fbs?: string;
+  ppbs?: string;
+  hba1c?: string;
+  tsh?: string;
+  weightKg?: number;
+  recordedDate?: string;
+}
+
 export interface PatientRecord {
   patientId: string;
+  _id?: string;
   name: string;
   phone: string;
   age: string;
@@ -300,6 +313,12 @@ export interface PatientRecord {
   lastVisit: string;
   chronicConditions?: string[];
   chronicMedications?: ChronicMedication[];
+  vitals?: PatientVitals;
+  allergies?: string[];
+  nextRefillDate?: string;
+  lastReminderSent?: string;
+  refillStatus?: 'ON_TRACK' | 'DUE_SOON' | 'OVERDUE';
+  notes?: string;
 }
 
 export interface SupplierRecord {
@@ -619,6 +638,45 @@ export interface PurchaseOrder {
   schemeNotes?: string;
   notes?: string;
   createdAt: string;
+}
+
+export interface ReorderSuggestionItem {
+  productId: string;
+  productName: string;
+  brand: string;
+  saltComposition: string;
+  packType: string;
+  currentStock: number;
+  onOrderQty: number;
+  pendingPoNumbers: string[];
+  soldInLookback: number;
+  dailyRunRate: number;
+  runRateSource: 'INVOICE_SALES' | 'VELOCITY_ESTIMATE';
+  daysOfCoverRemaining: number;
+  leadTimeDays: number;
+  safetyBufferDays: number;
+  reorderPoint: number;
+  suggestedOrderQty: number;
+  estimatedRate: number;
+  gstRate: number;
+  estimatedLineTotal: number;
+  urgency: 'CRITICAL_OUT' | 'TRIGGER_REORDER' | 'WATCHLIST';
+  supplierId: string;
+  supplierName: string;
+  supplierGstin: string;
+  supplierPhone: string;
+  creditPeriodDays: number;
+}
+
+export interface SupplierReorderGroup {
+  supplierId: string;
+  supplierName: string;
+  supplierGstin: string;
+  supplierPhone: string;
+  leadTimeDays: number;
+  creditPeriodDays: number;
+  items: ReorderSuggestionItem[];
+  totalEstimatedAmount: number;
 }
 
 export interface PatientAdherenceRecord {

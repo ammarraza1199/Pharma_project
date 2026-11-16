@@ -8,7 +8,8 @@ import {
   setMultiStoreModalOpen,
   setPatientInstructionModalOpen,
   openSubstitutionModalForProduct,
-  setRackRoboModalOpen
+  setRackRoboModalOpen,
+  openMedicineInspectionModal
 } from '../store/posSlice';
 import { getMedicineDetails } from '../utils/medicineDetails';
 import { getSortedBatchesFEFO, getEarliestExpiringBatch } from '../utils/fefoHelper';
@@ -17,7 +18,7 @@ import {
   Search, ScanBarcode, AlertCircle, Plus, Zap,
   X, ArrowUpDown, PackageX, TrendingUp, ChevronDown,
   FileText, Repeat, Building2, Volume2, PackageOpen, BadgeAlert,
-  Compass, MapPin
+  Compass, MapPin, Info
 } from 'lucide-react';
 import api from '../utils/api';
 
@@ -649,6 +650,19 @@ export const ProductSearch: React.FC = () => {
                     </button>
 
                     <div className="mt-1.5 flex items-center space-x-1.5 flex-wrap gap-y-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          dispatch(openMedicineInspectionModal({ product }));
+                        }}
+                        className="flex items-center space-x-1 text-[10px] font-bold text-emerald-800 hover:text-emerald-950 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded cursor-pointer transition-all shadow-2xs"
+                        title="Drug Inspection (Pricing, Batches, Generics, Warnings)"
+                      >
+                        <Info className="w-2.5 h-2.5 text-emerald-600" />
+                        <span>Inspect</span>
+                      </button>
+
                       <button
                         type="button"
                         onClick={(e) => {

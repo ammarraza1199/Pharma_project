@@ -6,6 +6,7 @@ import { GRNEntry } from '../models/GRNEntry';
 import { DisposalRecord } from '../models/DisposalRecord';
 import { ReturnNote } from '../models/ReturnNote';
 import { Supplier } from '../models/Supplier';
+import { CashRegister } from '../models/CashRegister';
 import { protect, requireRole, AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -630,6 +631,455 @@ router.get('/stock-movement/:productId', protect, requireRole('MANAGER', 'OWNER'
         timeline,
       },
     });
+  } catch (err) { next(err); }
+});
+
+// ============================================================================
+// DAY 10: GST COMPLIANCE & END-OF-DAY REGISTER ENDPOINTS
+// ============================================================================
+
+// GET /api/reports/gst/gstr-1
+router.get('/gst/gstr-1', protect, requireRole('MANAGER', 'OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { from, to } = req.query;
+    const dateQuery: any = {};
+    if (from) dateQuery.$gte = new Date(String(from));
+    if (to) { const t = new Date(String(to)); t.setHours(23, 59, 59, 999); dateQuery.$lte = t; }
+
+    const invoices = await Invoice.find(Object.keys(dateQuery).length > 0 ? { invoiceDate: dateQuery } : {}).sort({ invoiceDate: 1 });
+
+    const b2b: any[] = [];
+    const b2cSmallMap: Record<number, { gstRate: number; taxableValue: number; cgst: number; sgst: number; totalTax: number; lineTotal: number; invoiceCount: number }> = {};
+    const hsnMap: Record<string, { hsnCode: string; description: string; uqc: string; totalQty: number; totalValue: number; taxableValue: number; cgst: number; sgst: number; igst: number; cess: number }> = {};
+
+    let totalTaxable = 0;
+    let totalCGST = 0;
+    let totalSGST = 0;
+    let grandTotal = 0;
+
+    invoices.forEach((inv) => {
+      totalTaxable += (inv.subtotal || 0) - (inv.totalDiscount || 0);
+      totalCGST += inv.totalCGST || 0;
+      totalSGST += inv.totalSGST || 0;
+      grandTotal += inv.grandTotal || 0;
+
+      const customerGstin = (inv as any).customerGstin || (inv.billingSession?.patientDetails as any)?.gstin || (inv.billingSession?.doctorDetails as any)?.gstin || '';
+      const isB2B = Boolean(customerGstin && customerGstin.trim().length >= 15);
+
+      if (isB2B) {
+        b2b.push({
+          invoiceNumber: inv.invoiceNumber,
+          invoiceDate: inv.invoiceDate,
+          customerName: inv.billingSession?.patientDetails?.patientName || 'Institutional Buyer',
+          customerGstin: customerGstin.trim(),
+          placeOfSupply: '36-Telangana',
+          reverseCharge: 'N',
+          invoiceType: 'Regular B2B',
+          taxableValue: Number(((inv.subtotal || 0) - (inv.totalDiscount || 0)).toFixed(2)),
+          cgst: Number((inv.totalCGST || 0).toFixed(2)),
+          sgst: Number((inv.totalSGST || 0).toFixed(2)),
+          igst: 0,
+          cess: 0,
+          totalInvoiceValue: Number((inv.grandTotal || 0).toFixed(2)),
+        });
+      }
+
+      // Process items for B2C Small and HSN Table 12
+      (inv.billingSession?.items || []).forEach((item: any) => {
+        const rate = item.productSnapshot?.gstRate || (item.taxableAmount > 0 ? Math.round(((item.cgstAmount + item.sgstAmount) / item.taxableAmount) * 100) : 12);
+        const hsn = item.productSnapshot?.hsnCode || '30049099';
+        const desc = item.productSnapshot?.name || 'Medicament Formulation';
+        const qty = item.quantity || 1;
+        const taxVal = item.taxableAmount || 0;
+        const cgstVal = item.cgstAmount || 0;
+        const sgstVal = item.sgstAmount || 0;
+        const lineVal = item.lineTotal || 0;
+
+        if (!isB2B) {
+          if (!b2cSmallMap[rate]) {
+            b2cSmallMap[rate] = { gstRate: rate, taxableValue: 0, cgst: 0, sgst: 0, totalTax: 0, lineTotal: 0, invoiceCount: 0 };
+          }
+          b2cSmallMap[rate].taxableValue += taxVal;
+          b2cSmallMap[rate].cgst += cgstVal;
+          b2cSmallMap[rate].sgst += sgstVal;
+          b2cSmallMap[rate].totalTax += cgstVal + sgstVal;
+          b2cSmallMap[rate].lineTotal += lineVal;
+          b2cSmallMap[rate].invoiceCount += 1;
+        }
+
+        // HSN outward summary
+        if (!hsnMap[hsn]) {
+          hsnMap[hsn] = {
+            hsnCode: hsn,
+            description: desc,
+            uqc: 'STRIPS/NOS',
+            totalQty: 0,
+            totalValue: 0,
+            taxableValue: 0,
+            cgst: 0,
+            sgst: 0,
+            igst: 0,
+            cess: 0,
+          };
+        }
+        hsnMap[hsn].totalQty += qty;
+        hsnMap[hsn].totalValue += lineVal;
+        hsnMap[hsn].taxableValue += taxVal;
+        hsnMap[hsn].cgst += cgstVal;
+        hsnMap[hsn].sgst += sgstVal;
+      });
+    });
+
+    const b2cSmall = Object.values(b2cSmallMap).map((row) => ({
+      ...row,
+      taxableValue: Number(row.taxableValue.toFixed(2)),
+      cgst: Number(row.cgst.toFixed(2)),
+      sgst: Number(row.sgst.toFixed(2)),
+      totalTax: Number(row.totalTax.toFixed(2)),
+      lineTotal: Number(row.lineTotal.toFixed(2)),
+    })).sort((a, b) => a.gstRate - b.gstRate);
+
+    const hsnSummary = Object.values(hsnMap).map((row) => ({
+      ...row,
+      totalValue: Number(row.totalValue.toFixed(2)),
+      taxableValue: Number(row.taxableValue.toFixed(2)),
+      cgst: Number(row.cgst.toFixed(2)),
+      sgst: Number(row.sgst.toFixed(2)),
+    })).sort((a, b) => b.totalValue - a.totalValue);
+
+    const docSummary = {
+      docType: 'Invoices for outward supply (B2C & B2B)',
+      fromSerial: invoices.length > 0 ? invoices[0].invoiceNumber : 'N/A',
+      toSerial: invoices.length > 0 ? invoices[invoices.length - 1].invoiceNumber : 'N/A',
+      totalIssued: invoices.length,
+      cancelledCount: 0,
+      netIssued: invoices.length,
+    };
+
+    res.json({
+      success: true,
+      data: {
+        summaryTotals: {
+          totalInvoices: invoices.length,
+          totalTaxable: Number(totalTaxable.toFixed(2)),
+          totalCGST: Number(totalCGST.toFixed(2)),
+          totalSGST: Number(totalSGST.toFixed(2)),
+          totalIGST: 0,
+          totalTax: Number((totalCGST + totalSGST).toFixed(2)),
+          grandTotal: Number(grandTotal.toFixed(2)),
+        },
+        b2b,
+        b2cSmall,
+        hsnSummary,
+        docSummary,
+      },
+    });
+  } catch (err) { next(err); }
+});
+
+// GET /api/reports/gst/gstr-3b
+router.get('/gst/gstr-3b', protect, requireRole('MANAGER', 'OWNER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { from, to } = req.query;
+    const dateQuery: any = {};
+    if (from) dateQuery.$gte = new Date(String(from));
+    if (to) { const t = new Date(String(to)); t.setHours(23, 59, 59, 999); dateQuery.$lte = t; }
+
+    const [invoices, grnList] = await Promise.all([
+      Invoice.find(Object.keys(dateQuery).length > 0 ? { invoiceDate: dateQuery } : {}),
+      GRNEntry.find(Object.keys(dateQuery).length > 0 ? { receivedDate: dateQuery } : {}),
+    ]);
+
+    // Outward Supplies 3.1
+    let outwardTaxable = 0;
+    let outwardCGST = 0;
+    let outwardSGST = 0;
+    let outwardTotal = 0;
+
+    invoices.forEach((inv) => {
+      outwardTaxable += (inv.subtotal || 0) - (inv.totalDiscount || 0);
+      outwardCGST += inv.totalCGST || 0;
+      outwardSGST += inv.totalSGST || 0;
+      outwardTotal += inv.grandTotal || 0;
+    });
+
+    // Inward Inward/Purchase Input Tax Credit (ITC) 4(A)(5) All other ITC
+    let inwardTaxable = 0;
+    let itcCGST = 0;
+    let itcSGST = 0;
+
+    grnList.forEach((grn) => {
+      (grn.items || []).forEach((item) => {
+        const itemTaxable = (item.purchaseRate || 0) * (item.quantity || 1);
+        const rate = item.gstRate || 12;
+        const tax = itemTaxable * (rate / 100);
+        inwardTaxable += itemTaxable;
+        itcCGST += tax / 2;
+        itcSGST += tax / 2;
+      });
+    });
+
+    // Net tax payable
+    const netCGSTPayable = Math.max(0, outwardCGST - itcCGST);
+    const netSGSTPayable = Math.max(0, outwardSGST - itcSGST);
+    const itcCGSTCarryForward = Math.max(0, itcCGST - outwardCGST);
+    const itcSGSTCarryForward = Math.max(0, itcSGST - outwardSGST);
+
+    res.json({
+      success: true,
+      data: {
+        outwardSupplies: {
+          taxableSupplies: {
+            description: '3.1(a) Outward taxable supplies (other than zero rated, nil rated and exempted)',
+            taxableValue: Number(outwardTaxable.toFixed(2)),
+            igst: 0,
+            cgst: Number(outwardCGST.toFixed(2)),
+            sgst: Number(outwardSGST.toFixed(2)),
+            cess: 0,
+            totalTax: Number((outwardCGST + outwardSGST).toFixed(2)),
+          },
+          zeroRated: { description: '3.1(b) Outward taxable supplies (zero rated)', taxableValue: 0, igst: 0, cess: 0 },
+          nilExempt: { description: '3.1(c) Other outward supplies (Nil rated, exempted)', taxableValue: 0, igst: 0, cgst: 0, sgst: 0 },
+          reverseCharge: { description: '3.1(d) Inward supplies liable to reverse charge', taxableValue: 0, igst: 0, cgst: 0, sgst: 0 },
+          nonGst: { description: '3.1(e) Non-GST outward supplies', taxableValue: 0 },
+        },
+        eligibleITC: {
+          importGoods: { description: '4(A)(1) Import of Goods', igst: 0, cess: 0 },
+          importServices: { description: '4(A)(2) Import of Services', igst: 0, cess: 0 },
+          reverseChargeITC: { description: '4(A)(3) Inward supplies liable to reverse charge', igst: 0, cgst: 0, sgst: 0, cess: 0 },
+          allOtherITC: {
+            description: '4(A)(5) All other ITC (From GRN Inward Purchases)',
+            taxableValue: Number(inwardTaxable.toFixed(2)),
+            igst: 0,
+            cgst: Number(itcCGST.toFixed(2)),
+            sgst: Number(itcSGST.toFixed(2)),
+            cess: 0,
+            totalITC: Number((itcCGST + itcSGST).toFixed(2)),
+          },
+        },
+        netTaxComputation: {
+          outputTax: {
+            cgst: Number(outwardCGST.toFixed(2)),
+            sgst: Number(outwardSGST.toFixed(2)),
+            total: Number((outwardCGST + outwardSGST).toFixed(2)),
+          },
+          inputTaxCredit: {
+            cgst: Number(itcCGST.toFixed(2)),
+            sgst: Number(itcSGST.toFixed(2)),
+            total: Number((itcCGST + itcSGST).toFixed(2)),
+          },
+          netTaxToPayInCash: {
+            cgst: Number(netCGSTPayable.toFixed(2)),
+            sgst: Number(netSGSTPayable.toFixed(2)),
+            total: Number((netCGSTPayable + netSGSTPayable).toFixed(2)),
+          },
+          itcBalanceCarryForward: {
+            cgst: Number(itcCGSTCarryForward.toFixed(2)),
+            sgst: Number(itcSGSTCarryForward.toFixed(2)),
+            total: Number((itcCGSTCarryForward + itcSGSTCarryForward).toFixed(2)),
+          },
+        },
+      },
+    });
+  } catch (err) { next(err); }
+});
+
+// GET /api/reports/eod-register/live-summary
+router.get('/eod-register/live-summary', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const dateStr = String(req.query.date || new Date().toISOString().split('T')[0]);
+    const start = new Date(dateStr); start.setHours(0, 0, 0, 0);
+    const end = new Date(dateStr); end.setHours(23, 59, 59, 999);
+
+    const [invoices, returns, existingRegister] = await Promise.all([
+      Invoice.find({ invoiceDate: { $gte: start, $lte: end } }),
+      ReturnNote.find({ returnDate: { $gte: start, $lte: end } }),
+      CashRegister.findOne({ registerDate: { $gte: start, $lte: end } }).sort({ createdAt: -1 }),
+    ]);
+
+    let totalSalesCash = 0;
+    let totalSalesUpi = 0;
+    let totalSalesCard = 0;
+    let totalSalesSplitCash = 0;
+    let grossSales = 0;
+
+    invoices.forEach((inv) => {
+      grossSales += inv.grandTotal || 0;
+      const method = inv.payment?.method || 'CASH';
+      if (method === 'CASH') {
+        totalSalesCash += inv.payment?.cashAmount || inv.grandTotal || 0;
+      } else if (method === 'UPI') {
+        totalSalesUpi += inv.payment?.upiAmount || inv.grandTotal || 0;
+      } else if (method === 'CARD') {
+        totalSalesCard += inv.payment?.cardAmount || inv.grandTotal || 0;
+      } else if (method === 'SPLIT') {
+        totalSalesCash += inv.payment?.cashAmount || 0;
+        totalSalesSplitCash += inv.payment?.cashAmount || 0;
+        totalSalesUpi += inv.payment?.upiAmount || 0;
+        totalSalesCard += inv.payment?.cardAmount || 0;
+      }
+    });
+
+    const totalRefundsCash = returns
+      .filter((r) => r.refundMethod === 'CASH')
+      .reduce((s, r) => s + (r.totalRefundAmount || 0), 0);
+    const totalRefundsAll = returns.reduce((s, r) => s + (r.totalRefundAmount || 0), 0);
+
+    const openingFloat = existingRegister?.openingFloat ?? 2000;
+    const pettyCashOutflow = existingRegister?.pettyCashOutflow ?? 0;
+    const pettyCashInflow = existingRegister?.pettyCashInflow ?? 0;
+
+    const expectedCash = openingFloat + totalSalesCash - totalRefundsCash - pettyCashOutflow + pettyCashInflow;
+
+    res.json({
+      success: true,
+      data: {
+        date: dateStr,
+        shift: existingRegister?.shift || 'FULL_DAY',
+        status: existingRegister?.status || 'OPEN',
+        isClosed: existingRegister?.status === 'CLOSED',
+        cashierName: existingRegister?.cashierName || (req.user as any)?.name || req.user?.email || 'Cashier',
+        openingFloat: Number(openingFloat.toFixed(2)),
+        totalBills: invoices.length,
+        grossSales: Number(grossSales.toFixed(2)),
+        totalSalesCash: Number(totalSalesCash.toFixed(2)),
+        totalSalesUpi: Number(totalSalesUpi.toFixed(2)),
+        totalSalesCard: Number(totalSalesCard.toFixed(2)),
+        totalSalesSplitCash: Number(totalSalesSplitCash.toFixed(2)),
+        totalRefundsCash: Number(totalRefundsCash.toFixed(2)),
+        totalRefundsAll: Number(totalRefundsAll.toFixed(2)),
+        refundsCount: returns.length,
+        pettyCashOutflow: Number(pettyCashOutflow.toFixed(2)),
+        pettyCashInflow: Number(pettyCashInflow.toFixed(2)),
+        expectedCash: Number(expectedCash.toFixed(2)),
+        actualCashCounted: existingRegister ? existingRegister.actualCashCounted : Number(expectedCash.toFixed(2)),
+        cashVariance: existingRegister ? existingRegister.cashVariance : 0,
+        denominationBreakdown: existingRegister?.denominationBreakdown || {
+          n2000: 0,
+          n500: Math.floor(expectedCash / 500),
+          n200: 0,
+          n100: Math.floor((expectedCash % 500) / 100),
+          n50: 0,
+          n20: 0,
+          n10: 0,
+          coins: Number((expectedCash % 100).toFixed(2)),
+        },
+        notes: existingRegister?.notes || '',
+        verifiedBy: existingRegister?.verifiedBy || '',
+        closedAt: existingRegister?.closedAt,
+      },
+    });
+  } catch (err) { next(err); }
+});
+
+// POST /api/reports/eod-register/close-drawer
+router.post('/eod-register/close-drawer', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const {
+      date,
+      shift = 'FULL_DAY',
+      openingFloat = 2000,
+      pettyCashOutflow = 0,
+      pettyCashInflow = 0,
+      denominationBreakdown = {},
+      actualCashCounted = 0,
+      notes = '',
+      verifiedBy = '',
+    } = req.body;
+
+    const dateStr = String(date || new Date().toISOString().split('T')[0]);
+    const start = new Date(dateStr); start.setHours(0, 0, 0, 0);
+    const end = new Date(dateStr); end.setHours(23, 59, 59, 999);
+
+    const [invoices, returns] = await Promise.all([
+      Invoice.find({ invoiceDate: { $gte: start, $lte: end } }),
+      ReturnNote.find({ returnDate: { $gte: start, $lte: end } }),
+    ]);
+
+    let totalSalesCash = 0;
+    let totalSalesUpi = 0;
+    let totalSalesCard = 0;
+    let totalSalesSplitCash = 0;
+    let grossSales = 0;
+
+    invoices.forEach((inv) => {
+      grossSales += inv.grandTotal || 0;
+      const method = inv.payment?.method || 'CASH';
+      if (method === 'CASH') {
+        totalSalesCash += inv.payment?.cashAmount || inv.grandTotal || 0;
+      } else if (method === 'UPI') {
+        totalSalesUpi += inv.payment?.upiAmount || inv.grandTotal || 0;
+      } else if (method === 'CARD') {
+        totalSalesCard += inv.payment?.cardAmount || inv.grandTotal || 0;
+      } else if (method === 'SPLIT') {
+        totalSalesCash += inv.payment?.cashAmount || 0;
+        totalSalesSplitCash += inv.payment?.cashAmount || 0;
+        totalSalesUpi += inv.payment?.upiAmount || 0;
+        totalSalesCard += inv.payment?.cardAmount || 0;
+      }
+    });
+
+    const totalRefundsCash = returns
+      .filter((r) => r.refundMethod === 'CASH')
+      .reduce((s, r) => s + (r.totalRefundAmount || 0), 0);
+
+    const floatNum = Number(openingFloat) || 0;
+    const pettyOut = Number(pettyCashOutflow) || 0;
+    const pettyIn = Number(pettyCashInflow) || 0;
+    const counted = Number(actualCashCounted) || 0;
+
+    const expectedCash = Number((floatNum + totalSalesCash - totalRefundsCash - pettyOut + pettyIn).toFixed(2));
+    const cashVariance = Number((counted - expectedCash).toFixed(2));
+
+    const registerRecord = new CashRegister({
+      registerDate: start,
+      shift,
+      status: 'CLOSED',
+      cashierName: (req.user as any)?.name || req.user?.email || 'Cashier Desk',
+      openedAt: start,
+      closedAt: new Date(),
+      openingFloat: floatNum,
+      totalSalesCash: Number(totalSalesCash.toFixed(2)),
+      totalSalesUpi: Number(totalSalesUpi.toFixed(2)),
+      totalSalesCard: Number(totalSalesCard.toFixed(2)),
+      totalSalesSplitCash: Number(totalSalesSplitCash.toFixed(2)),
+      grossSales: Number(grossSales.toFixed(2)),
+      totalBills: invoices.length,
+      totalRefundsCash: Number(totalRefundsCash.toFixed(2)),
+      refundsCount: returns.length,
+      pettyCashOutflow: pettyOut,
+      pettyCashInflow: pettyIn,
+      expectedCash,
+      actualCashCounted: counted,
+      denominationBreakdown,
+      cashVariance,
+      notes,
+      verifiedBy: verifiedBy || (req.user as any)?.name || req.user?.email || 'Manager',
+    });
+
+    await registerRecord.save();
+
+    res.json({
+      success: true,
+      message: 'End-of-day cash drawer reconciliation completed successfully.',
+      data: registerRecord,
+    });
+  } catch (err) { next(err); }
+});
+
+// GET /api/reports/eod-register/history
+router.get('/eod-register/history', protect, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { from, to, limit = 30 } = req.query;
+    const query: any = {};
+    if (from || to) {
+      query.registerDate = {};
+      if (from) query.registerDate.$gte = new Date(String(from));
+      if (to) { const t = new Date(String(to)); t.setHours(23, 59, 59, 999); query.registerDate.$lte = t; }
+    }
+
+    const history = await CashRegister.find(query).sort({ registerDate: -1 }).limit(Number(limit));
+    res.json({ success: true, data: history });
   } catch (err) { next(err); }
 });
 

@@ -29,6 +29,8 @@ import deliveryRoutes from './routes/delivery.routes';
 import pilRoutes from './routes/pil.routes';
 import prescriptionRoutes from './routes/prescription.routes';
 import clinicalBundleRoutes from './routes/clinicalBundle.routes';
+import stockTransferRoutes from './routes/stockTransfer.routes';
+import backupRoutes from './routes/backup.routes';
 
 const app = express();
 const httpServer = createServer(app);
@@ -75,6 +77,8 @@ app.use('/api/delivery-orders', deliveryRoutes);
 app.use('/api/pil', pilRoutes);
 app.use('/api/prescriptions', prescriptionRoutes);
 app.use('/api/clinical-bundles', clinicalBundleRoutes);
+app.use('/api/stock-transfers', stockTransferRoutes);
+app.use('/api/backup', backupRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

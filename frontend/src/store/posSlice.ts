@@ -160,14 +160,25 @@ interface PosState {
     gender?: 'MALE' | 'FEMALE' | 'OTHER';
     sessionId?: string;
   };
+  offlineBackupModal: {
+    isOpen: boolean;
+  };
   patientInstructionModal: PatientInstructionModalState;
   clearanceGiftModal: ClearanceGiftModalState;
+  medicineInspectionModal: {
+    isOpen: boolean;
+    product?: Product;
+    activeTab?: 'PRICING' | 'BATCH_SHELF' | 'SUBSTITUTES' | 'WARNINGS';
+  };
   consultationRecords: VoiceConsultationRecord[];
 
   // Printing & Finalization
   invoices: FinalizedInvoice[];
   latestFinalizedInvoice: FinalizedInvoice | null;
   isSubmittingBill: boolean;
+
+  // Pending PO -> GRN Conversion
+  pendingGrnFromPo: PurchaseOrder | null;
 
   // Substitute Intelligence & Conversion Analytics (Task #52)
   substituteEvents: SubstituteEvent[];
@@ -390,6 +401,18 @@ const initialState: PosState = {
       totalSpent: 5420,
       lastVisit: '2026-08-14',
       chronicConditions: ['Hypertension (BP)', 'Type-2 Diabetes'],
+      vitals: {
+        bp: '138/88 mmHg',
+        fbs: '142 mg/dL',
+        ppbs: '192 mg/dL',
+        hba1c: '7.2%',
+        tsh: '2.4 µIU/mL',
+        weightKg: 74,
+        recordedDate: '2026-08-14'
+      },
+      allergies: ['Penicillin'],
+      nextRefillDate: '2026-08-28',
+      refillStatus: 'DUE_SOON',
       chronicMedications: [
         {
           productId: '64f1a2b3c4d5e6f7a8b9c004',
@@ -433,6 +456,16 @@ const initialState: PosState = {
       totalSpent: 2850,
       lastVisit: '2026-08-12',
       chronicConditions: ['Asthma', 'Allergic Rhinitis'],
+      vitals: {
+        bp: '118/76 mmHg',
+        fbs: '96 mg/dL',
+        tsh: '2.1 µIU/mL',
+        weightKg: 58,
+        recordedDate: '2026-08-12'
+      },
+      allergies: ['Sulfa drugs'],
+      nextRefillDate: '2026-08-20',
+      refillStatus: 'OVERDUE',
       chronicMedications: [
         {
           productId: '64f1a2b3c4d5e6f7a8b9c001',
@@ -454,7 +487,17 @@ const initialState: PosState = {
       gender: 'FEMALE',
       totalBills: 5,
       totalSpent: 1920,
-      lastVisit: '2026-08-10'
+      lastVisit: '2026-08-10',
+      vitals: {
+        bp: '120/80 mmHg',
+        fbs: '92 mg/dL',
+        tsh: '1.9 µIU/mL',
+        weightKg: 54,
+        recordedDate: '2026-08-10'
+      },
+      allergies: [],
+      nextRefillDate: '2026-09-10',
+      refillStatus: 'ON_TRACK'
     },
     {
       patientId: 'pat-004',
@@ -466,6 +509,18 @@ const initialState: PosState = {
       totalSpent: 12400,
       lastVisit: '2026-08-08',
       chronicConditions: ['Type 2 Diabetes (Sugar)', 'Hypertension (BP)', 'Cardiac Care'],
+      vitals: {
+        bp: '146/92 mmHg',
+        fbs: '168 mg/dL',
+        ppbs: '225 mg/dL',
+        hba1c: '8.1%',
+        tsh: '3.9 µIU/mL',
+        weightKg: 82,
+        recordedDate: '2026-08-08'
+      },
+      allergies: ['Aspirin (Mild GI irritation)'],
+      nextRefillDate: '2026-08-22',
+      refillStatus: 'OVERDUE',
       chronicMedications: [
         {
           productId: '64f1a2b3c4d5e6f7a8b9c003',
@@ -486,6 +541,39 @@ const initialState: PosState = {
           conditionCategory: 'HYPERTENSION',
           lastRefilledDate: '2026-07-25',
           doctorName: 'Dr. A. Verma (Cardiologist)'
+        }
+      ]
+    },
+    {
+      patientId: 'pat-005',
+      name: 'K. Sunitha Devi',
+      phone: '9876543214',
+      age: '48',
+      gender: 'FEMALE',
+      totalBills: 11,
+      totalSpent: 4780,
+      lastVisit: '2026-08-15',
+      chronicConditions: ['Hypothyroidism (Thyroid)', 'Mild Hypertension'],
+      vitals: {
+        bp: '128/84 mmHg',
+        fbs: '108 mg/dL',
+        tsh: '5.8 µIU/mL',
+        weightKg: 66,
+        recordedDate: '2026-08-15'
+      },
+      allergies: [],
+      nextRefillDate: '2026-08-30',
+      refillStatus: 'DUE_SOON',
+      chronicMedications: [
+        {
+          productId: '64f1a2b3c4d5e6f7a8b9c003',
+          productName: 'Dolo 650 Tablet',
+          dosage: '1 Tab SOS',
+          frequencyDays: 30,
+          quantity: 15,
+          conditionCategory: 'GENERAL',
+          lastRefilledDate: '2026-07-30',
+          doctorName: 'Dr. M. Gayatri (Endocrinologist)'
         }
       ]
     }
@@ -1111,6 +1199,10 @@ const initialState: PosState = {
     isOpen: false,
     category: 'DIABETES'
   },
+  medicineInspectionModal: {
+    isOpen: false,
+    activeTab: 'PRICING'
+  },
 
   branchStores: [
     { branchId: 'br-001', branchName: 'Hi-Tech City Main Branch (Current)', location: 'Plot 44, Tech City, Hyderabad', distanceKm: 0.0, phone: '+91 98765 43210', status: 'OPEN' },
@@ -1206,6 +1298,10 @@ const initialState: PosState = {
   },
 
   voiceConsultationModal: {
+    isOpen: false
+  },
+
+  offlineBackupModal: {
     isOpen: false
   },
 
@@ -1461,7 +1557,8 @@ const initialState: PosState = {
       counterNumber: 1,
       patientResponseNote: 'Customer accepted 15% discount benefit on Lupin Fexova.'
     }
-  ]
+  ],
+  pendingGrnFromPo: null
 };
 
 export const checkIsScheduleXOrNarcotic = (product: Product): boolean => {
@@ -1884,6 +1981,14 @@ export const posSlice = createSlice({
       state.patients = action.payload;
     },
 
+    // Update patient record & vitals
+    updatePatientRecord: (state, action: PayloadAction<Partial<PatientRecord> & { patientId: string }>) => {
+      const idx = state.patients.findIndex(p => p.patientId === action.payload.patientId || (action.payload.phone && p.phone === action.payload.phone));
+      if (idx !== -1) {
+        state.patients[idx] = { ...state.patients[idx], ...action.payload };
+      }
+    },
+
     addSupplier: (state, action: PayloadAction<Omit<SupplierRecord, 'supplierId'> & { supplierId?: string }>) => {
       const newSupplier: SupplierRecord = {
         ...action.payload,
@@ -1964,6 +2069,18 @@ export const posSlice = createSlice({
 
     createPurchaseOrder: (state, action: PayloadAction<PurchaseOrder>) => {
       state.purchaseOrders.unshift(action.payload);
+    },
+
+    createMultiplePurchaseOrders: (state, action: PayloadAction<PurchaseOrder[]>) => {
+      state.purchaseOrders = [...action.payload, ...state.purchaseOrders];
+    },
+
+    startGrnFromPurchaseOrder: (state, action: PayloadAction<PurchaseOrder>) => {
+      state.pendingGrnFromPo = action.payload;
+    },
+
+    clearPendingGrnFromPo: (state) => {
+      state.pendingGrnFromPo = null;
     },
 
     updatePurchaseOrderStatus: (state, action: PayloadAction<{ poId: string; status: 'DRAFT' | 'PLACED' | 'CONVERTED_TO_GRN' | 'CANCELLED' }>) => {
@@ -2099,6 +2216,13 @@ export const posSlice = createSlice({
 
     switchTab: (state, action: PayloadAction<string>) => {
       state.activeSessionId = action.payload;
+    },
+
+    updateTabTitle: (state, action: PayloadAction<{ sessionId: string; title: string }>) => {
+      const targetSession = state.sessions.find(s => s.id === action.payload.sessionId);
+      if (targetSession && action.payload.title.trim()) {
+        targetSession.tabTitle = action.payload.title.trim();
+      }
     },
 
     closeTab: (state, action: PayloadAction<string>) => {
@@ -2429,6 +2553,11 @@ export const posSlice = createSlice({
       const currentSession = state.sessions.find(s => s.id === state.activeSessionId);
       if (currentSession) {
         currentSession.patientDetails = action.payload;
+        if (action.payload?.patientName && action.payload.patientName.trim()) {
+          if (/^Customer\s+\d+$/i.test(currentSession.tabTitle) || !currentSession.tabTitle) {
+            currentSession.tabTitle = action.payload.patientName.trim();
+          }
+        }
       }
     },
     toggleDiscreetPackaging: (state, action: PayloadAction<{ sessionId?: string; isDiscreet?: boolean } | undefined>) => {
@@ -2489,22 +2618,36 @@ export const posSlice = createSlice({
       alert.status = 'ADDED_TO_PO';
 
       const qty = action.payload.reorderQty || alert.suggestedReorderQty || 50;
-      let draftPo = state.purchaseOrders.find(p => p.status === 'DRAFT');
-      const supplier = state.suppliers[0] || {
-        supplierId: 'sup-001',
-        name: 'MedLife Distributors Pvt Ltd',
-        gstin: '36AABCM4411D1ZP',
-        phone: '+91 98490 12345'
-      };
+      const prod = state.products.find(p => p._id === alert.productId);
+      const matchedSupplier =
+        state.suppliers.find(s => alert.supplierName && s.name.toLowerCase() === alert.supplierName.toLowerCase()) ||
+        state.suppliers.find(s =>
+          prod && Array.isArray(s.topBrandsSupplied) &&
+          s.topBrandsSupplied.some(b =>
+            prod.brand.toLowerCase().includes(b.toLowerCase()) ||
+            prod.name.toLowerCase().includes(b.toLowerCase()) ||
+            (b.toLowerCase() === 'gsk' && prod.brand.toLowerCase().includes('glaxo'))
+          )
+        ) ||
+        state.suppliers[0] || {
+          supplierId: 'sup-001',
+          name: alert.supplierName || 'MedLife Distributors Pvt Ltd',
+          gstin: '36AABCM4411D1ZP',
+          phone: '+91 98490 12345'
+        };
+
+      let draftPo = state.purchaseOrders.find(
+        p => p.status === 'DRAFT' && p.supplierName.toLowerCase() === matchedSupplier.name.toLowerCase()
+      );
 
       if (!draftPo) {
         draftPo = {
           poId: `po-${Date.now()}`,
           poNumber: `PO-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
-          supplierId: supplier.supplierId,
-          supplierName: supplier.name,
-          supplierGstin: supplier.gstin,
-          supplierPhone: supplier.phone,
+          supplierId: matchedSupplier.supplierId,
+          supplierName: matchedSupplier.name,
+          supplierGstin: matchedSupplier.gstin,
+          supplierPhone: matchedSupplier.phone,
           orderDate: new Date().toISOString().split('T')[0],
           expectedDeliveryDate: new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0],
           paymentTerms: 'CREDIT_15_DAYS',
@@ -2770,6 +2913,10 @@ export const posSlice = createSlice({
       }
     },
 
+    setOfflineBackupModalOpen: (state, action: PayloadAction<boolean>) => {
+      state.offlineBackupModal.isOpen = action.payload;
+    },
+
     setMultiStoreModalOpen: (state, action: PayloadAction<{ isOpen: boolean; selectedProductId?: string; activeTab?: 'BRANCH_STORES' | 'BORROWED_LOG' | 'TRANSFER_REQUEST' }>) => {
       state.multiStoreModal.isOpen = action.payload.isOpen;
       if (action.payload.selectedProductId) {
@@ -2897,6 +3044,70 @@ export const posSlice = createSlice({
         ...action.payload
       };
       state.borrowedMedicines.unshift(newBorrow);
+    },
+
+    settleBorrowedStock: (state, action: PayloadAction<string>) => {
+      const item = state.borrowedMedicines.find(b => b.borrowId === action.payload);
+      if (item) {
+        item.status = 'SETTLED';
+      }
+    },
+
+    borrowAndDispenseToCart: (state, action: PayloadAction<{
+      productId?: string;
+      medicineName: string;
+      saltComposition?: string;
+      sourceName: string;
+      sourceType?: 'NEIGHBOR_PHARMACY' | 'CENTRAL_GODOWN' | 'DISTRIBUTOR';
+      quantity: number;
+      unitPrice: number;
+      purchaseCostRate: number;
+      batchNumber?: string;
+    }>) => {
+      const {
+        productId,
+        medicineName,
+        saltComposition,
+        sourceName,
+        sourceType = 'NEIGHBOR_PHARMACY',
+        quantity = 1,
+        unitPrice,
+        purchaseCostRate,
+        batchNumber
+      } = action.payload;
+
+      const newBorrow: BorrowedMedicineRecord = {
+        borrowId: `bor-${Date.now()}`,
+        borrowDate: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+        medicineName,
+        saltComposition: saltComposition || 'Generic',
+        sourceType,
+        sourceName,
+        quantity,
+        unit: 'Strips',
+        purchaseCostRate,
+        newDisplayPrice: unitPrice,
+        status: 'PENDING_REPAYMENT',
+        notes: `Inter-store borrow from ${sourceName} for patient dispensing.`
+      };
+      state.borrowedMedicines.unshift(newBorrow);
+
+      let targetProduct = productId ? state.products.find(p => p._id === productId) : null;
+      if (!targetProduct) {
+        targetProduct = state.products.find(p => p.name.toLowerCase() === medicineName.toLowerCase()) || null;
+      }
+
+      if (targetProduct) {
+        const mockBatch: BatchInfo = {
+          batchNumber: batchNumber || `BORROW-${targetProduct.name.slice(0, 3).toUpperCase()}`,
+          expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+          stockQuantity: quantity + 5,
+          location: `Borrowed: ${sourceName}`,
+          mrp: targetProduct.unitMRP || unitPrice,
+          purchaseRate: purchaseCostRate,
+        };
+        addProductToCartInternal(state, targetProduct, mockBatch, quantity, 0, false, undefined, 'PACK');
+      }
     },
 
     attachPrescriptionToSession: (state, action: PayloadAction<{ sessionId?: string; prescriptionUrl: string; prescriptionName?: string }>) => {
@@ -3309,6 +3520,33 @@ export const posSlice = createSlice({
         ...action.payload
       };
       state.substituteEvents.unshift(newEvent);
+    },
+
+    // Day 3: Drug Inspection 4-Tab Popup
+    openMedicineInspectionModal: (
+      state,
+      action: PayloadAction<{ product: Product; initialTab?: 'PRICING' | 'BATCH_SHELF' | 'SUBSTITUTES' | 'WARNINGS' }>
+    ) => {
+      state.medicineInspectionModal = {
+        isOpen: true,
+        product: action.payload.product,
+        activeTab: action.payload.initialTab || 'PRICING'
+      };
+    },
+    closeMedicineInspectionModal: (state) => {
+      state.medicineInspectionModal = {
+        isOpen: false,
+        product: undefined,
+        activeTab: 'PRICING'
+      };
+    },
+    setMedicineInspectionTab: (
+      state,
+      action: PayloadAction<'PRICING' | 'BATCH_SHELF' | 'SUBSTITUTES' | 'WARNINGS'>
+    ) => {
+      if (state.medicineInspectionModal) {
+        state.medicineInspectionModal.activeTab = action.payload;
+      }
     }
   }
 });
@@ -3327,6 +3565,7 @@ export const {
   markStockDisposed,
   addPatient,
   setPatients,
+  updatePatientRecord,
   addSupplier,
   setSuppliers,
   updateSupplier,
@@ -3336,6 +3575,7 @@ export const {
   addNewTab,
   switchTab,
   closeTab,
+  updateTabTitle,
   openAssignBillModal,
   closeAssignBillModal,
   dismissTransferNotification,
@@ -3369,6 +3609,7 @@ export const {
   setPrescriptionUploadModalOpen,
   setChronicRefillModalOpen,
   setWellnessBrochureModalOpen,
+  setOfflineBackupModalOpen,
   setMultiStoreModalOpen,
   setInterStoreChatbotModalOpen,
   setVoiceConsultationModalOpen,
@@ -3378,6 +3619,8 @@ export const {
   deleteConsultationRecord,
   sendInterStoreChatMessage,
   recordBorrowedStock,
+  settleBorrowedStock,
+  borrowAndDispenseToCart,
   attachPrescriptionToSession,
   removePrescriptionFromSession,
   refillChronicMedicationsToCart,
@@ -3410,6 +3653,9 @@ export const {
   addSupplierBill,
   setPurchaseOrders,
   createPurchaseOrder,
+  createMultiplePurchaseOrders,
+  startGrnFromPurchaseOrder,
+  clearPendingGrnFromPo,
   updatePurchaseOrderStatus,
   deletePurchaseOrder,
   toggleDiscreetPackaging,
@@ -3431,7 +3677,10 @@ export const {
   unlinkValueAddedServiceFromSession,
   setRackRoboModalOpen,
   recordSubstituteEvent,
-  setAllProducts
+  setAllProducts,
+  openMedicineInspectionModal,
+  closeMedicineInspectionModal,
+  setMedicineInspectionTab
 } = posSlice.actions;
 
 export default posSlice.reducer;

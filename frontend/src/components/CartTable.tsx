@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import {
@@ -21,7 +21,8 @@ import {
   addReorderPushAlert,
   convertReorderAlertToPO,
   triggerLowStockIntimation,
-  dismissReorderToast
+  dismissReorderToast,
+  openMedicineInspectionModal
 } from '../store/posSlice';
 import { analyzeDrugInteractions } from '../utils/drugInteractionEngine';
 import { getMedicineDetails } from '../utils/medicineDetails';
@@ -39,7 +40,7 @@ import {
   Stethoscope, Edit2, Percent, FileText, RefreshCcw, Pill, Mic, Volume2, Zap,
   PackageOpen, BadgeAlert, Tag, Gift, Sparkles, CheckCircle2, X, Check,
   Star, ArrowRightLeft, BellRing, MapPin, TrendingUp, ChevronDown, ChevronUp,
-  Lightbulb, Flame, Coins, ShieldCheck
+  Lightbulb, Flame, Coins, ShieldCheck, Info, ChevronLeft, ChevronRight
 } from 'lucide-react';
 
 export const CartTable: React.FC = () => {
@@ -65,6 +66,16 @@ export const CartTable: React.FC = () => {
   const [cartConvinceProduct, setCartConvinceProduct] = useState<{ alternative: Product; originalName: string } | null>(null);
   const [isBundleModalOpen, setIsBundleModalOpen] = useState<boolean>(false);
   const [selectedBundleId, setSelectedBundleId] = useState<string | undefined>(undefined);
+  const shelfScrollRef = useRef<HTMLDivElement>(null);
+
+  const scrollShelf = (direction: 'left' | 'right') => {
+    if (shelfScrollRef.current) {
+      shelfScrollRef.current.scrollBy({
+        left: direction === 'left' ? -220 : 220,
+        behavior: 'smooth'
+      });
+    }
+  };
 
   const interactionResult = analyzeDrugInteractions(items);
   const marginAnalysis = analyzeMarginMaximizer(items);
@@ -160,10 +171,10 @@ export const CartTable: React.FC = () => {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-2xs p-3.5 flex flex-col h-full overflow-hidden">
+    <div className="bg-white rounded-xl border border-slate-200 shadow-2xs flex flex-col h-full min-h-0 overflow-hidden">
 
-      {/* ── TOP BANNER: PATIENT & DOCTOR DETAILS + RX TAG ─────────────── */}
-      <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 mb-2.5 flex items-center justify-between flex-shrink-0 flex-wrap gap-y-1.5">
+      {/* ── TOP BANNER: PATIENT & DOCTOR DETAILS + RX TAG (PINNED) ─────── */}
+      <div className="bg-slate-50 border-b border-slate-200 p-2.5 flex items-center justify-between shrink-0 flex-wrap gap-y-1.5">
         <div className="flex items-center space-x-3 text-xs flex-wrap gap-y-1">
           {/* Patient */}
           <div className="flex items-center space-x-1.5 text-slate-700">
@@ -239,6 +250,9 @@ export const CartTable: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* ── SCROLLABLE BODY: ACTIVE CART, TABLE, AND MARGIN MAXIMIZER ── */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-3 pb-24 space-y-2.5 scrollbar-thin scrollbar-thumb-slate-400 hover:scrollbar-thumb-slate-500">
 
       {/* ── CART HEADER CONTROL BAR (Bulk Discount & Clear) ─────────── */}
       <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 flex-shrink-0">
@@ -492,14 +506,14 @@ export const CartTable: React.FC = () => {
       )}
 
       {/* ── INTERACTIVE CART ITEMS TABLE ────────────────────────────── */}
-      <div className="flex-1 overflow-auto">
+      <div className="w-full">
         {items.length === 0 ? (
-          <div className="text-center py-16 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-2 text-slate-400">
+          <div className="text-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-1.5 text-slate-400">
               🛒
             </div>
             <p className="text-xs font-bold text-slate-600 font-heading">Cart is Empty</p>
-            <p className="text-[11px] text-slate-400 mt-1">
+            <p className="text-[11px] text-slate-400 mt-0.5">
               Scan a barcode (F2) or search medicines in the left panel to start billing
             </p>
           </div>
@@ -533,8 +547,18 @@ export const CartTable: React.FC = () => {
 
                     {/* Item Name & Salt */}
                     <td className="py-2.5 px-2" style={{ maxWidth: '140px' }}>
-                      <div className="font-bold text-slate-900 text-[11px] leading-tight truncate">
-                        {item.product.name}
+                      <div className="flex items-center justify-between gap-1">
+                        <div className="font-bold text-slate-900 text-[11px] leading-tight truncate">
+                          {item.product.name}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => dispatch(openMedicineInspectionModal({ product: item.product }))}
+                          className="text-emerald-700 hover:text-emerald-950 hover:bg-emerald-50 p-0.5 rounded transition-colors cursor-pointer shrink-0"
+                          title="Inspect Drug Details (Pricing, Batches, Generics, Warnings)"
+                        >
+                          <Info className="w-3 h-3" />
+                        </button>
                       </div>
                       <div className="text-[10px] text-slate-500 truncate">{item.product.saltComposition}</div>
                       
@@ -1068,29 +1092,55 @@ export const CartTable: React.FC = () => {
               </span>
             </div>
 
-            {/* Collapse / Expand Toggle */}
-            <button
-              onClick={() => setIsMarginMaximizerOpen(!isMarginMaximizerOpen)}
-              className="flex items-center space-x-1 text-xs font-bold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-xl transition-all cursor-pointer shadow-2xs"
-              title={isMarginMaximizerOpen ? 'Collapse Shelf' : 'Expand Shelf'}
-            >
-              <span>{isMarginMaximizerOpen ? 'Hide Shelf' : `Show Shelf (${marginAnalysis.recommendations.length})`}</span>
-              {isMarginMaximizerOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-            </button>
+            {/* Scroll Left/Right arrows & Collapse/Expand Toggle */}
+            <div className="flex items-center space-x-1.5">
+              {isMarginMaximizerOpen && marginAnalysis.recommendations.length > 1 && (
+                <div className="flex items-center space-x-1 mr-1">
+                  <button
+                    type="button"
+                    onClick={() => scrollShelf('left')}
+                    className="w-6 h-6 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 shadow-2xs cursor-pointer transition-colors"
+                    title="Previous companion recommendations"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => scrollShelf('right')}
+                    className="w-6 h-6 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 shadow-2xs cursor-pointer transition-colors"
+                    title="Next companion recommendations"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
+              <button
+                onClick={() => setIsMarginMaximizerOpen(!isMarginMaximizerOpen)}
+                className="flex items-center space-x-1 text-xs font-bold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-xl transition-all cursor-pointer shadow-2xs"
+                title={isMarginMaximizerOpen ? 'Collapse Shelf' : 'Expand Shelf'}
+              >
+                <span>{isMarginMaximizerOpen ? 'Hide Shelf' : `Show Shelf (${marginAnalysis.recommendations.length})`}</span>
+                {isMarginMaximizerOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Horizontal Companion Shelf (Expanded) */}
         {isMarginMaximizerOpen ? (
           <div className="pt-1">
-            <div className="flex space-x-2.5 overflow-x-auto pt-3.5 pb-2 px-1 scrollbar-thin">
+            <div
+              ref={shelfScrollRef}
+              className="flex space-x-2.5 overflow-x-auto pt-2.5 pb-2 px-0.5 scrollbar-thin scroll-smooth"
+            >
               {marginAnalysis.recommendations.map((comp) => {
                 const isJustAdded = addedCompanionId === comp.id;
 
                 return (
                   <div
                     key={comp.id}
-                    className={`w-[220px] flex-shrink-0 bg-white/95 rounded-xl border p-2.5 flex flex-col justify-between shadow-2xs hover:shadow-md transition-all relative ${
+                    className={`w-[210px] flex-shrink-0 bg-white rounded-xl border p-2 flex flex-col justify-between shadow-2xs hover:shadow-md transition-all relative ${
                       comp.isTopPick
                         ? 'border-emerald-400 ring-2 ring-emerald-400/20'
                         : 'border-slate-200 hover:border-emerald-300'
@@ -1098,62 +1148,57 @@ export const CartTable: React.FC = () => {
                   >
                     {/* Top Affinity Badge */}
                     {comp.isTopPick && (
-                      <div className="absolute -top-2.5 left-2.5 z-10 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[8.5px] font-black px-2.5 py-0.5 rounded-full shadow-xs uppercase tracking-wider flex items-center space-x-1 ring-1.5 ring-white">
+                      <div className="absolute -top-2 left-2 z-10 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[8px] font-black px-1.5 py-0.2 rounded-full shadow-xs uppercase tracking-wider flex items-center space-x-1 ring-1 ring-white">
                         <Sparkles className="w-2.5 h-2.5 text-amber-300" />
                         <span>Clinical Match</span>
                       </div>
                     )}
 
                     <div>
-                      {/* Emoji + Category + Margin Tag */}
-                      <div className="flex items-start justify-between mt-1">
-                        <div className="text-xl leading-none">{comp.iconEmoji}</div>
-                        <span className="bg-emerald-50 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-md border border-emerald-300">
+                      {/* Emoji + Brand + Margin Tag */}
+                      <div className="flex items-center justify-between text-xs mt-0.5">
+                        <div className="flex items-center space-x-1.5 truncate mr-1">
+                          <span className="text-base leading-none">{comp.iconEmoji}</span>
+                          <span className="text-[9.5px] font-bold text-slate-500 truncate" title={comp.brand}>
+                            {comp.brand}
+                          </span>
+                        </div>
+                        <span className="bg-emerald-50 text-emerald-800 text-[9px] font-black px-1.5 py-0.5 rounded border border-emerald-200 shrink-0">
                           {comp.badgeText}
                         </span>
                       </div>
 
                       {/* Product Name & Pack Size */}
-                      <h4 className="text-[11px] font-extrabold text-slate-900 mt-1.5 line-clamp-2 leading-tight min-h-[28px]" title={comp.name}>
+                      <h4 className="text-[11px] font-extrabold text-slate-900 mt-1 line-clamp-1 leading-tight" title={comp.name}>
                         {comp.name}
                       </h4>
-                      <p className="text-[9.5px] text-slate-500 font-medium mt-0.5">
-                        {comp.packSize} • {comp.brand}
+                      <p className="text-[9px] text-slate-500 font-medium truncate">
+                        {comp.packSize}
                       </p>
 
                       {/* Selling Price & Profit Contribution */}
-                      <div className="mt-2 bg-emerald-50/70 border border-emerald-200/80 rounded-lg p-1.5 flex items-center justify-between">
+                      <div className="mt-1 bg-emerald-50/70 border border-emerald-200/80 rounded-lg px-2 py-1 flex items-center justify-between">
                         <div>
-                          <div className="text-[9px] text-slate-500 line-through">MRP ₹{comp.mrp.toFixed(2)}</div>
-                          <div className="text-xs font-black text-slate-900">₹{comp.sellingPrice.toFixed(2)}</div>
+                          <span className="text-xs font-black text-slate-900">₹{comp.sellingPrice.toFixed(0)}</span>
+                          <span className="text-[9px] text-slate-400 line-through ml-1.5">₹{comp.mrp.toFixed(0)}</span>
                         </div>
-                        <div className="text-right">
-                          <div className="text-[9px] font-bold text-emerald-700">
-                            +₹{comp.netProfitAmount.toFixed(2)} Profit
-                          </div>
-                          <div className="text-[8.5px] font-extrabold text-amber-700">
-                            +{comp.projectedProfitBumpPercent}% bump
-                          </div>
+                        <div className="text-right text-[9px] font-extrabold text-emerald-700">
+                          +₹{comp.netProfitAmount.toFixed(0)} ({comp.projectedProfitBumpPercent}%)
                         </div>
                       </div>
 
-                      {/* Clinical Reason & Talking Point */}
-                      <div className="mt-1.5 text-[9.5px] text-slate-600 bg-slate-50 border border-slate-200/60 rounded-md p-1 leading-snug">
-                        <p className="font-semibold text-slate-800 truncate" title={comp.clinicalReason}>
-                          💡 {comp.clinicalReason}
-                        </p>
-                        <p className="text-[8.5px] text-slate-500 italic truncate mt-0.5" title={comp.verbalScript}>
-                          🗣️ &quot;{comp.verbalScript}&quot;
-                        </p>
-                      </div>
+                      {/* Clinical Reason (Single Line) */}
+                      <p className="mt-1 text-[9px] text-slate-600 truncate bg-slate-50 rounded px-1.5 py-0.5 border border-slate-100" title={comp.clinicalReason}>
+                        💡 {comp.clinicalReason}
+                      </p>
                     </div>
 
                     {/* 1-Click Instant Add Action */}
-                    <div className="mt-2.5">
+                    <div className="mt-1.5">
                       <button
                         onClick={() => handleAddCompanion(comp)}
                         disabled={isJustAdded}
-                        className={`w-full py-1.5 px-2 rounded-lg text-[10.5px] font-black transition-all cursor-pointer flex items-center justify-center space-x-1 shadow-xs active:scale-97 ${
+                        className={`w-full py-1.5 px-2 rounded-lg text-[10px] font-black transition-all cursor-pointer flex items-center justify-center space-x-1 shadow-xs active:scale-97 ${
                           isJustAdded
                             ? 'bg-emerald-600 text-white'
                             : 'bg-slate-900 hover:bg-emerald-700 text-white'
@@ -1162,13 +1207,13 @@ export const CartTable: React.FC = () => {
                       >
                         {isJustAdded ? (
                           <>
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-200 animate-pulse" />
+                            <CheckCircle2 className="w-3 h-3 text-emerald-200 animate-pulse" />
                             <span>Added to Cart!</span>
                           </>
                         ) : (
                           <>
                             <Plus className="w-3 h-3 text-amber-300" />
-                            <span>+ Add Companion (₹{comp.sellingPrice})</span>
+                            <span>+ Add Companion (₹{comp.sellingPrice.toFixed(0)})</span>
                           </>
                         )}
                       </button>
@@ -1212,6 +1257,9 @@ export const CartTable: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Bottom scroll clearance buffer so content never gets cut off */}
+      <div className="h-16 flex-shrink-0" aria-hidden="true" />
+      </div>
 
       {/* ── 🗣️ TASK #46: CONVINCE CUSTOMER FLOATING OVERLAY IN CART ─────── */}
       {isCartConvinceOpen && cartConvinceProduct && (

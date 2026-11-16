@@ -497,7 +497,7 @@ export const EmergencyDeliveryPage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-slate-100 min-h-screen p-4 space-y-4 font-sans">
+    <div className="flex-1 overflow-y-auto bg-slate-100 p-4 space-y-4 font-sans">
 
       {/* ── Top Emergency Header Banner (Clean Light-Accented) ── */}
       <div className="bg-white rounded-2xl border border-red-200 shadow-sm p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 bg-gradient-to-r from-red-50/60 via-white to-rose-50/60">

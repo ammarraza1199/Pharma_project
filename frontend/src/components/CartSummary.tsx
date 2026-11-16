@@ -148,10 +148,10 @@ export const CartSummary: React.FC = () => {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-2xs p-4 flex flex-col justify-between h-full">
-      {/* Financial Summary Breakdown */}
-      <div>
-        <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100 font-heading flex items-center justify-between">
+    <div className="bg-white rounded-xl border border-slate-200 shadow-2xs flex flex-col h-full min-h-0 overflow-hidden">
+      {/* ── 1. Scrollable Upper Area (With Visible Scroller) ── */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-3.5 space-y-3 scrollbar-thin scrollbar-thumb-slate-400 hover:scrollbar-thumb-slate-500">
+        <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider pb-1 border-b border-slate-100 font-heading flex items-center justify-between">
           <span>Billing Summary</span>
           <span className="text-emerald-800 font-extrabold text-[11px] font-mono">
             {totalPacksCount > 0 && `${totalPacksCount} Packs`}
@@ -658,8 +658,8 @@ export const CartSummary: React.FC = () => {
         </div>
       </div>
 
-      {/* Compliance Indicator & Finalize Checkout Trigger */}
-      <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
+      {/* ── 2. Pinned Bottom Bar: Compliance & Checkout Button (Always Visible!) ── */}
+      <div className="shrink-0 p-3 pt-2.5 border-t border-slate-200 bg-slate-50/70 space-y-2">
         {isScheduleHMissingDoctor && (
           <div className="bg-amber-50 border border-amber-300 rounded-lg p-2 flex items-center space-x-2 text-[11px] text-amber-900">
             <ShieldAlert className="w-4 h-4 text-amber-600 flex-shrink-0" />
